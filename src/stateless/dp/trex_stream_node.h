@@ -42,6 +42,9 @@ public:
 
     uint8_t             m_pad_end[104];
 
+    uint64_t            m_pad3[8];
+
+
 public:
     void free_command();
 
@@ -135,6 +138,7 @@ private:
     /* pad to match the size of CGenNode */
     uint8_t             m_pad_end[20];
 
+    uint64_t            m_pad3[8];
 
 public:
 
@@ -617,6 +621,9 @@ private:
 
     /* pad to match the size of CGenNode */
     uint8_t             m_pad_end[33];
+
+    uint64_t            m_pad3[8];
+
 
 } __rte_cache_aligned;
 

@@ -60,6 +60,7 @@ limitations under the License.
 #include "flow_stat.h"
 #include "trex_watchdog.h"
 #include "trex_client_config.h"
+#include "stw_timer.h"
 
 #include <trex_stateless_dp_core.h>
 
@@ -1437,10 +1438,11 @@ class CCapFileFlowInfo ;
 
 #define SYNC_TIME_OUT ( 1.0/1000)
 
-//#define SYNC_TIME_OUT ( 2000.0/1000)
 
 /* this is a simple struct, do not add constructor and destractor here!
    we are optimizing the allocation dealocation !!!
+   16 bytes size
+   
  */
 
 struct CGenNodeBase  {
@@ -1548,9 +1550,14 @@ public:
 
     void *              m_plugin_info;
 
-//private:
-
     CTupleGeneratorSmart *m_tuple_gen;
+
+/* cache line -2 */
+    CTimerObj            m_tmr;
+    uint64_t             m_tmr_pad[4];
+
+/* cache line -3 */
+
     // cache line 1 - 64bytes waste of space !
     uint32_t            m_nat_external_ipv4; /* client */
     uint32_t            m_nat_external_ipv4_server;
@@ -1771,6 +1778,8 @@ struct CGenNodeDeferPort  {
     uint32_t            m_clients[DEFER_CLIENTS_NUM];
     uint16_t            m_ports[DEFER_CLIENTS_NUM];
     uint8_t             m_pool_idx[DEFER_CLIENTS_NUM];
+
+    uint64_t            m_pad4[8];
 public:
     void init(void){
         m_type=CGenNode::FLOW_DEFER_PORT_RELEASE;
@@ -3630,6 +3639,10 @@ private:
     bool           server_seq_init;  /* TCP seq been init for server? */
 };
 
+#define BUCKET_TIME_USEC 20
+#define TW_BUCKETS       250
+#define TW_BUCKETS_MAX_TIME       (BUCKET_TIME_USEC *TW_BUCKETS)
+
 
 /////////////////////////////////////////////////////////////////////////////////
 /* per thread info  */
@@ -3795,6 +3808,8 @@ public:
 
 public:
     CNodeGenerator                   m_node_gen;
+    CTimerWheelBucket                m_tw;
+
 public:
     uint32_t                         m_cur_template;
     uint32_t                         m_non_active_nodes; /* the number of non active nodes -> nodes that try to stop somthing */

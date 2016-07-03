@@ -3310,8 +3310,6 @@ bool CFlowGenListPerThread::Create(uint32_t           thread_id,
     char name[100];
     sprintf(name,"nodes-%d",m_core_id);
 
-    //printf(" create thread %d %s socket: %d \n",m_core_id,name,socket_id);
-
     m_node_pool = utl_rte_mempool_create_non_pkt(name,
                                                  CGlobalInfo::m_memory_cfg.get_each_core_dp_flows(),
                                                  sizeof(CGenNode),
@@ -3319,7 +3317,8 @@ bool CFlowGenListPerThread::Create(uint32_t           thread_id,
                                                  0 ,
                                                  socket_id);
 
-    //printf(" pool %p \n",m_node_pool);
+
+    m_tw.Create(TW_BUCKETS);
 
     m_node_gen.Create(this);
     m_flow_id_to_node_lookup.Create();
@@ -3519,6 +3518,7 @@ void CFlowGenListPerThread::Delete(){
     m_node_gen.Delete();
     Clean();
     m_cpu_cp_u.Delete();
+    m_tw.Delete();
 
     utl_rte_mempool_delete(m_node_pool);
 }

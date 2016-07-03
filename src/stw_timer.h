@@ -98,7 +98,8 @@ public:
     CTimerWheelLink  m_links;
     uint32_t         m_rotation_count;
     uint32_t         m_last_update_tick; /* cur timer tick the timer was set/restart */
-    uint32_t         m_aging_ticks;  /* how log the aging in ticks, the first that it was set */
+    uint32_t         m_aging_ticks;      /* aging time in ticks */
+    uint32_t         m_pad;
 } ;
 
 
