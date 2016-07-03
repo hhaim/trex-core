@@ -2886,4 +2886,79 @@ TEST_F(gt_conf, t1) {
 
 #endif
 
+#include "stw_timer.h"
 
+
+class gt_stw_timer  : public testing::Test {
+
+protected:
+  virtual void SetUp() {
+  }
+
+  virtual void TearDown() {
+  }
+public:
+};
+
+void tw_on_tick_cb_test1(void *userdata,
+                         CTimerObj *tmr){
+    int tick=(int)((uintptr_t)userdata);
+
+    printf(" action %lu \n",(ulong)tick);
+}
+
+
+TEST_F(gt_stw_timer, timer1) {
+    CTimerWheelBucket tw;
+
+    CTimerObj  tmr1;
+    tmr1.reset();
+
+    tw.Create(100);
+    tw.timer_start(&tmr1,2);
+    int i;
+    for (i=0; i<10; i++) {
+        printf(" tick %lu \n",(ulong)i);
+        tw.do_tick((void*)((uintptr_t)i),tw_on_tick_cb_test1);
+    }
+    tw.timer_stats_dump(stdout);
+    tw.Delete();
+}
+
+
+class CMyTimerObject {
+public:
+    CTimerObj  m_tmr;
+    int        cnt;
+};
+
+void tw_on_tick_cb_test2(void *userdata,
+                         CTimerObj *tmr){
+
+    CTimerWheelBucket * lp_tw=(CTimerWheelBucket *)userdata;
+    
+    CMyTimerObject * obj=(CMyTimerObject *)(tmr-offsetof (CMyTimerObject,m_tmr));
+    printf(" action %lu \n",(ulong)obj->cnt);
+    if (obj->cnt) {
+        obj->cnt-=1;
+        lp_tw->timer_start(tmr,0);
+    }
+}
+
+
+TEST_F(gt_stw_timer, timer2) {
+    CTimerWheelBucket tw;
+
+    CMyTimerObject obj;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,2);
+    int i;
+    for (i=0; i<10; i++) {
+        printf(" tick %lu \n",(ulong)i);
+        tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    tw.Delete();
+}
