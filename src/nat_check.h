@@ -150,6 +150,7 @@ struct CGenNodeNatInfo : public CGenNodeMsgBase {
     uint32_t      m_pad3;
  #endif
     CNatFlowInfo  m_data[MAX_NAT_FLOW_INFO];
+    uint64_t      m_pad4[8];
 
 public:
       CNatFlowInfo * get_next_msg() {
@@ -166,6 +167,7 @@ public:
       void dump(FILE *fd);
 };
 
+
 struct CGenNodeLatencyPktInfo : public CGenNodeMsgBase {
     uint8_t       m_dir;
     uint16_t      m_latency_offset;
@@ -175,7 +177,10 @@ struct CGenNodeLatencyPktInfo : public CGenNodeMsgBase {
     struct rte_mbuf *   m_pkt;
 
     uint32_t      m_pad4[MAX_PKT_MSG_INFO];
+    uint64_t      m_pad5[8];
 };
+
+
 
 
 /* per thread ring info for NAT messages 

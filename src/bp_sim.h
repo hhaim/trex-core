@@ -1454,13 +1454,15 @@ public:
         FLOW_DEFER_PORT_RELEASE =2,
         FLOW_PKT_NAT            =3,
         FLOW_SYNC               =4,     /* called evey 1 msec */
-        STATELESS_PKT           =5,
-        EXIT_SCHED              =6,
-        COMMAND                 =7,
+        TW_SYNC                 =5,     /* called evey 20usec */
 
-        EXIT_PORT_SCHED         =8,
+        STATELESS_PKT           =6,
+        EXIT_SCHED              =7,
+        COMMAND                 =8,
 
-        PCAP_PKT                =9,
+        EXIT_PORT_SCHED         =9,
+
+        PCAP_PKT                =10,
 
 
     };
@@ -1531,6 +1533,9 @@ public:
 
     void free_base();
 };
+
+
+
 
 
 struct CGenNode : public CGenNodeBase  {
@@ -1754,6 +1759,7 @@ public:
     inline void replace_tuple(void);
 
 } __rte_cache_aligned;
+
 
 
 
@@ -2088,11 +2094,12 @@ public:
     void dump_json(std::string & json);
 
 
-private:
     inline int   flush_one_node_to_file(CGenNode * node){
         return (m_v_if->send_node(node));
     }
     int   update_stats(CGenNode * node);
+
+private:
     int   update_stl_stats(CGenNodeStateless *node_sl);
     bool  has_limit_reached();
 
@@ -3682,6 +3689,9 @@ public:
         m_monitor.tickle();
     }
 
+    void on_flow_tick(CGenNode *node,bool always);
+
+
     /* return the dual port ID this thread is attached to in 4 ports configuration
        there are 2 dual-ports
 
@@ -3922,6 +3932,9 @@ inline void CCapFileFlowInfo::generate_flow(CTupleTemplateGeneratorSmart   * tup
     CTupleBase  tuple;
     tuple_gen->GenerateTuple(tuple);
 
+    CFlowGenListPerThread  * lpThread=gen->Parent();
+
+
     /* add the first packet of the flow */
     CFlowPktInfo *  lp=GetPacket((uint32_t)0);
 
@@ -3950,7 +3963,6 @@ inline void CCapFileFlowInfo::generate_flow(CTupleTemplateGeneratorSmart   * tup
         // check if flow is two direction
         if ( lp->m_pkt_indication.m_desc.IsBiDirectionalFlow() ) {
             /* we are in learn mode */
-            CFlowGenListPerThread  * lpThread=gen->Parent();
             lpThread->associate(((uint32_t)flow_id) & NAT_FLOW_ID_MASK, node);  /* associate flow_id=>node */
             node->set_nat_first_state();
         }
@@ -3987,7 +3999,14 @@ inline void CCapFileFlowInfo::generate_flow(CTupleTemplateGeneratorSmart   * tup
         on_node_first(template_info->m_plugin_id,node,template_info,tuple_gen,gen->Parent() );
     }
 
-    gen->add_node(node);
+    node->m_tmr.reset();
+    //printf(" add to TW %lu \n",flow_id);
+
+    lpThread->m_tw.timer_start(&node->m_tmr,0);   /* next tick*/
+
+    /* schedule the objects throw timer wheel */
+    /* TBD-TIMER*/
+    //gen->add_node(node);
 }
 
 

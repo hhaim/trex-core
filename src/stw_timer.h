@@ -225,8 +225,7 @@ public:
 
         void do_tick(void *userdata,tw_on_tick_cb_t cb);
 
-        inline CTimerObj *  timer_tick_get_next ()
-        {
+        inline CTimerObj *  timer_tick_get_next(void) {
             CTimerWheelLink  *bucket, *next, *prev;
             CTimerObj *tmr;
         #ifdef TW_DEBUG 
@@ -298,7 +297,11 @@ private:
             uint32_t td;
         
             td = (ticks % m_wheel_size);
-            tmr->m_rotation_count = (ticks / m_wheel_size);
+            if (ticks > m_wheel_size) {
+                tmr->m_rotation_count = (ticks / m_wheel_size);
+            }else{
+                tmr->m_rotation_count=0;
+            }
             cursor = ((m_bucket_index + td) % m_wheel_size);
             spoke = &m_buckets[cursor];
             prev = spoke->stw_prev;

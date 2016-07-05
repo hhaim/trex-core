@@ -15,14 +15,15 @@ hhaim
 void CTimerWheelBucket::do_tick(void *userdata,tw_on_tick_cb_t cb){
 
     CTimerObj * tmr;
+    int cnt=0;
     while (  true ) {
         tmr = timer_tick_get_next();
         if (!tmr) {
             break;
         }
         cb(userdata,tmr);
+        cnt++;
     }
-    /* inc the tick */
     timer_tick();
 }
 
