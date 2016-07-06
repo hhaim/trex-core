@@ -2147,8 +2147,9 @@ void CCoreEthIF::add_vlan(rte_mbuf_t *m, uint16_t vlan_id) {
 }
 
 int CCoreEthIF::send_node(CGenNode * node) {
-     
 
+
+#if 0
     if ( unlikely( node->get_cache_mbuf() !=NULL ) ) {
         pkt_dir_t       dir;
         rte_mbuf_t *    m=node->get_cache_mbuf();
@@ -2159,17 +2160,18 @@ int CCoreEthIF::send_node(CGenNode * node) {
         send_pkt(lp_port,m,lp_stats);
         return (0);
     }
-
+#endif
 
     CFlowPktInfo *  lp=node->m_pkt_info;
     rte_mbuf_t *    m=lp->generate_new_mbuf(node);
 
     pkt_dir_t       dir;
-    bool            single_port;
+    //bool            single_port;
 
     dir         = node->cur_interface_dir();
-    single_port = node->get_is_all_flow_from_same_dir() ;
+    //single_port = node->get_is_all_flow_from_same_dir() ;
 
+#if 0
     if ( unlikely( CGlobalInfo::m_options.preview.get_vlan_mode_enable() ) ){
         /* which vlan to choose 0 or 1*/
         uint8_t vlan_port = (node->m_src_ip &1);
@@ -2185,6 +2187,7 @@ int CCoreEthIF::send_node(CGenNode * node) {
 
         add_vlan(m, vlan_id);
     }
+#endif
 
     CCorePerPort *lp_port = &m_ports[dir];
     CVirtualIFPerSideStats *lp_stats = &m_stats[dir];
@@ -2199,6 +2202,8 @@ int CCoreEthIF::send_node(CGenNode * node) {
     uint8_t p_id = lp_port->m_port->get_port_id();
     
     memcpy(p,CGlobalInfo::m_options.get_dst_src_mac_addr(p_id),12);
+
+    #if 0
 
     if ( unlikely( CGlobalInfo::m_options.preview.get_mac_ip_overide_enable() ) ) {
         /* client side */
@@ -2233,6 +2238,7 @@ int CCoreEthIF::send_node(CGenNode * node) {
 
     /*printf("send packet -- \n");
       rte_pktmbuf_dump(stdout,m, rte_pktmbuf_pkt_len(m));*/
+#endif
 
     /* send the packet */
     send_pkt(lp_port,m,lp_stats);

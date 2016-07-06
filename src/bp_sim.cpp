@@ -3649,11 +3649,11 @@ void CFlowGenListPerThread::on_flow_tick(CGenNode *node,bool always){
             free_last_flow_node( node);
         //}
     }else{
-        //double save_t =node->m_time;
+        double save_t =node->m_time;
         node->update_next_pkt_in_flow();
-        //uint32_t ticks = (uint32_t)((node->m_time - save_t)*(1.0/((double)BUCKET_TIME_USEC/1000000.0)));
+        uint32_t ticks = (uint32_t)((node->m_time - save_t)*(1.0/((double)BUCKET_TIME_USEC/1000000.0)));
         //printf(" tick %lu \n",(ulong)ticks);
-        m_tw.timer_start(&node->m_tmr,200); /* add to time-wheel */
+        m_tw.timer_start(&node->m_tmr,ticks); /* add to time-wheel */
     }
 }
 
@@ -3681,7 +3681,7 @@ inline bool CNodeGenerator::do_work_both(CGenNode * node,
             }else{
                 thread->m_tw.do_tick((void*)thread,tw_on_tick_per_thread_cb);
             }
-            node->m_time += (1000.0/1000000.0);
+            node->m_time += (20.0/1000000.0);
             m_p_queue.push(node);
         }else{
             if ( likely( type == CGenNode::FLOW_PKT ) ) {

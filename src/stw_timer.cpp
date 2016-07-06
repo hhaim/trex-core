@@ -12,8 +12,50 @@ hhaim
 */
 
 
-void CTimerWheelBucket::do_tick(void *userdata,tw_on_tick_cb_t cb){
+void CTimerObj::Dump(FILE *fd){
 
+    fprintf(fd,"m_rotation_count        :%lu \n", (ulong)m_rotation_count);
+    fprintf(fd,"m_last_update_tick      :%lu \n", (ulong)m_last_update_tick);
+    fprintf(fd,"m_aging_ticks           :%lu \n", (ulong)m_aging_ticks);
+}
+
+
+void  CTimerWheelBucket::dump_link_list(void *userdata,tw_on_tick_cb_t cb,FILE *fd){
+
+
+    CTimerWheelLink  *bucket, *next;
+    CTimerObj *tmr;
+
+
+    bucket = m_active_bucket;
+
+    tmr = (CTimerObj *)bucket->stw_next;
+    bool found=false;
+    if ((CTimerWheelLink *)tmr != bucket) {
+        fprintf(fd,"[%lu,\n",(ulong)m_bucket_index);
+        found=true;
+    }
+
+    while( (CTimerWheelLink *)tmr != bucket) {
+
+        next = (CTimerWheelLink *)tmr->m_links.stw_next;
+
+        tmr->Dump(fd);
+        cb(userdata,tmr);
+
+        tmr = (CTimerObj *)next;
+    }
+    if (found){
+        fprintf(fd,"]\n");
+    }
+}
+
+
+bool CTimerWheelBucket::do_tick(void *userdata,
+                                tw_on_tick_cb_t cb,
+                                int32_t limit){
+
+    
     CTimerObj * tmr;
     int cnt=0;
     while (  true ) {
@@ -23,8 +65,12 @@ void CTimerWheelBucket::do_tick(void *userdata,tw_on_tick_cb_t cb){
         }
         cb(userdata,tmr);
         cnt++;
+        if (cnt>limit && (limit>0)) {
+            return(false);
+        }
     }
     timer_tick();
+    return(true);
 }
 
 

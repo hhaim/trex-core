@@ -2928,9 +2928,13 @@ TEST_F(gt_stw_timer, timer1) {
 
 class CMyTimerObject {
 public:
+    int        id;
     int        cnt;
     CTimerObj  m_tmr;
 };
+
+uint32_t tw_cnt;
+uint32_t tw_last_tick;
 
 void tw_on_tick_cb_test2(void *userdata,
                          CTimerObj *tmr){
@@ -2938,11 +2942,20 @@ void tw_on_tick_cb_test2(void *userdata,
     CTimerWheelBucket * lp_tw=(CTimerWheelBucket *)userdata;
     
     CMyTimerObject * obj=(CMyTimerObject *)((uint8_t*)tmr-offsetof (CMyTimerObject,m_tmr));
-    printf(" action %lu \n",(ulong)obj->cnt);
+    printf(" tick %lu action %lu %lu \n",(ulong)lp_tw->get_ticks(), (ulong)obj->id,(ulong)obj->cnt);
+    tw_cnt++;
+    tw_last_tick=lp_tw->get_ticks();
     if (obj->cnt) {
         obj->cnt-=1;
         lp_tw->timer_start(tmr,0);
     }
+}
+
+void tw_on_tick_cb_test3(void *userdata,
+                         CTimerObj *tmr){
+
+    CMyTimerObject * obj=(CMyTimerObject *)((uint8_t*)tmr-offsetof (CMyTimerObject,m_tmr));
+    printf(" id-%lu:%lu, \n",(ulong)obj->id,(ulong)obj->cnt);
 }
 
 
@@ -2970,6 +2983,7 @@ TEST_F(gt_stw_timer, timer3) {
     int i;
     for (i=0; i<10; i++) {
         CMyTimerObject* lp=&obj[i];
+        lp->id=i;
         lp->cnt=i+1;
         lp->m_tmr.reset();
     }
@@ -2980,10 +2994,266 @@ TEST_F(gt_stw_timer, timer3) {
         tw.timer_start(&obj[i].m_tmr,100); /* set in the current bucket*/
     }
 
-
+    tw_cnt=0;
     for (i=0; i<200; i++) {
-        printf(" tick %lu \n",(ulong)i);
-        tw.do_tick(&tw,tw_on_tick_cb_test2);
+
+        while (true){
+
+            if ( tw.do_tick(&tw,tw_on_tick_cb_test2,((rand() % 5)+1)) == true){
+                break;
+            }
+        }
+
+
     }
+    printf(" cnt:%lu \n",(ulong)tw_cnt);
+    EXPECT_EQ(tw_cnt, 65);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer4) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj[10];
+
+    int i;
+    for (i=0; i<10; i++) {
+        CMyTimerObject* lp=&obj[i];
+        lp->id=i;
+        lp->cnt=i+1;
+        lp->m_tmr.reset();
+    }
+
+
+    tw.Create(100);
+    for (i=0; i<10; i++) {
+        tw.timer_start(&obj[i].m_tmr,100+i); /* set in the current bucket*/
+    }
+
+    tw_cnt=0;
+    for (i=0; i<200; i++) {
+
+        while (true){
+
+            if ( tw.do_tick(&tw,tw_on_tick_cb_test2,((rand() % 5)+1)) == true){
+                break;
+            }
+        }
+
+
+    }
+    printf(" cnt:%lu \n",(ulong)tw_cnt);
+    EXPECT_EQ(tw_cnt, 65);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer5) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj[10];
+
+    int i;
+    for (i=0; i<10; i++) {
+        CMyTimerObject* lp=&obj[i];
+        lp->id=i;
+        lp->cnt=i+1;
+        lp->m_tmr.reset();
+    }
+
+
+    tw.Create(100);
+    for (i=0; i<5; i++) {
+        tw.timer_start(&obj[i].m_tmr,50+i); /* set in the current bucket*/
+    }
+    for (i=5; i<10; i++) {
+        tw.timer_start(&obj[i].m_tmr,100+i); /* set in the current bucket*/
+    }
+
+    tw_cnt=0;
+    for (i=0; i<200; i++) {
+
+        while (true){
+
+            if ( tw.do_tick(&tw,tw_on_tick_cb_test2,((rand() % 5)+1)) == true){
+                break;
+            }
+        }
+    }
+    printf(" cnt:%lu \n",(ulong)tw_cnt);
+    EXPECT_EQ(tw_cnt, 65);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer6) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj[10];
+
+    int i;
+    for (i=0; i<10; i++) {
+        CMyTimerObject* lp=&obj[i];
+        lp->id=i;
+        lp->cnt=i+1;
+        lp->m_tmr.reset();
+    }
+
+
+    tw.Create(100);
+    for (i=0; i<5; i++) {
+        tw.timer_start(&obj[i].m_tmr,50+i); /* set in the current bucket*/
+        tw.timer_restart(&obj[i].m_tmr,60+i); /* set in the current bucket*/
+    }
+    for (i=5; i<10; i++) {
+        tw.timer_start(&obj[i].m_tmr,100+i); /* set in the current bucket*/
+        tw.timer_restart(&obj[i].m_tmr,200+i); /* set in the current bucket*/
+    }
+
+    tw_cnt=0;
+    for (i=0; i<400; i++) {
+
+        while (true){
+
+            if ( tw.do_tick(&tw,tw_on_tick_cb_test2,((rand() % 5)+1)) == true){
+                break;
+            }
+        }
+    }
+    printf(" cnt:%lu \n",(ulong)tw_cnt);
+    EXPECT_EQ(tw_cnt, 65);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer7) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj;
+
+    obj.id=1;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+    tw_last_tick=0;
+
+
+    int i;
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,100+1); /* set in the current bucket*/
+    tw.timer_restart(&obj.m_tmr,200+1); /* set in the current bucket*/
+
+    tw_cnt=0;
+    for (i=0; i<300; i++) {
+        printf(" tick %lu \n",(ulong)i);
+         tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    printf(" cnt:%lu %lu \n",(ulong)tw_cnt,(ulong)tw_last_tick);
+    EXPECT_EQ(tw_cnt, 3);
+    EXPECT_EQ(tw_last_tick, 201);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer8) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj;
+
+    obj.id=1;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+    tw_last_tick=0;
+
+
+    int i;
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,100+1); /* set in the current bucket*/
+    tw.timer_restart(&obj.m_tmr,201+1); /* set in the current bucket*/
+
+    tw_cnt=0;
+    for (i=0; i<300; i++) {
+        printf(" tick %lu \n",(ulong)i);
+         tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    printf(" cnt:%lu %lu \n",(ulong)tw_cnt,(ulong)tw_last_tick);
+    EXPECT_EQ(tw_cnt, 3);
+    EXPECT_EQ(tw_last_tick, 202);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer9) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj;
+
+    obj.id=1;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+    tw_last_tick=0;
+
+
+    int i;
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,100+1); /* set in the current bucket*/
+
+    tw_cnt=0;
+    for (i=0; i<300; i++) {
+        if (i==50) {
+            tw.timer_restart(&obj.m_tmr); 
+        }
+         tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    printf(" cnt:%lu %lu \n",(ulong)tw_cnt,(ulong)tw_last_tick);
+    EXPECT_EQ(tw_cnt, 3);
+    EXPECT_EQ(tw_last_tick, 151);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer10) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj;
+
+    obj.id=1;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+    tw_last_tick=0;
+
+
+    int i;
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,100+1); /* set in the current bucket*/
+
+    tw_cnt=0;
+    for (i=0; i<300; i++) {
+        if (i==50) {
+            tw.timer_restart(&obj.m_tmr); 
+        }
+        if (i==51) {
+            tw.timer_stop(&obj.m_tmr);
+        }
+
+         tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    printf(" cnt:%lu %lu \n",(ulong)tw_cnt,(ulong)tw_last_tick);
+    EXPECT_EQ(tw_cnt, 0);
+    EXPECT_EQ(tw_last_tick, 0);
+    tw.Delete();
+}
+
+TEST_F(gt_stw_timer, timer11) {
+    CTimerWheelBucket tw;
+    CMyTimerObject obj;
+
+    obj.id=1;
+    obj.cnt=2;
+    obj.m_tmr.reset();
+    tw_last_tick=0;
+
+
+    int i;
+    tw.Create(100);
+    tw.timer_start(&obj.m_tmr,100+1); /* set in the current bucket*/
+
+    tw_cnt=0;
+    for (i=0; i<300; i++) {
+        if (i==50) {
+            tw.timer_restart(&obj.m_tmr,10); 
+        }
+
+         tw.do_tick(&tw,tw_on_tick_cb_test2);
+    }
+    printf(" cnt:%lu %lu \n",(ulong)tw_cnt,(ulong)tw_last_tick);
+    EXPECT_EQ(tw_cnt, 3);
+    EXPECT_EQ(tw_last_tick, 60);
     tw.Delete();
 }

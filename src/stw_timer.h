@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include "pal_utl.h"
+#include <rte_prefetch.h>
 
 
 
@@ -50,6 +51,7 @@ typedef enum {
     RC_STW_NULL_FV,
     RC_STW_NULL_WHEEL,
     RC_STW_NULL_TMR,
+    RC_STW_TIMER_IS_ON,
     RC_STW_INVALID_WHEEL,
     RC_STW_INVALID_WHEEL_SIZE,
     RC_STW_INVALID_GRANULARITY,
@@ -96,6 +98,7 @@ public:
         return (  m_aging_ticks -dticks );
     }
 
+    void Dump(FILE *fd);
 public:
     CTimerWheelLink  m_links;
     uint32_t         m_rotation_count;
@@ -130,8 +133,24 @@ public:
     }
 
 
+
     inline RC_STW_t timer_restart(CTimerObj  *tmr,
                                 uint32_t   ticks){
+
+        if ( tmr->is_running() ){
+            if ( tmr->restart_aging_ticks(m_ticks) < ticks) {
+                tmr->m_last_update_tick = m_ticks;
+                tmr->m_aging_ticks =ticks;
+
+                #ifdef TW_DEBUG 
+                m_timer_restart++ ;
+                #endif
+                return (RC_STW_OK);
+
+            }else{
+                timer_stop (tmr);
+            }
+        }
         return (timer_start(tmr,ticks));
     }
 
@@ -139,17 +158,8 @@ public:
         						uint32_t   ticks){
 
         if ( tmr->is_running() ){
-            /* already runing */
-            if ( tmr->m_aging_ticks >= ticks ) {
-                tmr->m_last_update_tick = m_ticks;
-                tmr->m_aging_ticks =ticks;
-                m_timer_restart++ ;
-            }else{
-                timer_stop (tmr);
-            }
+            return( RC_STW_TIMER_IS_ON);
         }
-
-
         
         #ifdef TW_DEBUG 
             CTimerWheelLink *next, *prev;
@@ -218,14 +228,18 @@ public:
         
         	m_bucket_index++;
         
-        	if ( unlikely(m_bucket_index == m_wheel_size) ) {
+        	if ( m_bucket_index == m_wheel_size ) {
         		m_bucket_index=0;
         	}
         	m_active_bucket = &m_buckets[m_bucket_index];
             m_active_tick_timer = m_active_bucket;
         }
 
-        void do_tick(void *userdata,tw_on_tick_cb_t cb);
+        bool do_tick(void *userdata,tw_on_tick_cb_t cb,int32_t limit=0);
+
+
+        void  dump_link_list(void *userdata,tw_on_tick_cb_t cb,FILE *fd) ;
+
 
         inline CTimerObj *  timer_tick_get_next(void) {
 
@@ -244,7 +258,8 @@ public:
         
             bucket = m_active_bucket; /* point the last/first */
             tmr = (CTimerObj *)m_active_tick_timer->stw_next;
-        
+            rte_prefetch0(tmr);
+
             while( (CTimerWheelLink *)tmr != bucket) {
         
                 next = (CTimerWheelLink *)tmr->m_links.stw_next;
@@ -257,31 +272,43 @@ public:
                     tmr->m_rotation_count--;
                 } else {
 
-                    prev = (CTimerWheelLink *)tmr->m_links.stw_prev;
-
-                    prev->stw_next = next;
-                    next->stw_prev = prev;
-        
-                    tmr->m_links.stw_next = 0;
-                    tmr->m_links.stw_prev = 0;
-
-                    /* check that the aging wasn't resatrt again */
-
                     uint32_t reschedule = tmr->restart_aging_ticks(m_ticks);
-                    #ifdef TW_DEBUG 
-                    assert(reschedule<0x10000);
-                    #endif
 
-                    if ( reschedule ) {
-                        tmr_enqueue (tmr, reschedule);
-                    }else{
+                    if ( reschedule == 0){
+                        /* no reschedule */
+                        prev = (CTimerWheelLink *)tmr->m_links.stw_prev;
+
+                        prev->stw_next = next;
+                        next->stw_prev = prev;
+
+                        tmr->m_links.stw_next = 0;
+                        tmr->m_links.stw_prev = 0;
+
                         #ifdef TW_DEBUG 
                         /* book keeping */
                         m_timer_active--;
                         m_timer_expired++;
                         #endif
-                        m_active_tick_timer = next; 
+                        
+                        m_active_tick_timer = next->stw_prev; 
             			return(tmr);
+                    }else{
+                        if ( (reschedule % m_wheel_size ==0)) {
+                            /* same spoke */
+                            tmr->m_rotation_count = (reschedule / m_wheel_size)-1;
+                        }else{
+                            /* diff spoke */
+
+                            prev = (CTimerWheelLink *)tmr->m_links.stw_prev;
+
+                            prev->stw_next = next;
+                            next->stw_prev = prev;
+
+                            tmr->m_links.stw_next = 0;
+                            tmr->m_links.stw_prev = 0;
+                            tmr_enqueue (tmr, reschedule);
+                        }
+
                     }
                 }
         
@@ -305,15 +332,13 @@ private:
             CTimerWheelLink  *prev, *spoke;
         
             uint32_t cursor;
-            uint32_t td;
         
-            td = (ticks % m_wheel_size);
-            if (ticks > m_wheel_size) {
+            if (ticks >= m_wheel_size) {
                 tmr->m_rotation_count = (ticks / m_wheel_size);
             }else{
                 tmr->m_rotation_count=0;
             }
-            cursor = ((m_bucket_index + td) % m_wheel_size);
+            cursor = ((m_bucket_index + ticks) % m_wheel_size);
             spoke = &m_buckets[cursor];
             prev = spoke->stw_prev;
             tmr->m_links.stw_next = spoke;     
