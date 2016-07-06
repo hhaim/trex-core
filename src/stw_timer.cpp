@@ -145,6 +145,7 @@ RC_STW_t CTimerWheelBucket::Create(uint32_t wheel_size){
 
     bucket = &m_buckets[0];
 	m_active_bucket=bucket;
+    m_active_tick_timer = m_active_bucket;
     /* link list point to itself */
     for (j = 0; j < wheel_size; j++) {
         bucket->stw_next = bucket;    

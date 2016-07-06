@@ -2965,14 +2965,22 @@ TEST_F(gt_stw_timer, timer2) {
 
 TEST_F(gt_stw_timer, timer3) {
     CTimerWheelBucket tw;
+    CMyTimerObject obj[10];
 
-    CMyTimerObject obj;
-    obj.cnt=2;
-    obj.m_tmr.reset();
+    int i;
+    for (i=0; i<10; i++) {
+        CMyTimerObject* lp=&obj[i];
+        lp->cnt=i+1;
+        lp->m_tmr.reset();
+    }
+
 
     tw.Create(100);
-    tw.timer_start(&obj.m_tmr,120);
-    int i;
+    for (i=0; i<10; i++) {
+        tw.timer_start(&obj[i].m_tmr,100); /* set in the current bucket*/
+    }
+
+
     for (i=0; i<200; i++) {
         printf(" tick %lu \n",(ulong)i);
         tw.do_tick(&tw,tw_on_tick_cb_test2);

@@ -40,6 +40,8 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include "pal_utl.h"
+
 
 
 typedef enum {
@@ -216,30 +218,36 @@ public:
         
         	m_bucket_index++;
         
-        	//TBD unlikly 
-        	if ( m_bucket_index == m_wheel_size ) {
+        	if ( unlikely(m_bucket_index == m_wheel_size) ) {
         		m_bucket_index=0;
         	}
         	m_active_bucket = &m_buckets[m_bucket_index];
+            m_active_tick_timer = m_active_bucket;
         }
 
         void do_tick(void *userdata,tw_on_tick_cb_t cb);
 
         inline CTimerObj *  timer_tick_get_next(void) {
+
+            if ( m_active_tick_timer == NULL ){
+                return ((CTimerObj *)0);
+            }
+
             CTimerWheelLink  *bucket, *next, *prev;
             CTimerObj *tmr;
+
         #ifdef TW_DEBUG 
             if ((this == 0) || (m_magic_tag != MAGIC_TAG)) {
                 return (CTimerObj *)0;
             }
         #endif
-            bucket = m_active_bucket;
-            tmr = (CTimerObj *)bucket->stw_next;
+        
+            bucket = m_active_bucket; /* point the last/first */
+            tmr = (CTimerObj *)m_active_tick_timer->stw_next;
         
             while( (CTimerWheelLink *)tmr != bucket) {
         
                 next = (CTimerWheelLink *)tmr->m_links.stw_next;
-                prev = (CTimerWheelLink *)tmr->m_links.stw_prev;
         
                 /*
                  * if the timer is a long one and requires one or more rotations
@@ -248,7 +256,9 @@ public:
                 if (tmr->m_rotation_count != 0) {
                     tmr->m_rotation_count--;
                 } else {
-        
+
+                    prev = (CTimerWheelLink *)tmr->m_links.stw_prev;
+
                     prev->stw_next = next;
                     next->stw_prev = prev;
         
@@ -263,7 +273,6 @@ public:
                     #endif
 
                     if ( reschedule ) {
-                        /* we need to reschedule the timer */
                         tmr_enqueue (tmr, reschedule);
                     }else{
                         #ifdef TW_DEBUG 
@@ -271,13 +280,15 @@ public:
                         m_timer_active--;
                         m_timer_expired++;
                         #endif
+                        m_active_tick_timer = next; 
             			return(tmr);
                     }
                 }
         
                 tmr = (CTimerObj *)next;
             }
-            return 0;
+            m_active_tick_timer = NULL; /* point to the bucket */
+            return (CTimerObj *)0;
         }
 
 public:
@@ -316,12 +327,15 @@ private:
 
 private:
 	CTimerWheelLink  * m_buckets;
-	CTimerWheelLink  * m_active_bucket;
+	CTimerWheelLink  * m_active_bucket;     /* point to the current bucket m_buckets[m_bucket_index] */
+    CTimerWheelLink  * m_active_tick_timer; /* interator of current tick, could be NULL in case we finish scanning the line */
+
 
     uint32_t           m_ticks;               
     uint32_t           m_magic_tag;           
+
     uint32_t           m_wheel_size;
-    uint32_t           m_bucket_index;         
+    uint32_t           m_bucket_index; 
 
 protected:
     /* stats */
