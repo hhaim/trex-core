@@ -2352,6 +2352,24 @@ void CCapFileFlowInfo::update_min_ipg(dsec_t min_ipg,
         if ( lp->m_pkt_indication.m_cap_ipg  < min_ipg ){
             lp->m_pkt_indication.m_cap_ipg=override_ipg;
         }
+
+        double dtime;
+        if ( likely ( lp->m_pkt_indication.m_desc.IsPcapTiming()) ){
+            dtime = lp->m_pkt_indication.m_cap_ipg;
+        }else{
+            /*if ( lp->m_pkt_indication.m_desc.IsRtt() ){
+                dtime     = m_template_info->m_rtt_sec ;
+            }else{
+                dtime     = m_template_info->m_ipg_sec;
+            } */
+        }
+        lp->m_pkt_indication.m_ticks = (uint32_t)(dtime/BUCKET_TIME_SEC);
+        printf(" %f %lu \n",dtime,lp->m_pkt_indication.m_ticks);
+
+
+        /* update ticks */
+        
+
         if ( lp->m_pkt_indication.m_cap_ipg  < override_ipg ){
             lp->m_pkt_indication.m_cap_ipg=override_ipg;
         }
@@ -3681,7 +3699,7 @@ inline bool CNodeGenerator::do_work_both(CGenNode * node,
             }else{
                 thread->m_tw.do_tick((void*)thread,tw_on_tick_per_thread_cb);
             }
-            node->m_time += (20.0/1000000.0);
+            node->m_time += ((double)BUCKET_TIME_USEC/1000000.0);
             m_p_queue.push(node);
         }else{
             if ( likely( type == CGenNode::FLOW_PKT ) ) {

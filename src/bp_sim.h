@@ -2585,6 +2585,7 @@ class CPacketIndication {
 
 public:
     dsec_t       m_cap_ipg; /* ipg from cap file */
+    uint32_t     m_ticks;
     CCapPktRaw * m_packet;
 
     CFlow *          m_flow;
@@ -3647,7 +3648,9 @@ private:
 };
 
 #define BUCKET_TIME_USEC 20
-#define TW_BUCKETS       250
+#define TW_BUCKETS       560
+#define BUCKET_TIME_SEC ((double)BUCKET_TIME_USEC/1000000.0)
+
 #define TW_BUCKETS_MAX_TIME       (BUCKET_TIME_USEC *TW_BUCKETS)
 
 
