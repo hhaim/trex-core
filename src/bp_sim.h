@@ -1590,7 +1590,7 @@ public:
 
     /* is it possible to cache MBUF */
 
-    inline void update_next_pkt_in_flow(void);
+    inline uint32_t update_next_pkt_in_flow(void);
     inline void reset_pkt_in_flow(void);
     inline uint8_t get_plugin_id(void){
         return ( m_template_info->m_plugin_id);
@@ -3648,7 +3648,7 @@ private:
 };
 
 #define BUCKET_TIME_USEC 20
-#define TW_BUCKETS       560
+#define TW_BUCKETS       1024
 #define BUCKET_TIME_SEC ((double)BUCKET_TIME_USEC/1000000.0)
 
 #define TW_BUCKETS_MAX_TIME       (BUCKET_TIME_USEC *TW_BUCKETS)
@@ -4049,7 +4049,7 @@ inline bool CGenNode::is_repeat_flow(){
     return ( m_template_info->m_limit_was_set);
 }
 
-inline void CGenNode::update_next_pkt_in_flow(void){
+inline uint32_t CGenNode::update_next_pkt_in_flow(void){
         if ( likely ( m_pkt_info->m_pkt_indication.m_desc.IsPcapTiming()) ){
             m_time     += m_pkt_info->m_pkt_indication.m_cap_ipg ;
         }else{
@@ -4058,11 +4058,14 @@ inline void CGenNode::update_next_pkt_in_flow(void){
             }else{
                 m_time     += m_template_info->m_ipg_sec;
             }
+
         }
+        uint32_t dtime=m_pkt_info->m_pkt_indication.m_ticks;
 
         uint32_t pkt_index   = m_pkt_info->m_pkt_indication.m_packet->pkt_cnt;
         pkt_index++;
         m_pkt_info = m_flow_info->GetPacket((pkt_index-1));
+        return( dtime);
 }
 
 inline void CGenNode::reset_pkt_in_flow(void){

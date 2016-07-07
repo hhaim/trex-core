@@ -2317,6 +2317,11 @@ void CCapFileFlowInfo::update_pcap_mode(){
     for (i=0; i<(int)Size(); i++) {
         CFlowPktInfo * lp=GetPacket((uint32_t)i);
         lp->m_pkt_indication.m_desc.SetPcapTiming(true);
+
+        double dtime = lp->m_pkt_indication.m_cap_ipg;
+        lp->m_pkt_indication.m_ticks = (uint32_t)(dtime/BUCKET_TIME_SEC);
+        //printf(" %f , %lu \n",dtime,(ulong)lp->m_pkt_indication.m_ticks);
+
     }
 }
 
@@ -2352,20 +2357,6 @@ void CCapFileFlowInfo::update_min_ipg(dsec_t min_ipg,
         if ( lp->m_pkt_indication.m_cap_ipg  < min_ipg ){
             lp->m_pkt_indication.m_cap_ipg=override_ipg;
         }
-
-        double dtime;
-        if ( likely ( lp->m_pkt_indication.m_desc.IsPcapTiming()) ){
-            dtime = lp->m_pkt_indication.m_cap_ipg;
-        }else{
-            /*if ( lp->m_pkt_indication.m_desc.IsRtt() ){
-                dtime     = m_template_info->m_rtt_sec ;
-            }else{
-                dtime     = m_template_info->m_ipg_sec;
-            } */
-        }
-        lp->m_pkt_indication.m_ticks = (uint32_t)(dtime/BUCKET_TIME_SEC);
-        printf(" %f %lu \n",dtime,lp->m_pkt_indication.m_ticks);
-
 
         /* update ticks */
         
@@ -3644,8 +3635,7 @@ void tw_on_tick_per_thread_cb(void *userdata,
 }
 
 
-/* TBD fix  reschedule_flow */
-void CFlowGenListPerThread::on_flow_tick(CGenNode *node,bool always){
+void CFlowGenListPerThread::on_flow_tick_on_exit(CGenNode *node){
 
     //printf(" on_flow_tick %lu \n",(ulong)node->m_flow_id);
     /* TBD need to handle repeat mode */
@@ -3667,11 +3657,43 @@ void CFlowGenListPerThread::on_flow_tick(CGenNode *node,bool always){
             free_last_flow_node( node);
         //}
     }else{
-        double save_t =node->m_time;
-        node->update_next_pkt_in_flow();
-        uint32_t ticks = (uint32_t)((node->m_time - save_t)*(1.0/((double)BUCKET_TIME_USEC/1000000.0)));
+        //double save_t =node->m_time;
+        m_tw.timer_start(&node->m_tmr,node->update_next_pkt_in_flow() );
+        ///uint32_t ticks = (uint32_t)((node->m_time - save_t)*(1.0/((double)BUCKET_TIME_USEC/1000000.0)));
         //printf(" tick %lu \n",(ulong)ticks);
-        m_tw.timer_start(&node->m_tmr,ticks); /* add to time-wheel */
+        //m_tw.timer_start(&node->m_tmr,ticks); /* add to time-wheel */
+    }
+}
+
+
+/* TBD fix  reschedule_flow */
+void CFlowGenListPerThread::on_flow_tick(CGenNode *node){
+
+    //printf(" on_flow_tick %lu \n",(ulong)node->m_flow_id);
+    /* TBD need to handle repeat mode */
+
+    //if ( !(node->is_repeat_flow()) || (always==false)) {
+        m_node_gen.flush_one_node_to_file(node);
+        //#ifdef _DEBUG
+        //m_node_gen.update_stats(node);
+        //#endif
+    //}
+
+    if ( node->is_last_in_flow() ) {
+        //if ((node->is_repeat_flow()) && (always==false)) {
+            /* Flow is repeated, reschedule it */
+         //   reschedule_flow( node);
+        //}else{
+            //printf(" last flow \n");
+            /* Flow will not be repeated, so free node */
+            free_last_flow_node( node);
+        //}
+    }else{
+        //double save_t =node->m_time;
+        m_tw.timer_start(&node->m_tmr,node->update_next_pkt_in_flow() );
+        ///uint32_t ticks = (uint32_t)((node->m_time - save_t)*(1.0/((double)BUCKET_TIME_USEC/1000000.0)));
+        //printf(" tick %lu \n",(ulong)ticks);
+        //m_tw.timer_start(&node->m_tmr,ticks); /* add to time-wheel */
     }
 }
 
@@ -3695,7 +3717,6 @@ inline bool CNodeGenerator::do_work_both(CGenNode * node,
 
             if (always == true ) {
                 thread->m_tw.do_tick((void*)thread,tw_on_tick_per_thread_cb_always);
-                thread->m_tw.do_tick((void*)thread,tw_on_tick_per_thread_cb);
             }else{
                 thread->m_tw.do_tick((void*)thread,tw_on_tick_per_thread_cb);
             }

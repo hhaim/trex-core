@@ -258,11 +258,11 @@ public:
         
             bucket = m_active_bucket; /* point the last/first */
             tmr = (CTimerObj *)m_active_tick_timer->stw_next;
-            rte_prefetch0(tmr);
 
             while( (CTimerWheelLink *)tmr != bucket) {
         
                 next = (CTimerWheelLink *)tmr->m_links.stw_next;
+                rte_prefetch0(next);
         
                 /*
                  * if the timer is a long one and requires one or more rotations
