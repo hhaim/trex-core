@@ -37,23 +37,23 @@ for file in /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepag
     fi
 done
 
-if ! lsmod | grep -q igb_uio  ;  then
-    echo "Load the drivers for the first time "
-    modprobe uio
-    km=ko/$SYS/igb_uio.ko
-    if [ -e $km ] ; then 
-        insmod $km
-    else
-        echo "ERROR kernel module is not supported for this OS"
-        echo "Please run the following commands: "
-        echo "\$cd ko/src  "
-        echo "\$make  "
-        echo "\$make install  "
-        echo "\$cd -  "
-        echo "and try to run it again "
-        exit 1
-    fi
-fi
+#if ! lsmod | grep -q igb_uio  ;  then
+#    echo "Load the drivers for the first time "
+##    modprobe uio
+#    km=ko/$SYS/igb_uio.ko
+#    if [ -e $km ] ; then 
+#        insmod $km
+#    else
+#        echo "ERROR kernel module is not supported for this OS"
+#        echo "Please run the following commands: "
+#        echo "\$cd ko/src  "
+#        echo "\$make  "
+#        echo "\$make install  "
+#        echo "\$cd -  "
+#        echo "and try to run it again "
+#        exit 1
+#    fi
+#fi
 
 # try to bind the ports from the configuration file (new DPDK)
 PARENT_ARGS="$0 $@"

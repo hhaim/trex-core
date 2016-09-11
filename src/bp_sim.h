@@ -2997,6 +2997,7 @@ inline void CFlowPktInfo::update_pkt_info(char *p,
                 printf(" %.3f : DP :  learn packet !\n",now_sec());
 #endif
                 ipv4->setTimeToLive(TTL_RESERVE_DUPLICATE);
+                ipv4->setTOS(10);
 
                 /* first ipv4 option add the info in case of learn packet, usualy only the first packet */
         if (CGlobalInfo::is_learn_mode(CParserOption::LEARN_MODE_IP_OPTION)) {

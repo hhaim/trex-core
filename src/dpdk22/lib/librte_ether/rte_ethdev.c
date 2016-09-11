@@ -188,7 +188,6 @@ rte_eth_dev_allocate(const char *name, enum rte_eth_dev_type type)
 {
 	uint8_t port_id;
 	struct rte_eth_dev *eth_dev;
-
 	port_id = rte_eth_dev_find_free_port();
 	if (port_id == RTE_MAX_ETHPORTS) {
 		RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet ports\n");
@@ -2862,7 +2861,6 @@ int
 rte_eth_dev_filter_supported(uint8_t port_id, enum rte_filter_type filter_type)
 {
 	struct rte_eth_dev *dev;
-
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
@@ -2876,7 +2874,6 @@ rte_eth_dev_filter_ctrl(uint8_t port_id, enum rte_filter_type filter_type,
 		       enum rte_filter_op filter_op, void *arg)
 {
 	struct rte_eth_dev *dev;
-
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];

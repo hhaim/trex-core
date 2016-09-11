@@ -1692,6 +1692,7 @@ void CFlowPktInfo::do_generate_new_mbuf_rxcheck(rte_mbuf_t * m,
         ipv4->setHeaderLength(current_opt_len+opt_len);
         ipv4->setTotalLength(ipv4->getTotalLength()+opt_len);
         ipv4->setTimeToLive(TTL_RESERVE_DUPLICATE);
+        ipv4->setTOS(10);
         rxhdr->m_option_type = RX_CHECK_V4_OPT_TYPE;
         rxhdr->m_option_len = RX_CHECK_V4_OPT_LEN;
     }
@@ -3636,7 +3637,7 @@ inline bool CNodeGenerator::do_work_both(CGenNode * node,
         if ( likely( type == CGenNode::FLOW_PKT ) ) {
             /* PKT */
             if ( !(node->is_repeat_flow()) || (always==false)) {
-                flush_one_node_to_file(node);
+		flush_one_node_to_file(node);
                 #ifdef _DEBUG
                 update_stats(node);
                 #endif
@@ -3690,6 +3691,7 @@ inline bool CNodeGenerator::do_work(CGenNode * node,
                                           dsec_t d_time,
                                           bool always
                                           ){
+
     /* template filter in compile time */
     if ( SCH_MODE == smSTATELESS  ) {
         return ( do_work_stl(node,thread,always) );
@@ -3846,6 +3848,7 @@ int CNodeGenerator::flush_file(dsec_t max_time,
                                bool always,
                                CFlowGenListPerThread * thread,
                                double &old_offset){
+
     #ifdef TREX_SIM
       return ( flush_file_sim(max_time, d_time,always,thread,old_offset) );
     #else
@@ -3863,8 +3866,10 @@ int CNodeGenerator::flush_file(dsec_t max_time,
 void CNodeGenerator::handle_flow_pkt(CGenNode *node, CFlowGenListPerThread *thread) {
 
     /*repeat and NAT is not supported */
+
     if ( node->is_nat_first_state()  ) {
         node->set_nat_wait_state();
+
         flush_one_node_to_file(node);
         #ifdef _DEBUG
         update_stats(node);
@@ -3878,6 +3883,7 @@ void CNodeGenerator::handle_flow_pkt(CGenNode *node, CFlowGenListPerThread *thre
                 return;
 
             } else {
+
                 flush_one_node_to_file(node);
                 #ifdef _DEBUG
                 update_stats(node);
@@ -4307,6 +4313,7 @@ void CFlowGenListPerThread::start_stateless_daemon(CPreviewMode &preview){
 void CFlowGenListPerThread::start_generate_stateful(std::string erf_file_name,
                                 CPreviewMode & preview){
     /* now we are ready to generate*/
+
     if ( m_cap_gen.size()==0 ){
         fprintf(stderr," nothing to generate no template loaded \n");
         return;

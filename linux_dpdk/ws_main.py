@@ -259,6 +259,19 @@ dpdk_src = SrcGroup(dir='src/dpdk22/',
                  'drivers/net/enic/enic_ethdev.c',
                  'drivers/net/enic/enic_main.c',
                  'drivers/net/enic/enic_res.c',
+                 'drivers/net/mlx5/mlx5_mr.c',
+                 'drivers/net/mlx5/mlx5_ethdev.c',
+                 'drivers/net/mlx5/mlx5_mac.c',
+                 'drivers/net/mlx5/mlx5_rxmode.c',
+                 'drivers/net/mlx5/mlx5_rxtx.c',
+                 'drivers/net/mlx5/mlx5_stats.c',
+                 'drivers/net/mlx5/mlx5_txq.c',
+                 'drivers/net/mlx5/mlx5.c',
+                 'drivers/net/mlx5/mlx5_fdir.c',
+                 'drivers/net/mlx5/mlx5_rss.c',
+                 'drivers/net/mlx5/mlx5_rxq.c',
+                 'drivers/net/mlx5/mlx5_trigger.c',
+                 'drivers/net/mlx5/mlx5_vlan.c',
                  'drivers/net/fm10k/base/fm10k_api.c',
                  'drivers/net/fm10k/base/fm10k_common.c',
                  'drivers/net/fm10k/base/fm10k_mbx.c',
@@ -384,6 +397,7 @@ common_flags = ['-DWIN_UCODE_SIM',
                 '-D_BYTE_ORDER',
                 '-D_LITTLE_ENDIAN',
                 '-DLINUX',
+                '-UNDEBUG',
                 '-g',
                 '-Wno-format',
                 '-Wno-deprecated-declarations',
@@ -689,6 +703,9 @@ def build_prog (bld, build_obj):
     zmq_lib_path='external_libs/zmq/'
     bld.read_shlib( name='zmq' , paths=[top+zmq_lib_path] )
 
+    ibverbs_lib_path='/usr/libibverbs'
+    bld.read_shlib( name='ibverbs' , paths=[top+ibverbs_lib_path] )
+
     #rte_libs =[
     #         'dpdk'];
 
@@ -711,7 +728,7 @@ def build_prog (bld, build_obj):
                 cxxflags =(build_obj.get_cxx_flags()+['-std=gnu++11',]),
                 linkflags = build_obj.get_link_flags() ,
                 lib=['pthread','dl', 'z'],
-                use =[build_obj.get_dpdk_target(),'zmq'],
+                use =[build_obj.get_dpdk_target(),'zmq','ibverbs'],
                 source = bp.file_list(top),
                 target = build_obj.get_target())
 
@@ -840,6 +857,7 @@ def copy_single_system1 (bld, exec_p, build_obj):
 
 files_list=[
             'libzmq.so.3',
+            'libibverbs.so.1',
             'trex-cfg',
             'bp-sim-64',
             'bp-sim-64-debug',

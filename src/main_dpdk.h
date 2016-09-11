@@ -120,6 +120,31 @@ class CPhyEthIF  {
         return (m_last_rx_pps);
     }
 
+    uint64_t get_base_packets_in() {
+        return (m_base_packets_in);
+    }
+    uint64_t get_base_packets_out() {
+        return (m_base_packets_out);
+    }
+
+    uint64_t get_base_bytes_in() {
+        return (m_base_bytes_in);
+    }
+
+    uint64_t get_base_bytes_out() {
+        return (m_base_bytes_out);
+    }
+
+    uint64_t get_base_errors_in() {
+        return (m_base_errors_in);
+    }
+
+    uint64_t get_base_errors_out() {
+        return (m_base_errors_out);
+    }
+
+
+    void set_base_stats();
     CPhyEthIFStats     & get_stats(){
         return ( m_stats );
     }
@@ -169,6 +194,14 @@ class CPhyEthIF  {
     float                    m_last_rx_rate;
     float                    m_last_tx_pps;
     float                    m_last_rx_pps;
+
+    uint64_t                 m_base_packets_in=0;
+    uint64_t                 m_base_bytes_in=0;
+    uint64_t                 m_base_errors_in=0;
+    uint64_t                 m_base_packets_out=0;
+    uint64_t                 m_base_bytes_out=0;
+    uint64_t                 m_base_errors_out=0;
+
  public:
     struct rte_eth_dev_info  m_dev_info;
 };

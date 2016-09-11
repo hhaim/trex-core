@@ -278,6 +278,7 @@ void CRxCoreStateless::handle_rx_queue_msgs(uint8_t thread_id, CNodeRing * r) {
 void CRxCoreStateless::try_rx_queues() {
 
     CMessagingManager * rx_dp = CMsgIns::Ins()->getRxDp();
+
     uint8_t threads=CMsgIns::Ins()->get_num_threads();
     int ti;
     for (ti = 0; ti < (int)threads; ti++) {
@@ -293,6 +294,7 @@ void CRxCoreStateless::try_rx_queues() {
 void CRxCoreStateless::flush_rx() {
     rte_mbuf_t * rx_pkts[64];
     int i, total_pkts = 0;
+
     for (i = 0; i < m_max_ports; i++) {
         CLatencyManagerPerPortStl * lp = &m_ports[i];
         rte_mbuf_t * m;
@@ -315,7 +317,8 @@ void CRxCoreStateless::flush_rx() {
 int CRxCoreStateless::try_rx() {
     rte_mbuf_t * rx_pkts[64];
     int i, total_pkts = 0;
-    for (i = 0; i < m_max_ports; i++) {
+    
+for (i = 0; i < m_max_ports; i++) {
         CLatencyManagerPerPortStl * lp = &m_ports[i];
         rte_mbuf_t * m;
         /* try to read 64 packets clean up the queue */

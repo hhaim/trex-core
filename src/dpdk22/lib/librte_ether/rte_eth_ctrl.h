@@ -407,8 +407,9 @@ struct rte_eth_l2_flow {
 struct rte_eth_ipv4_flow {
 	uint32_t src_ip;      /**< IPv4 source address to match. */
 	uint32_t dst_ip;      /**< IPv4 destination address to match. */
-	// TREX_PATCH (ttl and ip_id)
+	// TREX_PATCH (ttl tos, and ip_id)
 	uint8_t ttl;	      /**< IPv4 ttl to match */
+        uint8_t tos;          /**< IPv4 tos to match */
     uint16_t ip_id;       /**< IPv4 IP ID to match */
 	uint8_t l4_protocol;  /**< IPv4 l4 protocol to match */
 };
