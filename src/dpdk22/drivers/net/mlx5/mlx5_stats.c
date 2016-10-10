@@ -72,7 +72,6 @@
 
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
-
 /**
  * DPDK callback to get device statistics.
  *
@@ -97,6 +96,25 @@ mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	struct ethtool_gstrings *strings = NULL;
 
 	unsigned int n_stats, sz_str, sz_stats;
+
+
+	int rx_vport_unicast_bytes = 0;
+	int rx_vport_multicast_bytes = 0;
+	int rx_vport_broadcast_bytes = 0;
+	int rx_vport_unicast_packets = 0;
+	int rx_vport_multicast_packets = 0;
+	int rx_vport_broadcast_packets = 0;
+	int tx_vport_unicast_bytes = 0;
+	int tx_vport_multicast_bytes = 0;
+	int tx_vport_broadcast_bytes = 0;
+	int tx_vport_unicast_packets = 0;
+	int tx_vport_multicast_packets = 0;
+	int tx_vport_broadcast_packets = 0;
+	int rx_wqe_err = 0;
+	int rx_crc_errors_phy = 0;
+	int rx_in_range_len_errors_phy = 0;
+	int rx_symbol_err_phy = 0;
+	int tx_errors_phy = 0;
 
 	priv_lock(priv);
 
@@ -143,6 +161,32 @@ mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 		return;
 	} 
 
+        for (i = 0; (i != n_stats); ++i) {
+		const char * curr_string = (const char*) &(strings->data[i * ETH_GSTRING_LEN]);
+                if (!strcmp("rx_vport_unicast_bytes", curr_string)) rx_vport_unicast_bytes = i;
+                if (!strcmp("rx_vport_multicast_bytes", curr_string)) rx_vport_multicast_bytes = i;
+		if (!strcmp("rx_vport_broadcast_bytes", curr_string)) rx_vport_broadcast_bytes = i;
+
+                if (!strcmp("rx_vport_unicast_packets", curr_string)) rx_vport_unicast_packets = i;
+                if (!strcmp("rx_vport_multicast_packets", curr_string)) rx_vport_multicast_packets = i;
+                if (!strcmp("rx_vport_broadcast_packets", curr_string)) rx_vport_broadcast_packets = i;
+
+                if (!strcmp("tx_vport_unicast_bytes", curr_string)) tx_vport_unicast_bytes = i;
+                if (!strcmp("tx_vport_multicast_bytes", curr_string)) tx_vport_multicast_bytes = i;
+                if (!strcmp("tx_vport_broadcast_bytes", curr_string)) tx_vport_broadcast_bytes = i;
+
+                if (!strcmp("tx_vport_unicast_packets", curr_string)) tx_vport_unicast_packets = i;
+                if (!strcmp("tx_vport_multicast_packets", curr_string)) tx_vport_multicast_packets = i;
+                if (!strcmp("tx_vport_broadcast_packets", curr_string)) tx_vport_broadcast_packets = i;
+
+                if (!strcmp("rx_wqe_err", curr_string)) rx_wqe_err = i;
+                if (!strcmp("rx_crc_errors_phy", curr_string)) rx_crc_errors_phy = i;
+                if (!strcmp("rx_in_range_len_errors_phy", curr_string)) rx_in_range_len_errors_phy = i;
+                if (!strcmp("rx_symbol_err_phy", curr_string)) rx_symbol_err_phy = i;
+
+                if (!strcmp("tx_errors_phy", curr_string)) tx_errors_phy = i;
+	}
+
 	/* Grab stat values */
 	et_stats->cmd = ETHTOOL_GSTATS;
 	et_stats->n_stats = n_stats;
@@ -155,32 +199,46 @@ mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 
 	if (et_stats) free(et_stats);
 
-        tmp.ibytes += et_stats->data[RX_VPORT_UNICAST_BYTES];// +
-//		      et_stats->data[RX_VPORT_MULTICAST_BYTES] +
-//		      et_stats->data[RX_VPORT_BROADCOAST_BYTES];
+        if (!rx_vport_unicast_bytes ||
+	    !rx_vport_multicast_bytes ||
+	    !rx_vport_broadcast_bytes || 
+	    !rx_vport_unicast_packets ||
+	    !rx_vport_multicast_packets ||
+	    !rx_vport_broadcast_packets ||
+	    !tx_vport_unicast_bytes || 
+	    !tx_vport_multicast_bytes ||
+	    !tx_vport_broadcast_bytes ||
+	    !tx_vport_unicast_packets ||
+	    !tx_vport_multicast_packets ||
+	    !tx_vport_broadcast_packets ||
+	    !rx_wqe_err ||
+	    !rx_crc_errors_phy ||
+	    !rx_in_range_len_errors_phy) {
+                WARN("Counters are not recognized %s", ifname);
+	} else {
+		tmp.ibytes += et_stats->data[rx_vport_unicast_bytes];// +
+//			      et_stats->data[rx_vport_multicast_bytes] +
+//			      et_stats->data[rx_vport_broadcast_bytes];
         
-        tmp.ipackets += et_stats->data[RX_VPORT_UNICAST_PACKETS] /* rx_vport_unicast_packets */;// +
-//			et_stats->data[RX_VPORT_MULTICAST_PACKETS] /* rx_vport_multicast_packets */ +
-//			et_stats->data[RX_VPORT_BROADCOAST_PACKETS] /* rx_vport_broadcast_packets */;
+		tmp.ipackets += et_stats->data[rx_vport_unicast_packets] ;// +
+//				et_stats->data[rx_vport_multicast_packets] +
+//				et_stats->data[rx_vport_broadcast_packets];
 			
-        tmp.ierrors += 	et_stats->data[RX_WQE_ERR] +
-			et_stats->data[RX_CRC_ERRORS_PHY] +
-			et_stats->data[RX_IN_RANGE_LEN_ERRORS_PHY] +
-			et_stats->data[RX_SYMBOL_ERR_PHY];
+		tmp.ierrors += 	et_stats->data[rx_wqe_err] +
+				et_stats->data[rx_crc_errors_phy] +
+				et_stats->data[rx_in_range_len_errors_phy] +
+				et_stats->data[rx_symbol_err_phy];
 
-        tmp.obytes += et_stats->data[TX_VPORT_UNICAST_BYTES];// +
-//                      et_stats->data[TX_VPORT_MULTICAST_BYTES] +
-//                      et_stats->data[TX_VPORT_BROADCOAST_BYTES];
+		tmp.obytes += et_stats->data[tx_vport_unicast_bytes];// +
+//			      et_stats->data[tx_vport_multicast_bytes] +
+//			      et_stats->data[tx_vport_broadcast_bytes];
 
-        tmp.opackets += et_stats->data[TX_VPORT_UNICAST_PACKETS] /* rx_vport_unicast_packets */;// +
-//                        et_stats->data[TX_VPORT_MULTICAST_PACKETS] /* rx_vport_multicast_packets */ +
-//                        et_stats->data[TX_VPORT_BROADCOAST_PACKETS] /* rx_vport_broadcast_packets */;
+		tmp.opackets += et_stats->data[tx_vport_unicast_packets] ;// +
+//				et_stats->data[tx_vport_multicast_packets] +
+//				et_stats->data[tx_vport_broadcast_packets];
 
-        tmp.oerrors += et_stats->data[TX_ERRORS_PHY];
-
-
-
-
+		tmp.oerrors += et_stats->data[tx_errors_phy];
+	}
 
 	for (i = 0; (i != priv->rxqs_n); ++i) {
 		struct rxq *rxq = (*priv->rxqs)[i];
