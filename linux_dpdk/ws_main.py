@@ -499,6 +499,8 @@ includes_path =''' ../src/pal/linux_dpdk/
 dpdk_includes_path =''' ../src/ 
                         ../src/pal/linux_dpdk/
                         ../src/pal/linux_dpdk/dpdk22
+                   ../external_libs/ibverbs/include/
+
 ../src/dpdk22/drivers/
 ../src/dpdk22/drivers/net/
 ../src/dpdk22/drivers/net/af_packet/
@@ -703,7 +705,7 @@ def build_prog (bld, build_obj):
     zmq_lib_path='external_libs/zmq/'
     bld.read_shlib( name='zmq' , paths=[top+zmq_lib_path] )
 
-    ibverbs_lib_path='/usr/libibverbs'
+    ibverbs_lib_path='external_libs/ibverbs/'
     bld.read_shlib( name='ibverbs' , paths=[top+ibverbs_lib_path] )
 
     #rte_libs =[
