@@ -3419,6 +3419,8 @@ public:
 public:
     void update_min_ipg(dsec_t min_ipg, dsec_t override_ipg);
     void update_pcap_mode();
+    void update_ipg_mode(double ipg);
+
     void Dump(FILE *fd);
 
 private:
@@ -3647,8 +3649,8 @@ private:
     bool           server_seq_init;  /* TCP seq been init for server? */
 };
 
-#define BUCKET_TIME_USEC 20
-#define TW_BUCKETS       1024
+#define BUCKET_TIME_USEC (20*5)
+#define TW_BUCKETS       (1024*2)
 #define BUCKET_TIME_SEC ((double)BUCKET_TIME_USEC/1000000.0)
 
 #define TW_BUCKETS_MAX_TIME       (BUCKET_TIME_USEC *TW_BUCKETS)
@@ -3729,6 +3731,7 @@ public :
 
     inline void free_node(CGenNode *p);
     inline void free_last_flow_node(CGenNode *p);
+    void on_flow_tick_on_exit(CGenNode *node);
 
 
 public:

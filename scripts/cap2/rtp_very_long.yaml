@@ -13,14 +13,9 @@
   mac        : [0x0,0x0,0x0,0x1,0x0,0x00]
   #cap_ipg    : true
   cap_info : 
-     - name: avl/delay_10_http_browsing_0.pcap
-       cps : 0.276
+     - name:  cap2/long_udp_flow.pcap
+       cps : 100
        ipg : 20040
        rtt : 20040
-       w   : 1
-     - name: avl/delay_10_http_browsing_0.pcap
-       cps : 2.482
-       ipg : 2040
-       rtt : 2040
        w   : 1
 

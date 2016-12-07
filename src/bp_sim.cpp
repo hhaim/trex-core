@@ -2312,6 +2312,16 @@ enum CCapFileFlowInfo::load_cap_file_err CCapFileFlowInfo::load_cap_file(std::st
     return kOK;
 }
 
+
+void CCapFileFlowInfo::update_ipg_mode(double ipg){
+    int i;
+    for (i=0; i<(int)Size(); i++) {
+        CFlowPktInfo * lp=GetPacket((uint32_t)i);
+        lp->m_pkt_indication.m_ticks = (uint32_t)(ipg/BUCKET_TIME_SEC);
+        //printf(" %f , %lu \n",ipg,(ulong)lp->m_pkt_indication.m_ticks);
+    }
+}
+
 void CCapFileFlowInfo::update_pcap_mode(){
     int i;
     for (i=0; i<(int)Size(); i++) {
@@ -2319,7 +2329,7 @@ void CCapFileFlowInfo::update_pcap_mode(){
         lp->m_pkt_indication.m_desc.SetPcapTiming(true);
 
         double dtime = lp->m_pkt_indication.m_cap_ipg;
-        lp->m_pkt_indication.m_ticks = (uint32_t)(dtime/BUCKET_TIME_SEC);
+        lp->m_pkt_indication.m_ticks = (uint32_t)(dtime*100.0/BUCKET_TIME_SEC);
         //printf(" %f , %lu \n",dtime,(ulong)lp->m_pkt_indication.m_ticks);
 
     }
@@ -3125,6 +3135,9 @@ void CFlowGeneratorRec::getFlowStats(CFlowStats * stats){
 void CFlowGeneratorRec::fixup_ipg_if_needed(void){
     if  ( m_flows_info->m_cap_mode ) {
         m_flow_info.update_pcap_mode();
+    }else{
+        m_flow_info.update_ipg_mode(m_info->m_ipg_sec);
+        /* IPG/RTT*/
     }
 
     if ( (m_flows_info->m_cap_mode) &&
@@ -3667,7 +3680,7 @@ void CFlowGenListPerThread::on_flow_tick_on_exit(CGenNode *node){
 
 
 /* TBD fix  reschedule_flow */
-void CFlowGenListPerThread::on_flow_tick(CGenNode *node){
+void CFlowGenListPerThread::on_flow_tick(CGenNode *node,bool always){
 
     //printf(" on_flow_tick %lu \n",(ulong)node->m_flow_id);
     /* TBD need to handle repeat mode */

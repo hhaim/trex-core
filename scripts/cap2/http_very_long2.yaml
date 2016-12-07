@@ -14,12 +14,7 @@
   #cap_ipg    : true
   cap_info : 
      - name: avl/delay_10_http_browsing_0.pcap
-       cps : 0.276
-       ipg : 20040
-       rtt : 20040
-       w   : 1
-     - name: avl/delay_10_http_browsing_0.pcap
-       cps : 2.482
+       cps : 2.76
        ipg : 2040
        rtt : 2040
        w   : 1
