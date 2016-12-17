@@ -834,7 +834,7 @@ def show_intro (logger, c):
     port_types = {}
     for port in x['ports']:
         if 'supp_speeds' in port:
-            speed = max(port['supp_speeds']) // 1000
+            speed =  1000
         else:
             speed = port['speed']
         key = (speed, port.get('description', port['driver']))

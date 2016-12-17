@@ -563,7 +563,7 @@ private:
         register_driver(std::string("rte_igb_pmd"),CTRexExtendedDriverBase1G::create);
         register_driver(std::string("rte_i40e_pmd"),CTRexExtendedDriverBase40G::create);
         register_driver(std::string("rte_enic_pmd"),CTRexExtendedDriverBaseVIC::create);
-        register_driver(std::string("librte_pmd_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
+        register_driver(std::string("net_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
 
 
         /* virtual devices */
@@ -6742,6 +6742,7 @@ void CTRexExtendedDriverBaseMlnx5G::add_del_rules(enum rte_filter_op op, uint8_t
 }
 
 int CTRexExtendedDriverBaseMlnx5G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
+    #if 0
     uint8_t port_id=_if->get_rte_port_id();
 
     if (set_on) {
@@ -6752,6 +6753,7 @@ int CTRexExtendedDriverBaseMlnx5G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
         add_del_rx_filter_rules(_if, true);
     }
 
+    #endif
     return 0;
 
 }
@@ -6779,8 +6781,11 @@ int CTRexExtendedDriverBaseMlnx5G::add_del_rx_filter_rules(CPhyEthIF * _if, bool
 }
 
 int CTRexExtendedDriverBaseMlnx5G::configure_rx_filter_rules(CPhyEthIF * _if) {
+    #if 0
     set_rcv_all(_if, false);
     return add_del_rx_filter_rules(_if, true);
+    #endif
+    return (0);
 }
 
 void CTRexExtendedDriverBaseMlnx5G::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len) {

@@ -101,6 +101,38 @@ extern "C" {
  */
 #define PKT_RX_VLAN_STRIPPED (1ULL << 6)
 
+
+/**
+ * Mask of bits used to determine the status of RX IP checksum.
+ * - PKT_RX_IP_CKSUM_UNKNOWN: no information about the RX IP checksum
+ * - PKT_RX_IP_CKSUM_BAD: the IP checksum in the packet is wrong
+ * - PKT_RX_IP_CKSUM_GOOD: the IP checksum in the packet is valid
+ * - PKT_RX_IP_CKSUM_NONE: the IP checksum is not correct in the packet
+ *   data, but the integrity of the IP header is verified.
+ */
+#define PKT_RX_IP_CKSUM_MASK ((1ULL << 4) | (1ULL << 7))
+
+#define PKT_RX_IP_CKSUM_UNKNOWN 0
+#define PKT_RX_IP_CKSUM_BAD     (1ULL << 4)
+#define PKT_RX_IP_CKSUM_GOOD    (1ULL << 7)
+#define PKT_RX_IP_CKSUM_NONE    ((1ULL << 4) | (1ULL << 7))
+
+/**
+ * Mask of bits used to determine the status of RX L4 checksum.
+ * - PKT_RX_L4_CKSUM_UNKNOWN: no information about the RX L4 checksum
+ * - PKT_RX_L4_CKSUM_BAD: the L4 checksum in the packet is wrong
+ * - PKT_RX_L4_CKSUM_GOOD: the L4 checksum in the packet is valid
+ * - PKT_RX_L4_CKSUM_NONE: the L4 checksum is not correct in the packet
+ *   data, but the integrity of the L4 data is verified.
+ */
+#define PKT_RX_L4_CKSUM_MASK ((1ULL << 3) | (1ULL << 8))
+
+#define PKT_RX_L4_CKSUM_UNKNOWN 0
+#define PKT_RX_L4_CKSUM_BAD     (1ULL << 3)
+#define PKT_RX_L4_CKSUM_GOOD    (1ULL << 8)
+#define PKT_RX_L4_CKSUM_NONE    ((1ULL << 3) | (1ULL << 8))
+
+
 /* hole, some bits can be reused here  */
 
 #define PKT_RX_IEEE1588_PTP  (1ULL << 9)  /**< RX IEEE1588 L2 Ethernet PT Packet. */
