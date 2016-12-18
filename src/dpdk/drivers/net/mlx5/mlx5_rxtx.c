@@ -537,12 +537,17 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 			 * of data segment size.
 			 */
 			assert(!(sizeof(*wqe) % sizeof(*dseg)));
-			if (!(ds % (sizeof(*wqe) / 16)))
-				dseg = (volatile void *)
-					&(*txq->wqes)[txq->wqe_ci++ &
-						      (txq->wqe_n - 1)];
-			else
-				++dseg;
+			if (!(ds % (sizeof(*wqe) / 16))){
+                dseg = (volatile void *)
+                    &(*txq->wqes)[txq->wqe_ci++ &
+                              (txq->wqe_n - 1)];
+            }else if (!dseg) {
+                dseg = (struct mlx5_wqe_data_seg *)
+                    ((uintptr_t)wqe +
+                     (ds * 16));
+            }else{
+                ++dseg;
+            }
 			++ds;
 			buf = buf->next;
 			assert(buf);

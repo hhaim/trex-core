@@ -527,7 +527,7 @@ mlx5_pci_devinit(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 
 		/* TREX PATCH */
 		/* set for maximum performance default */
-		priv->txq_inline  =128;
+		priv->txq_inline  =64;
 		priv->txqs_inline =4;
 
 
