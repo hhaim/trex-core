@@ -562,6 +562,8 @@ mlx5_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *info)
 	unsigned int max;
 	char ifname[IF_NAMESIZE];
 
+	info->pci_dev = RTE_DEV_TO_PCI(dev->device);
+
 	priv_lock(priv);
 	/* FIXME: we should ask the device for these values. */
 	info->min_rx_bufsize = 32;
@@ -626,7 +628,7 @@ mlx5_dev_supported_ptypes_get(struct rte_eth_dev *dev)
 }
 
 /**
- * Retrieve physical link information (unlocked version using legacy ioctl).
+ * DPDK callback to retrieve physical link information.
  *
  * @param dev
  *   Pointer to Ethernet device structure.
@@ -643,6 +645,8 @@ mlx5_link_update_unlocked_gset(struct rte_eth_dev *dev, int wait_to_complete)
 	struct ifreq ifr;
 	struct rte_eth_link dev_link;
 	int link_speed = 0;
+
+	/* priv_lock() is not taken to allow concurrent calls. */
 
 	(void)wait_to_complete;
 	if (priv_ifreq(priv, SIOCGIFFLAGS, &ifr)) {
@@ -788,25 +792,6 @@ mlx5_link_update_unlocked_gs(struct rte_eth_dev *dev, int wait_to_complete)
 }
 
 /**
- * DPDK callback to retrieve physical link information (unlocked version).
- *
- * @param dev
- *   Pointer to Ethernet device structure.
- * @param wait_to_complete
- *   Wait for request completion (ignored).
- */
-int
-mlx5_link_update_unlocked(struct rte_eth_dev *dev, int wait_to_complete)
-{
-	int ret;
-
-	ret = mlx5_link_update_unlocked_gs(dev, wait_to_complete);
-	if (ret < 0)
-		ret = mlx5_link_update_unlocked_gset(dev, wait_to_complete);
-	return ret;
-}
-
-/**
  * DPDK callback to retrieve physical link information.
  *
  * @param dev
@@ -817,12 +802,11 @@ mlx5_link_update_unlocked(struct rte_eth_dev *dev, int wait_to_complete)
 int
 mlx5_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 {
-	struct priv *priv = mlx5_get_priv(dev);
 	int ret;
 
-	priv_lock(priv);
-	ret = mlx5_link_update_unlocked(dev, wait_to_complete);
-	priv_unlock(priv);
+	ret = mlx5_link_update_unlocked_gs(dev, wait_to_complete);
+	if (ret < 0)
+		ret = mlx5_link_update_unlocked_gset(dev, wait_to_complete);
 	return ret;
 }
 
@@ -1162,7 +1146,7 @@ priv_dev_link_status_handler(struct priv *priv, struct rte_eth_dev *dev)
 		struct rte_eth_link *link = &dev->data->dev_link;
 
 		priv->pending_alarm = 0;
-		mlx5_link_update_unlocked(dev, 0);
+		mlx5_link_update(dev, 0);
 		if (((link->link_speed == 0) && link->link_status) ||
 		    ((link->link_speed != 0) && !link->link_status)) {
 			/* Inconsistent status, check again later. */
@@ -1193,8 +1177,8 @@ mlx5_dev_link_status_handler(void *arg)
 	assert(priv->pending_alarm == 1);
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
-	//if (ret)
-	//	_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
+	if (ret)
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
 }
 
 /**
@@ -1216,8 +1200,8 @@ mlx5_dev_interrupt_handler(struct rte_intr_handle *intr_handle, void *cb_arg)
 	priv_lock(priv);
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
-	//if (ret)
-	//	_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
+	if (ret)
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
 }
 
 /**
@@ -1515,14 +1499,11 @@ void
 priv_select_tx_function(struct priv *priv)
 {
 	priv->dev->tx_pkt_burst = mlx5_tx_burst;
-	/* Display warning for unsupported configurations. */
-	if (priv->sriov && priv->mps)
-		WARN("multi-packet send WQE cannot be used on a SR-IOV setup");
 	/* Select appropriate TX function. */
-	if ((priv->sriov == 0) && priv->mps && priv->txq_inline) {
+	if (priv->mps && priv->txq_inline) {
 		priv->dev->tx_pkt_burst = mlx5_tx_burst_mpw_inline;
 		DEBUG("selected MPW inline TX function");
-	} else if ((priv->sriov == 0) && priv->mps) {
+	} else if (priv->mps) {
 		priv->dev->tx_pkt_burst = mlx5_tx_burst_mpw;
 		DEBUG("selected MPW TX function");
 	}
