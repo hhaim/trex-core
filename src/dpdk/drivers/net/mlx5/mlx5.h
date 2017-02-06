@@ -70,31 +70,33 @@
 #include "mlx5_defs.h"
 
 #if !defined(HAVE_VERBS_IBV_EXP_CQ_COMPRESSED_CQE) || \
-	!defined(HAVE_VERBS_MLX5_ETH_VLAN_INLINE_HEADER_SIZE)
+    !defined(HAVE_VERBS_MLX5_ETH_VLAN_INLINE_HEADER_SIZE)
 #error Mellanox OFED >= 3.3 is required, please refer to the documentation.
 #endif
 
 enum {
-	PCI_VENDOR_ID_MELLANOX = 0x15b3,
+    PCI_VENDOR_ID_MELLANOX = 0x15b3,
 };
 
 enum {
-	PCI_DEVICE_ID_MELLANOX_CONNECTX4 = 0x1013,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX4VF = 0x1014,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX4LX = 0x1015,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX4LXVF = 0x1016,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX5 = 0x1017,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX5VF = 0x1018,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX5EX = 0x1019,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX5EXVF = 0x101a,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX4 = 0x1013,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX4VF = 0x1014,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX4LX = 0x1015,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX4LXVF = 0x1016,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX5 = 0x1017,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX5VF = 0x1018,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX5EX = 0x1019,
+    PCI_DEVICE_ID_MELLANOX_CONNECTX5EXVF = 0x101a,
 };
 
+#define TREX_PATCH
+#ifdef TREX_PATCH
 struct mlx5_stats_priv {
 
     struct rte_eth_stats m_shadow;
     uint32_t      n_stats; /* number of counters */
 
-    void    *  et_stats  ;/* point to ethtool counter struct ethtool_stats*/
+    void	*  et_stats  ;/* point to ethtool counter struct ethtool_stats*/
 
     /* index into ethtool */
     uint16_t inx_rx_vport_unicast_bytes;
@@ -115,80 +117,82 @@ struct mlx5_stats_priv {
     uint16_t inx_rx_symbol_err_phy;
     uint16_t inx_tx_errors_phy;
 };
-
+#endif
 
 struct mlx5_xstats_ctrl {
-	/* Number of device stats. */
-	uint16_t stats_n;
-	/* Index in the device counters table. */
-	uint16_t dev_table_idx[MLX5_MAX_XSTATS];
-	uint64_t base[MLX5_MAX_XSTATS];
+    /* Number of device stats. */
+    uint16_t stats_n;
+    /* Index in the device counters table. */
+    uint16_t dev_table_idx[MLX5_MAX_XSTATS];
+    uint64_t base[MLX5_MAX_XSTATS];
 };
 
 struct priv {
-	struct rte_eth_dev *dev; /* Ethernet device. */
-	struct ibv_context *ctx; /* Verbs context. */
-	struct ibv_device_attr device_attr; /* Device properties. */
-	struct ibv_pd *pd; /* Protection Domain. */
-	/*
-	 * MAC addresses array and configuration bit-field.
-	 * An extra entry that cannot be modified by the DPDK is reserved
-	 * for broadcast frames (destination MAC address ff:ff:ff:ff:ff:ff).
-	 */
-	struct ether_addr mac[MLX5_MAX_MAC_ADDRESSES];
-	BITFIELD_DECLARE(mac_configured, uint32_t, MLX5_MAX_MAC_ADDRESSES);
-	uint16_t vlan_filter[MLX5_MAX_VLAN_IDS]; /* VLAN filters table. */
-	unsigned int vlan_filter_n; /* Number of configured VLAN filters. */
-	/* Device properties. */
-	uint16_t mtu; /* Configured MTU. */
-	uint8_t port; /* Physical port number. */
-	unsigned int started:1; /* Device started, flows enabled. */
-	unsigned int promisc_req:1; /* Promiscuous mode requested. */
-	unsigned int allmulti_req:1; /* All multicast mode requested. */
-	unsigned int hw_csum:1; /* Checksum offload is supported. */
-	unsigned int hw_csum_l2tun:1; /* Same for L2 tunnels. */
-	unsigned int hw_vlan_strip:1; /* VLAN stripping is supported. */
-	unsigned int hw_fcs_strip:1; /* FCS stripping is supported. */
-	unsigned int hw_padding:1; /* End alignment padding is supported. */
-	unsigned int sriov:1; /* This is a VF or PF with VF devices. */
-	unsigned int mps:1; /* Whether multi-packet send is supported. */
-	unsigned int cqe_comp:1; /* Whether CQE compression is enabled. */
-	unsigned int pending_alarm:1; /* An alarm is pending. */
-	unsigned int txq_inline; /* Maximum packet size for inlining. */
-	unsigned int txqs_inline; /* Queue number threshold for inlining. */
-	/* RX/TX queues. */
-	unsigned int rxqs_n; /* RX queues array size. */
-	unsigned int txqs_n; /* TX queues array size. */
-	struct rxq *(*rxqs)[]; /* RX queues. */
-	struct txq *(*txqs)[]; /* TX queues. */
-	/* Indirection tables referencing all RX WQs. */
-	struct ibv_exp_rwq_ind_table *(*ind_tables)[];
-	unsigned int ind_tables_n; /* Number of indirection tables. */
-	unsigned int ind_table_max_size; /* Maximum indirection table size. */
-	/* Hash RX QPs feeding the indirection table. */
-	struct hash_rxq (*hash_rxqs)[];
-	unsigned int hash_rxqs_n; /* Hash RX QPs array size. */
-	/* RSS configuration array indexed by hash RX queue type. */
-	struct rte_eth_rss_conf *(*rss_conf)[];
-	uint64_t rss_hf; /* RSS DPDK bit field of active RSS. */
-	struct rte_intr_handle intr_handle; /* Interrupt handler. */
-	unsigned int (*reta_idx)[]; /* RETA index table. */
-	unsigned int reta_idx_n; /* RETA index size. */
-	struct fdir_filter_list *fdir_filter_list; /* Flow director rules. */
-	struct fdir_queue *fdir_drop_queue; /* Flow director drop queue. */
-	LIST_HEAD(mlx5_flows, rte_flow) flows; /* RTE Flow rules. */
-	uint32_t link_speed_capa; /* Link speed capabilities. */
-	struct mlx5_xstats_ctrl xstats_ctrl; /* Extended stats control. */
-	rte_spinlock_t lock; /* Lock for control functions. */
+    struct rte_eth_dev *dev; /* Ethernet device. */
+    struct ibv_context *ctx; /* Verbs context. */
+    struct ibv_device_attr device_attr; /* Device properties. */
+    struct ibv_pd *pd; /* Protection Domain. */
+    /*
+     * MAC addresses array and configuration bit-field.
+     * An extra entry that cannot be modified by the DPDK is reserved
+     * for broadcast frames (destination MAC address ff:ff:ff:ff:ff:ff).
+     */
+    struct ether_addr mac[MLX5_MAX_MAC_ADDRESSES];
+    BITFIELD_DECLARE(mac_configured, uint32_t, MLX5_MAX_MAC_ADDRESSES);
+    uint16_t vlan_filter[MLX5_MAX_VLAN_IDS]; /* VLAN filters table. */
+    unsigned int vlan_filter_n; /* Number of configured VLAN filters. */
+    /* Device properties. */
+    uint16_t mtu; /* Configured MTU. */
+    uint8_t port; /* Physical port number. */
+    unsigned int started:1; /* Device started, flows enabled. */
+    unsigned int promisc_req:1; /* Promiscuous mode requested. */
+    unsigned int allmulti_req:1; /* All multicast mode requested. */
+    unsigned int hw_csum:1; /* Checksum offload is supported. */
+    unsigned int hw_csum_l2tun:1; /* Same for L2 tunnels. */
+    unsigned int hw_vlan_strip:1; /* VLAN stripping is supported. */
+    unsigned int hw_fcs_strip:1; /* FCS stripping is supported. */
+    unsigned int hw_padding:1; /* End alignment padding is supported. */
+    unsigned int sriov:1; /* This is a VF or PF with VF devices. */
+    unsigned int mps:1; /* Whether multi-packet send is supported. */
+    unsigned int cqe_comp:1; /* Whether CQE compression is enabled. */
+    unsigned int pending_alarm:1; /* An alarm is pending. */
+    unsigned int txq_inline; /* Maximum packet size for inlining. */
+    unsigned int txqs_inline; /* Queue number threshold for inlining. */
+    /* RX/TX queues. */
+    unsigned int rxqs_n; /* RX queues array size. */
+    unsigned int txqs_n; /* TX queues array size. */
+    struct rxq *(*rxqs)[]; /* RX queues. */
+    struct txq *(*txqs)[]; /* TX queues. */
+    /* Indirection tables referencing all RX WQs. */
+    struct ibv_exp_rwq_ind_table *(*ind_tables)[];
+    unsigned int ind_tables_n; /* Number of indirection tables. */
+    unsigned int ind_table_max_size; /* Maximum indirection table size. */
+    /* Hash RX QPs feeding the indirection table. */
+    struct hash_rxq (*hash_rxqs)[];
+    unsigned int hash_rxqs_n; /* Hash RX QPs array size. */
+    /* RSS configuration array indexed by hash RX queue type. */
+    struct rte_eth_rss_conf *(*rss_conf)[];
+    uint64_t rss_hf; /* RSS DPDK bit field of active RSS. */
+    struct rte_intr_handle intr_handle; /* Interrupt handler. */
+    unsigned int (*reta_idx)[]; /* RETA index table. */
+    unsigned int reta_idx_n; /* RETA index size. */
+    struct fdir_filter_list *fdir_filter_list; /* Flow director rules. */
+    struct fdir_queue *fdir_drop_queue; /* Flow director drop queue. */
+    LIST_HEAD(mlx5_flows, rte_flow) flows; /* RTE Flow rules. */
+    uint32_t link_speed_capa; /* Link speed capabilities. */
+    struct mlx5_xstats_ctrl xstats_ctrl; /* Extended stats control. */
+    rte_spinlock_t lock; /* Lock for control functions. */
+#ifdef TREX_PATCH
     struct mlx5_stats_priv m_stats;
+#endif
 };
 
 /* Local storage for secondary process data. */
 struct mlx5_secondary_data {
-	struct rte_eth_dev_data data; /* Local device data. */
-	struct priv *primary_priv; /* Private structure from primary. */
-	struct rte_eth_dev_data *shared_dev_data; /* Shared device data. */
-	rte_spinlock_t lock; /* Port configuration lock. */
+    struct rte_eth_dev_data data; /* Local device data. */
+    struct priv *primary_priv; /* Private structure from primary. */
+    struct rte_eth_dev_data *shared_dev_data; /* Shared device data. */
+    rte_spinlock_t lock; /* Port configuration lock. */
 } mlx5_secondary_data[RTE_MAX_ETHPORTS];
 
 /**
@@ -201,7 +205,7 @@ struct mlx5_secondary_data {
 static inline void
 priv_lock(struct priv *priv)
 {
-	rte_spinlock_lock(&priv->lock);
+    rte_spinlock_lock(&priv->lock);
 }
 
 /**
@@ -213,7 +217,7 @@ priv_lock(struct priv *priv)
 static inline void
 priv_unlock(struct priv *priv)
 {
-	rte_spinlock_unlock(&priv->lock);
+    rte_spinlock_unlock(&priv->lock);
 }
 
 /* mlx5.c */
@@ -237,7 +241,7 @@ int mlx5_dev_set_mtu(struct rte_eth_dev *, uint16_t);
 int mlx5_dev_get_flow_ctrl(struct rte_eth_dev *, struct rte_eth_fc_conf *);
 int mlx5_dev_set_flow_ctrl(struct rte_eth_dev *, struct rte_eth_fc_conf *);
 int mlx5_ibv_device_to_pci_addr(const struct ibv_device *,
-				struct rte_pci_addr *);
+                struct rte_pci_addr *);
 void mlx5_dev_link_status_handler(void *);
 void mlx5_dev_interrupt_handler(struct rte_intr_handle *, void *);
 void priv_dev_interrupt_handler_uninstall(struct priv *, struct rte_eth_dev *);
@@ -256,23 +260,23 @@ void priv_mac_addrs_disable(struct priv *);
 void mlx5_mac_addr_remove(struct rte_eth_dev *, uint32_t);
 int hash_rxq_mac_addrs_add(struct hash_rxq *);
 int priv_mac_addr_add(struct priv *, unsigned int,
-		      const uint8_t (*)[ETHER_ADDR_LEN]);
+              const uint8_t (*)[ETHER_ADDR_LEN]);
 int priv_mac_addrs_enable(struct priv *);
 void mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
-		       uint32_t);
+               uint32_t);
 void mlx5_mac_addr_set(struct rte_eth_dev *, struct ether_addr *);
 
 /* mlx5_rss.c */
 
 int rss_hash_rss_conf_new_key(struct priv *, const uint8_t *, unsigned int,
-			      uint64_t);
+                  uint64_t);
 int mlx5_rss_hash_update(struct rte_eth_dev *, struct rte_eth_rss_conf *);
 int mlx5_rss_hash_conf_get(struct rte_eth_dev *, struct rte_eth_rss_conf *);
 int priv_rss_reta_index_resize(struct priv *, unsigned int);
 int mlx5_dev_rss_reta_query(struct rte_eth_dev *,
-			    struct rte_eth_rss_reta_entry64 *, uint16_t);
+                struct rte_eth_rss_reta_entry64 *, uint16_t);
 int mlx5_dev_rss_reta_update(struct rte_eth_dev *,
-			     struct rte_eth_rss_reta_entry64 *, uint16_t);
+                 struct rte_eth_rss_reta_entry64 *, uint16_t);
 
 /* mlx5_rxmode.c */
 
@@ -290,13 +294,15 @@ void mlx5_allmulticast_disable(struct rte_eth_dev *);
 void priv_xstats_init(struct priv *);
 void mlx5_stats_get(struct rte_eth_dev *, struct rte_eth_stats *);
 void mlx5_stats_reset(struct rte_eth_dev *);
+#ifdef TREX_PATCH
 void mlx5_stats_free(struct rte_eth_dev *dev);
+#endif
 
 int mlx5_xstats_get(struct rte_eth_dev *,
-		    struct rte_eth_xstat *, unsigned int);
+            struct rte_eth_xstat *, unsigned int);
 void mlx5_xstats_reset(struct rte_eth_dev *);
 int mlx5_xstats_get_names(struct rte_eth_dev *,
-			  struct rte_eth_xstat_name *, unsigned int);
+              struct rte_eth_xstat_name *, unsigned int);
 
 /* mlx5_vlan.c */
 
@@ -317,21 +323,21 @@ void priv_fdir_delete_filters_list(struct priv *);
 void priv_fdir_disable(struct priv *);
 void priv_fdir_enable(struct priv *);
 int mlx5_dev_filter_ctrl(struct rte_eth_dev *, enum rte_filter_type,
-			 enum rte_filter_op, void *);
+             enum rte_filter_op, void *);
 
 /* mlx5_flow.c */
 
 int mlx5_flow_validate(struct rte_eth_dev *, const struct rte_flow_attr *,
-		       const struct rte_flow_item [],
-		       const struct rte_flow_action [],
-		       struct rte_flow_error *);
+               const struct rte_flow_item [],
+               const struct rte_flow_action [],
+               struct rte_flow_error *);
 struct rte_flow *mlx5_flow_create(struct rte_eth_dev *,
-				  const struct rte_flow_attr *,
-				  const struct rte_flow_item [],
-				  const struct rte_flow_action [],
-				  struct rte_flow_error *);
+                  const struct rte_flow_attr *,
+                  const struct rte_flow_item [],
+                  const struct rte_flow_action [],
+                  struct rte_flow_error *);
 int mlx5_flow_destroy(struct rte_eth_dev *, struct rte_flow *,
-		      struct rte_flow_error *);
+              struct rte_flow_error *);
 int mlx5_flow_flush(struct rte_eth_dev *, struct rte_flow_error *);
 int priv_flow_start(struct priv *);
 void priv_flow_stop(struct priv *);

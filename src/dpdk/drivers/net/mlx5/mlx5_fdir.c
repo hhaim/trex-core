@@ -38,13 +38,17 @@
 #include <errno.h>
 
 #define TREX_PATCH
-         
+
 /* Verbs header. */
 /* ISO C doesn't support unnamed structs/unions, disabling -pedantic. */
 #ifdef PEDANTIC
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+#ifdef TREX_PATCH
 #include <infiniband/verbs_exp.h>
+#else
+#include <infiniband/verbs.h>
+#endif
 #ifdef PEDANTIC
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
@@ -71,9 +75,11 @@ struct fdir_flow_desc {
 	uint16_t src_port;
 	uint32_t src_ip[4];
 	uint32_t dst_ip[4];
+#ifdef TREX_PATCH
     uint8_t  tos;
     uint8_t  ip_id;
     uint8_t  proto;
+#endif
 	uint8_t	mac[6];
 	uint16_t vlan_tag;
 	enum hash_rxq_type type;
@@ -161,9 +167,11 @@ fdir_filter_to_flow_desc(const struct rte_eth_fdir_filter *fdir_filter,
 	case RTE_ETH_FLOW_NONFRAG_IPV4_OTHER:
 		desc->src_ip[0] = fdir_filter->input.flow.ip4_flow.src_ip;
 		desc->dst_ip[0] = fdir_filter->input.flow.ip4_flow.dst_ip;
-        desc->tos       = fdir_filter->input.flow.ip4_flow.ttl; /* TTL is mapped to TOS TREX_PATCH */
+#ifdef TREX_PATCH
+        desc->tos       = fdir_filter->input.flow.ip4_flow.ttl; /* TTL is mapped to TOS */
         desc->ip_id     = fdir_filter->input.flow.ip4_flow.ip_id;
         desc->proto     = fdir_filter->input.flow.ip4_flow.proto;
+#endif
 		break;
 	case RTE_ETH_FLOW_NONFRAG_IPV6_UDP:
 	case RTE_ETH_FLOW_NONFRAG_IPV6_TCP:
@@ -177,9 +185,11 @@ fdir_filter_to_flow_desc(const struct rte_eth_fdir_filter *fdir_filter,
 		rte_memcpy(desc->dst_ip,
 			   fdir_filter->input.flow.ipv6_flow.dst_ip,
 			   sizeof(desc->dst_ip));
-        desc->tos       = (uint8_t)fdir_filter->input.flow.ipv6_flow.hop_limits;  /* TTL is mapped to TOS - TREX_PATCH */
+#ifdef TREX_PATCH
+        desc->tos       = (uint8_t)fdir_filter->input.flow.ipv6_flow.hop_limits;  /* TTL is mapped to TOS */
         desc->ip_id     = (uint8_t)fdir_filter->input.flow.ipv6_flow.flow_label;
         desc->proto     = fdir_filter->input.flow.ipv6_flow.proto;
+#endif
 		break;
 	default:
 		break;
@@ -220,10 +230,12 @@ priv_fdir_overlap(const struct priv *priv,
 	    ((desc1->dst_port & mask->dst_port_mask) !=
 	     (desc2->dst_port & mask->dst_port_mask)))
 		return 0;
+#ifdef TREX_PATCH
     if  ( (desc1->tos    != desc2->tos)  ||
           (desc1->ip_id  != desc2->ip_id) ||
           (desc1->proto  != desc2->proto) ) 
         return 0;
+#endif
 
 	switch (desc1->type) {
 	case HASH_RXQ_IPV4:
@@ -279,8 +291,13 @@ priv_fdir_flow_add(struct priv *priv,
 	struct ibv_exp_flow_attr *attr = &data->attr;
 	uintptr_t spec_offset = (uintptr_t)&data->spec;
 	struct ibv_exp_flow_spec_eth *spec_eth;
+#ifdef TREX_PATCH
 	struct ibv_exp_flow_spec_ipv4_ext *spec_ipv4;
 	struct ibv_exp_flow_spec_ipv6_ext *spec_ipv6;
+#else
+	struct ibv_exp_flow_spec_ipv4 *spec_ipv4;
+	struct ibv_exp_flow_spec_ipv6 *spec_ipv6;
+#endif
 	struct ibv_exp_flow_spec_tcp_udp *spec_tcp_udp;
 	struct mlx5_fdir_filter *iter_fdir_filter;
 	unsigned int i;
@@ -292,10 +309,15 @@ priv_fdir_flow_add(struct priv *priv,
 		    (iter_fdir_filter->flow != NULL) &&
 		    (priv_fdir_overlap(priv,
 				       &mlx5_fdir_filter->desc,
-				       &iter_fdir_filter->desc))){
-            ERROR("overlap rules, please check your rules");
+				       &iter_fdir_filter->desc)))
+#ifndef TREX_PATCH
             return EEXIST;
-        }
+#else
+    {
+        ERROR("overlap rules, please check your rules");
+        return EEXIST;
+    }
+#endif
 
 	/*
 	 * No padding must be inserted by the compiler between attr and spec.
@@ -336,7 +358,7 @@ priv_fdir_flow_add(struct priv *priv,
         spec_eth->mask.ether_type = 0x0000;
         goto create_flow;
     }
-#endif    
+#endif
 
 
 	switch (desc->type) {
@@ -346,10 +368,18 @@ priv_fdir_flow_add(struct priv *priv,
 		spec_offset += spec_eth->size;
 
 		/* Set IP spec */
+#ifdef TREX_PATCH
 		spec_ipv4 = (struct ibv_exp_flow_spec_ipv4_ext *)spec_offset;
+#else
+        spec_ipv4 = (struct ibv_exp_flow_spec_ipv4 *)spec_offset;
+#endif
 
 		/* The second specification must be IP. */
+#ifdef TREX_PATCH
 		assert(spec_ipv4->type == IBV_EXP_FLOW_SPEC_IPV4_EXT);
+#else
+        assert(spec_ipv4->type == IBV_EXP_FLOW_SPEC_IPV4);
+#endif
 		assert(spec_ipv4->size == sizeof(*spec_ipv4));
 
 		spec_ipv4->val.src_ip =
@@ -362,10 +392,10 @@ priv_fdir_flow_add(struct priv *priv,
 		/* Update priority */
 		attr->priority = 1;
 
+#ifdef TREX_PATCH
         spec_ipv4->val.proto  = desc->proto & mask->ipv4_mask.proto;
         spec_ipv4->mask.proto = mask->ipv4_mask.proto;
 
-#ifdef TREX_PATCH
         /* TOS */
         if (desc->ip_id == 1) {
             spec_ipv4->mask.tos = 0x1;
@@ -388,10 +418,18 @@ priv_fdir_flow_add(struct priv *priv,
 		spec_offset += spec_eth->size;
 
 		/* Set IP spec */
+#ifdef TREX_PATCH
 		spec_ipv6 = (struct ibv_exp_flow_spec_ipv6_ext *)spec_offset;
+#else
+        spec_ipv6 = (struct ibv_exp_flow_spec_ipv6 *)spec_offset;
+#endif
 
 		/* The second specification must be IP. */
+#ifdef TREX_PATCH
 		assert(spec_ipv6->type == IBV_EXP_FLOW_SPEC_IPV6_EXT);
+#else
+        assert(spec_ipv6->type == IBV_EXP_FLOW_SPEC_IPV6);
+#endif
 		assert(spec_ipv6->size == sizeof(*spec_ipv6));
 
 		for (i = 0; i != RTE_DIM(desc->src_ip); ++i) {
@@ -407,10 +445,10 @@ priv_fdir_flow_add(struct priv *priv,
 			   mask->ipv6_mask.dst_ip,
 			   sizeof(spec_ipv6->mask.dst_ip));
 
+#ifdef TREX_PATCH
         spec_ipv6->val.next_hdr  = desc->proto & mask->ipv6_mask.proto;
         spec_ipv6->mask.next_hdr = mask->ipv6_mask.proto;
 
-#ifdef TREX_PATCH
         /* TOS */
         if (desc->ip_id == 1) {
             spec_ipv6->mask.traffic_class = 0x1;
@@ -900,8 +938,10 @@ priv_fdir_filter_add(struct priv *priv,
 	if (mlx5_fdir_filter != NULL) {
 #ifndef TREX_PATCH
 		ERROR("filter already exists");
-#endif
+        return EINVAL;
+#else
 		return EEXIST;
+#endif
 	}
 
 	/* Create new flow director filter. */
@@ -1029,8 +1069,10 @@ priv_fdir_filter_delete(struct priv *priv,
 #ifndef TREX_PATCH
 	ERROR("%p: flow director delete failed, cannot find filter",
 	      (void *)priv);
+    return EINVAL;
+#else
+    return ENOENT;
 #endif
-	 return ENOENT;
 }
 
 /**
