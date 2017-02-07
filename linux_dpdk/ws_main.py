@@ -415,21 +415,6 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'drivers/net/ixgbe/ixgbe_rxtx.c',
                  'drivers/net/ixgbe/ixgbe_rxtx_vec_sse.c',
 
-                 'drivers/net/mlx5/mlx5_mr.c',
-                 'drivers/net/mlx5/mlx5_ethdev.c',
-                 'drivers/net/mlx5/mlx5_mac.c',
-                 'drivers/net/mlx5/mlx5_rxmode.c',
-                 'drivers/net/mlx5/mlx5_rxtx.c',
-                 'drivers/net/mlx5/mlx5_stats.c',
-                 'drivers/net/mlx5/mlx5_txq.c',
-                 'drivers/net/mlx5/mlx5.c',
-                 'drivers/net/mlx5/mlx5_fdir.c',
-                 'drivers/net/mlx5/mlx5_flow.c',
-                 'drivers/net/mlx5/mlx5_rss.c',
-                 'drivers/net/mlx5/mlx5_rxq.c',
-                 'drivers/net/mlx5/mlx5_trigger.c',
-                 'drivers/net/mlx5/mlx5_vlan.c',
-
                  'drivers/net/i40e/base/i40e_adminq.c',
                  'drivers/net/i40e/base/i40e_common.c',
                  'drivers/net/i40e/base/i40e_dcb.c',
@@ -441,7 +426,7 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'drivers/net/i40e/i40e_pf.c',
                  'drivers/net/i40e/i40e_rxtx.c',
                  'drivers/net/i40e/i40e_flow.c',
-                 '/drivers/net/i40e/i40e_rxtx_vec_sse.c',
+                 'drivers/net/i40e/i40e_rxtx_vec_sse.c',
                  'drivers/net/i40e/i40e_fdir.c',
                  'drivers/net/i40e/i40e_ethdev.c',
                  'drivers/net/null/rte_eth_null.c',
@@ -452,17 +437,17 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'drivers/net/virtio/virtio_rxtx_simple.c',
                  'drivers/net/virtio/virtqueue.c',
                  'drivers/net/virtio/virtio_rxtx_simple_sse.c',
-                 '/drivers/net/virtio/virtio_user_ethdev.c',
+                 'drivers/net/virtio/virtio_user_ethdev.c',
                  'drivers/net/virtio/virtio_user/vhost_kernel.c',
-                 '/drivers/net/virtio/virtio_user/vhost_kernel_tap.c',
-                 '/drivers/net/virtio/virtio_user/vhost_user.c',
-                 '/drivers/net/virtio/virtio_user/virtio_user_dev.c',
-                 '/drivers/net/vmxnet3/vmxnet3_ethdev.c',
-                 '/drivers/net/vmxnet3/vmxnet3_rxtx.c',
+                 'drivers/net/virtio/virtio_user/vhost_kernel_tap.c',
+                 'drivers/net/virtio/virtio_user/vhost_user.c',
+                 'drivers/net/virtio/virtio_user/virtio_user_dev.c',
+                 'drivers/net/vmxnet3/vmxnet3_ethdev.c',
+                 'drivers/net/vmxnet3/vmxnet3_rxtx.c',
                  'lib/librte_cfgfile/rte_cfgfile.c',
                  'lib/librte_eal/common/arch/x86/rte_cpuflags.c',
                  'lib/librte_eal/common/arch/x86/rte_spinlock.c',
-                 '/lib/librte_eal/common/eal_common_bus.c',
+                 'lib/librte_eal/common/eal_common_bus.c',
                  'lib/librte_eal/common/eal_common_cpuflags.c',
                  'lib/librte_eal/common/eal_common_dev.c',
                  'lib/librte_eal/common/eal_common_devargs.c',
@@ -514,9 +499,33 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'lib/librte_ring/rte_ring.c',
             ]);
 
+mlx5_dpdk_src = SrcGroup(dir='src/dpdk/',
+                src_list=[
+
+                 'drivers/net/mlx5/mlx5_mr.c',
+                 'drivers/net/mlx5/mlx5_ethdev.c',
+                 'drivers/net/mlx5/mlx5_mac.c',
+                 'drivers/net/mlx5/mlx5_rxmode.c',
+                 'drivers/net/mlx5/mlx5_rxtx.c',
+                 'drivers/net/mlx5/mlx5_stats.c',
+                 'drivers/net/mlx5/mlx5_txq.c',
+                 'drivers/net/mlx5/mlx5.c',
+                 'drivers/net/mlx5/mlx5_fdir.c',
+                 'drivers/net/mlx5/mlx5_flow.c',
+                 'drivers/net/mlx5/mlx5_rss.c',
+                 'drivers/net/mlx5/mlx5_rxq.c',
+                 'drivers/net/mlx5/mlx5_trigger.c',
+                 'drivers/net/mlx5/mlx5_vlan.c',
+            ]);
+
 bp_dpdk =SrcGroups([
                 dpdk_src
                 ]);
+
+mlx5_dpdk =SrcGroups([
+                mlx5_dpdk_src
+                ]);
+
 
 # this is the library dp going to falcon (and maybe other platforms)
 bp =SrcGroups([
@@ -794,6 +803,12 @@ class build_option:
     def get_dpdk_target (self):
         return self.update_executable_name("dpdk");
 
+    def get_mlx5_target (self):
+        return self.update_executable_name("mlx5");
+
+    def get_mlx5so_target (self):
+        return self.update_executable_name("libmlx5")+'.so';
+
     def get_common_flags (self):
         if self.isPIE():
             flags = copy.copy(common_flags_old)
@@ -871,19 +886,29 @@ def build_prog (bld, build_obj):
 
     bld.objects(
       features='c ',
-      includes = dpdk_includes_path+dpdk_includes_verb_path,
+      includes = dpdk_includes_path,
       
       cflags   = (build_obj.get_c_flags()+DPDK_FLAGS ),
       source   = bp_dpdk.file_list(top),
       target=build_obj.get_dpdk_target() 
       );
 
+    bld.shlib(
+      features='c',
+      includes = dpdk_includes_path+dpdk_includes_verb_path,
+      cflags   = (build_obj.get_c_flags()+DPDK_FLAGS ),
+      use =['ibverbs'],
+
+      source   = mlx5_dpdk.file_list(top),
+      target   = build_obj.get_mlx5_target() 
+   )
+
     bld.program(features='cxx cxxprogram', 
                 includes =includes_path,
                 cxxflags =(build_obj.get_cxx_flags()+['-std=gnu++11',]),
                 linkflags = build_obj.get_link_flags() ,
                 lib=['pthread','dl', 'z'],
-                use =[build_obj.get_dpdk_target(),'zmq','ibverbs'],
+                use =[build_obj.get_dpdk_target(),'zmq'],
                 source = bp.file_list(top) + debug_file_list,
                 rpath = rpath_linkage,
                 target = build_obj.get_target())
@@ -923,16 +948,26 @@ def build(bld):
 
 def build_info(bld):
     pass;
-      
+
+def do_create_link (src,dst,exec_p):
+    if os.path.exists(src):
+        dest_file = exec_p +dst
+        if not os.path.lexists(dest_file):
+            print(dest_file)
+            relative_path = os.path.relpath(src, exec_p)
+            os.symlink(relative_path, dest_file);
+
 def install_single_system (bld, exec_p, build_obj):
     o='build_dpdk/linux_dpdk/';
+
     src_file =  os.path.realpath(o+build_obj.get_target())
-    if os.path.exists(src_file):
-        dest_file = exec_p +build_obj.get_target()
-        print(dest_file)
-        if not os.path.lexists(dest_file):
-            relative_path = os.path.relpath(src_file, exec_p)
-            os.symlink(relative_path, dest_file);
+    dest_file = exec_p +build_obj.get_target()
+    do_create_link(src_file,dest_file,exec_p);
+
+    src_mlx_file =  os.path.realpath(o+build_obj.get_mlx5so_target())
+    dest_mlx_file = exec_p + build_obj.get_mlx5so_target()
+    do_create_link(src_mlx_file,dest_mlx_file,exec_p);
+
 
 
 def pre_build(bld):
@@ -1017,12 +1052,24 @@ def _copy_single_system1 (bld, exec_p, build_obj):
         os.system("cp %s %s " %(src_file,dest_file));
         os.system("chmod +x %s " %(dest_file));
 
+def _copy_single_system2 (bld, exec_p, build_obj):
+    o='../scripts/';
+    src_file =  os.path.realpath(o+build_obj.get_mlx5so_target()[1:])
+    print(src_file)
+    if os.path.exists(src_file):
+        dest_file = exec_p +build_obj.get_mlx5so_target()[1:]
+        os.system("cp %s %s " %(src_file,dest_file));
+        os.system("chmod +x %s " %(dest_file));
+
 
 def copy_single_system (bld, exec_p, build_obj):
     _copy_single_system (bld, exec_p, build_obj)
 
 def copy_single_system1 (bld, exec_p, build_obj):
     _copy_single_system1 (bld, exec_p, build_obj)
+
+def copy_single_system2 (bld, exec_p, build_obj):
+    _copy_single_system2 (bld, exec_p, build_obj)
 
 
 files_list=[
@@ -1137,8 +1184,9 @@ def release(bld, custom_dir = None):
     os.system(' mkdir -p '+exec_p);
 
     for obj in build_types:
-        copy_single_system (bld,exec_p,obj);
-        copy_single_system1 (bld,exec_p,obj)
+        copy_single_system(bld,exec_p,obj)
+        copy_single_system1(bld,exec_p,obj)
+        copy_single_system2(bld,exec_p,obj)
 
     for obj in files_list:
         src_file =  '../scripts/'+obj
