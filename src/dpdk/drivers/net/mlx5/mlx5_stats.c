@@ -50,81 +50,81 @@
 #include "mlx5_defs.h"
 
 struct mlx5_counter_ctrl {
-    /* Name of the counter. */
-    char dpdk_name[RTE_ETH_XSTATS_NAME_SIZE];
-    /* Name of the counter on the device table. */
-    char ctr_name[RTE_ETH_XSTATS_NAME_SIZE];
+	/* Name of the counter. */
+	char dpdk_name[RTE_ETH_XSTATS_NAME_SIZE];
+	/* Name of the counter on the device table. */
+	char ctr_name[RTE_ETH_XSTATS_NAME_SIZE];
 };
 
 static const struct mlx5_counter_ctrl mlx5_counters_init[] = {
-    {
-        .dpdk_name = "rx_port_unicast_bytes",
-        .ctr_name = "rx_vport_unicast_bytes",
-    },
-    {
-        .dpdk_name = "rx_port_multicast_bytes",
-        .ctr_name = "rx_vport_multicast_bytes",
-    },
-    {
-        .dpdk_name = "rx_port_broadcast_bytes",
-        .ctr_name = "rx_vport_broadcast_bytes",
-    },
-    {
-        .dpdk_name = "rx_port_unicast_packets",
-        .ctr_name = "rx_vport_unicast_packets",
-    },
-    {
-        .dpdk_name = "rx_port_multicast_packets",
-        .ctr_name = "rx_vport_multicast_packets",
-    },
-    {
-        .dpdk_name = "rx_port_broadcast_packets",
-        .ctr_name = "rx_vport_broadcast_packets",
-    },
-    {
-        .dpdk_name = "tx_port_unicast_bytes",
-        .ctr_name = "tx_vport_unicast_bytes",
-    },
-    {
-        .dpdk_name = "tx_port_multicast_bytes",
-        .ctr_name = "tx_vport_multicast_bytes",
-    },
-    {
-        .dpdk_name = "tx_port_broadcast_bytes",
-        .ctr_name = "tx_vport_broadcast_bytes",
-    },
-    {
-        .dpdk_name = "tx_port_unicast_packets",
-        .ctr_name = "tx_vport_unicast_packets",
-    },
-    {
-        .dpdk_name = "tx_port_multicast_packets",
-        .ctr_name = "tx_vport_multicast_packets",
-    },
-    {
-        .dpdk_name = "tx_port_broadcast_packets",
-        .ctr_name = "tx_vport_broadcast_packets",
-    },
-    {
-        .dpdk_name = "rx_wqe_err",
-        .ctr_name = "rx_wqe_err",
-    },
-    {
-        .dpdk_name = "rx_crc_errors_phy",
-        .ctr_name = "rx_crc_errors_phy",
-    },
-    {
-        .dpdk_name = "rx_in_range_len_errors_phy",
-        .ctr_name = "rx_in_range_len_errors_phy",
-    },
-    {
-        .dpdk_name = "rx_symbol_err_phy",
-        .ctr_name = "rx_symbol_err_phy",
-    },
-    {
-        .dpdk_name = "tx_errors_phy",
-        .ctr_name = "tx_errors_phy",
-    },
+	{
+		.dpdk_name = "rx_port_unicast_bytes",
+		.ctr_name = "rx_vport_unicast_bytes",
+	},
+	{
+		.dpdk_name = "rx_port_multicast_bytes",
+		.ctr_name = "rx_vport_multicast_bytes",
+	},
+	{
+		.dpdk_name = "rx_port_broadcast_bytes",
+		.ctr_name = "rx_vport_broadcast_bytes",
+	},
+	{
+		.dpdk_name = "rx_port_unicast_packets",
+		.ctr_name = "rx_vport_unicast_packets",
+	},
+	{
+		.dpdk_name = "rx_port_multicast_packets",
+		.ctr_name = "rx_vport_multicast_packets",
+	},
+	{
+		.dpdk_name = "rx_port_broadcast_packets",
+		.ctr_name = "rx_vport_broadcast_packets",
+	},
+	{
+		.dpdk_name = "tx_port_unicast_bytes",
+		.ctr_name = "tx_vport_unicast_bytes",
+	},
+	{
+		.dpdk_name = "tx_port_multicast_bytes",
+		.ctr_name = "tx_vport_multicast_bytes",
+	},
+	{
+		.dpdk_name = "tx_port_broadcast_bytes",
+		.ctr_name = "tx_vport_broadcast_bytes",
+	},
+	{
+		.dpdk_name = "tx_port_unicast_packets",
+		.ctr_name = "tx_vport_unicast_packets",
+	},
+	{
+		.dpdk_name = "tx_port_multicast_packets",
+		.ctr_name = "tx_vport_multicast_packets",
+	},
+	{
+		.dpdk_name = "tx_port_broadcast_packets",
+		.ctr_name = "tx_vport_broadcast_packets",
+	},
+	{
+		.dpdk_name = "rx_wqe_err",
+		.ctr_name = "rx_wqe_err",
+	},
+	{
+		.dpdk_name = "rx_crc_errors_phy",
+		.ctr_name = "rx_crc_errors_phy",
+	},
+	{
+		.dpdk_name = "rx_in_range_len_errors_phy",
+		.ctr_name = "rx_in_range_len_errors_phy",
+	},
+	{
+		.dpdk_name = "rx_symbol_err_phy",
+		.ctr_name = "rx_symbol_err_phy",
+	},
+	{
+		.dpdk_name = "tx_errors_phy",
+		.ctr_name = "tx_errors_phy",
+	},
 };
 
 static const unsigned int xstats_n = RTE_DIM(mlx5_counters_init);
@@ -143,26 +143,26 @@ static const unsigned int xstats_n = RTE_DIM(mlx5_counters_init);
 static int
 priv_read_dev_counters(struct priv *priv, uint64_t *stats)
 {
-    struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
-    unsigned int i;
-    struct ifreq ifr;
-    unsigned int stats_sz = (xstats_ctrl->stats_n * sizeof(uint64_t)) +
-                 sizeof(struct ethtool_stats);
-    struct ethtool_stats et_stats[(stats_sz + (
-                      sizeof(struct ethtool_stats) - 1)) /
-                      sizeof(struct ethtool_stats)];
+	struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
+	unsigned int i;
+	struct ifreq ifr;
+	unsigned int stats_sz = (xstats_ctrl->stats_n * sizeof(uint64_t)) +
+				 sizeof(struct ethtool_stats);
+	struct ethtool_stats et_stats[(stats_sz + (
+				      sizeof(struct ethtool_stats) - 1)) /
+				      sizeof(struct ethtool_stats)];
 
-    et_stats->cmd = ETHTOOL_GSTATS;
-    et_stats->n_stats = xstats_ctrl->stats_n;
-    ifr.ifr_data = (caddr_t)et_stats;
-    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
-        WARN("unable to read statistic values from device");
-        return -1;
-    }
-    for (i = 0; i != xstats_n; ++i)
-        stats[i] = (uint64_t)
-               et_stats->data[xstats_ctrl->dev_table_idx[i]];
-    return 0;
+	et_stats->cmd = ETHTOOL_GSTATS;
+	et_stats->n_stats = xstats_ctrl->stats_n;
+	ifr.ifr_data = (caddr_t)et_stats;
+	if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
+		WARN("unable to read statistic values from device");
+		return -1;
+	}
+	for (i = 0; i != xstats_n; ++i)
+		stats[i] = (uint64_t)
+			   et_stats->data[xstats_ctrl->dev_table_idx[i]];
+	return 0;
 }
 
 /**
@@ -174,81 +174,79 @@ priv_read_dev_counters(struct priv *priv, uint64_t *stats)
 void
 priv_xstats_init(struct priv *priv)
 {
-    struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
-    unsigned int i;
-    unsigned int j;
-    char ifname[IF_NAMESIZE];
-    struct ifreq ifr;
-    struct ethtool_drvinfo drvinfo;
-    struct ethtool_gstrings *strings = NULL;
-    unsigned int dev_stats_n;
-    unsigned int str_sz;
+	struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
+	unsigned int i;
+	unsigned int j;
+	char ifname[IF_NAMESIZE];
+	struct ifreq ifr;
+	struct ethtool_drvinfo drvinfo;
+	struct ethtool_gstrings *strings = NULL;
+	unsigned int dev_stats_n;
+	unsigned int str_sz;
 
-    if (priv_get_ifname(priv, &ifname)) {
-        WARN("unable to get interface name");
-        return;
-    }
-    /* How many statistics are available. */
-    drvinfo.cmd = ETHTOOL_GDRVINFO;
-    ifr.ifr_data = (caddr_t)&drvinfo;
-    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
-        WARN("unable to get driver info");
-        return;
-    }
-    dev_stats_n = drvinfo.n_stats;
-    if (dev_stats_n < 1) {
-        WARN("no extended statistics available");
-        return;
-    }
-    xstats_ctrl->stats_n = dev_stats_n;
-    /* Allocate memory to grab stat names and values. */
-    str_sz = dev_stats_n * ETH_GSTRING_LEN;
-    strings = (struct ethtool_gstrings *)
-          rte_malloc("xstats_strings",
-                 str_sz + sizeof(struct ethtool_gstrings), 0);
-    if (!strings) {
-        WARN("unable to allocate memory for xstats");
-        return;
-    }
-    strings->cmd = ETHTOOL_GSTRINGS;
-    strings->string_set = ETH_SS_STATS;
-    strings->len = dev_stats_n;
-    ifr.ifr_data = (caddr_t)strings;
-    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
-        WARN("unable to get statistic names");
-        goto free;
-    }
-    for (j = 0; j != xstats_n; ++j)
-        xstats_ctrl->dev_table_idx[j] = dev_stats_n;
-    for (i = 0; i != dev_stats_n; ++i) {
-        const char *curr_string = (const char *)
-            &strings->data[i * ETH_GSTRING_LEN];
+	if (priv_get_ifname(priv, &ifname)) {
+		WARN("unable to get interface name");
+		return;
+	}
+	/* How many statistics are available. */
+	drvinfo.cmd = ETHTOOL_GDRVINFO;
+	ifr.ifr_data = (caddr_t)&drvinfo;
+	if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
+		WARN("unable to get driver info");
+		return;
+	}
+	dev_stats_n = drvinfo.n_stats;
+	if (dev_stats_n < 1) {
+		WARN("no extended statistics available");
+		return;
+	}
+	xstats_ctrl->stats_n = dev_stats_n;
+	/* Allocate memory to grab stat names and values. */
+	str_sz = dev_stats_n * ETH_GSTRING_LEN;
+	strings = (struct ethtool_gstrings *)
+		  rte_malloc("xstats_strings",
+			     str_sz + sizeof(struct ethtool_gstrings), 0);
+	if (!strings) {
+		WARN("unable to allocate memory for xstats");
+		return;
+	}
+	strings->cmd = ETHTOOL_GSTRINGS;
+	strings->string_set = ETH_SS_STATS;
+	strings->len = dev_stats_n;
+	ifr.ifr_data = (caddr_t)strings;
+	if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
+		WARN("unable to get statistic names");
+		goto free;
+	}
+	for (j = 0; j != xstats_n; ++j)
+		xstats_ctrl->dev_table_idx[j] = dev_stats_n;
+	for (i = 0; i != dev_stats_n; ++i) {
+		const char *curr_string = (const char *)
+			&strings->data[i * ETH_GSTRING_LEN];
 
-        for (j = 0; j != xstats_n; ++j) {
-            if (!strcmp(mlx5_counters_init[j].ctr_name,
-                    curr_string)) {
-                xstats_ctrl->dev_table_idx[j] = i;
-                break;
-            }
-        }
-    }
-    for (j = 0; j != xstats_n; ++j) {
-        if (xstats_ctrl->dev_table_idx[j] >= dev_stats_n) {
-            WARN("counter \"%s\" is not recognized",
-                 mlx5_counters_init[j].dpdk_name);
-            goto free;
-        }
-    }
-    /* Copy to base at first time. */
-    assert(xstats_n <= MLX5_MAX_XSTATS);
-    priv_read_dev_counters(priv, xstats_ctrl->base);
+		for (j = 0; j != xstats_n; ++j) {
+			if (!strcmp(mlx5_counters_init[j].ctr_name,
+				    curr_string)) {
+				xstats_ctrl->dev_table_idx[j] = i;
+				break;
+			}
+		}
+	}
+	for (j = 0; j != xstats_n; ++j) {
+		if (xstats_ctrl->dev_table_idx[j] >= dev_stats_n) {
+			WARN("counter \"%s\" is not recognized",
+			     mlx5_counters_init[j].dpdk_name);
+			goto free;
+		}
+	}
+	/* Copy to base at first time. */
+	assert(xstats_n <= MLX5_MAX_XSTATS);
+	priv_read_dev_counters(priv, xstats_ctrl->base);
 free:
-    rte_free(strings);
+	rte_free(strings);
 }
 
 
-#define TREX_PATCH
-#ifdef TREX_PATCH
 
 static void
 mlx5_stats_read_hw(struct rte_eth_dev *dev,
@@ -266,8 +264,8 @@ mlx5_stats_read_hw(struct rte_eth_dev *dev,
 
     ifr.ifr_data = (caddr_t) et_stats;
 
-    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
-        WARN("unable to get statistic values for mlnx5 ");
+    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) { 
+        WARN("unable to get statistic values for mlnx5 "); 
     }
 
     tmp.ibytes += et_stats->data[lps->inx_rx_vport_unicast_bytes] +
@@ -278,7 +276,7 @@ mlx5_stats_read_hw(struct rte_eth_dev *dev,
                 et_stats->data[lps->inx_rx_vport_multicast_packets] +
                 et_stats->data[lps->inx_rx_vport_broadcast_packets];
 
-    tmp.ierrors +=  (et_stats->data[lps->inx_rx_wqe_err] +
+    tmp.ierrors += 	(et_stats->data[lps->inx_rx_wqe_err] +
                     et_stats->data[lps->inx_rx_crc_errors_phy] +
                     et_stats->data[lps->inx_rx_in_range_len_errors_phy] +
                     et_stats->data[lps->inx_rx_symbol_err_phy]);
@@ -362,31 +360,31 @@ mlx5_stats_init(struct rte_eth_dev *dev)
     }
     lps->n_stats = n_stats;
 
-    /* Allocate memory to grab stat names and values */
-    sz_str = n_stats * ETH_GSTRING_LEN;
-    sz_stats = n_stats * sizeof(uint64_t);
-    strings = calloc(1, sz_str + sizeof(struct ethtool_gstrings));
-    if (!strings) {
-        WARN("unable to allocate memory for strings");
+    /* Allocate memory to grab stat names and values */ 
+    sz_str = n_stats * ETH_GSTRING_LEN; 
+    sz_stats = n_stats * sizeof(uint64_t); 
+    strings = calloc(1, sz_str + sizeof(struct ethtool_gstrings)); 
+    if (!strings) { 
+        WARN("unable to allocate memory for strings"); 
         return;
-    }
+    } 
 
-    et_stats = calloc(1, sz_stats + sizeof(struct ethtool_stats));
-    if (!et_stats) {
+    et_stats = calloc(1, sz_stats + sizeof(struct ethtool_stats)); 
+    if (!et_stats) { 
         free(strings);
-        WARN("unable to allocate memory for stats");
-    }
+        WARN("unable to allocate memory for stats"); 
+    } 
 
-    strings->cmd = ETHTOOL_GSTRINGS;
-    strings->string_set = ETH_SS_STATS;
-    strings->len = n_stats;
-    ifr.ifr_data = (caddr_t) strings;
-    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) {
-        WARN("unable to get statistic names for %s", ifname);
+    strings->cmd = ETHTOOL_GSTRINGS; 
+    strings->string_set = ETH_SS_STATS; 
+    strings->len = n_stats; 
+    ifr.ifr_data = (caddr_t) strings; 
+    if (priv_ifreq(priv, SIOCETHTOOL, &ifr) != 0) { 
+        WARN("unable to get statistic names for %s", ifname); 
         free(strings);
         free(et_stats);
         return;
-    }
+    } 
 
     for (i = 0; (i != n_stats); ++i) {
 
@@ -420,11 +418,11 @@ mlx5_stats_init(struct rte_eth_dev *dev)
 
     if (!lps->inx_rx_vport_unicast_bytes ||
     !lps->inx_rx_vport_multicast_bytes ||
-    !lps->inx_rx_vport_broadcast_bytes ||
+    !lps->inx_rx_vport_broadcast_bytes || 
     !lps->inx_rx_vport_unicast_packets ||
     !lps->inx_rx_vport_multicast_packets ||
     !lps->inx_rx_vport_broadcast_packets ||
-    !lps->inx_tx_vport_unicast_bytes ||
+    !lps->inx_tx_vport_unicast_bytes || 
     !lps->inx_tx_vport_multicast_bytes ||
     !lps->inx_tx_vport_broadcast_bytes ||
     !lps->inx_tx_vport_unicast_packets ||
@@ -453,16 +451,16 @@ mlx5_stats_diff(struct rte_eth_stats *a,
     #define MLX5_DIFF(cnt) { a->cnt = (b->cnt - c->cnt);  }
 
     MLX5_DIFF(ipackets);
-    MLX5_DIFF(opackets);
-    MLX5_DIFF(ibytes);
+    MLX5_DIFF(opackets); 
+    MLX5_DIFF(ibytes); 
     MLX5_DIFF(obytes);
     MLX5_DIFF(imissed);
 
-    MLX5_DIFF(ierrors);
-    MLX5_DIFF(oerrors);
+    MLX5_DIFF(ierrors); 
+    MLX5_DIFF(oerrors); 
     MLX5_DIFF(rx_nombuf);
 }
-#endif
+
 
 
 /**
@@ -480,18 +478,18 @@ mlx5_stats_diff(struct rte_eth_stats *a,
 static int
 priv_xstats_get(struct priv *priv, struct rte_eth_xstat *stats)
 {
-    struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
-    unsigned int i;
-    unsigned int n = xstats_n;
-    uint64_t counters[n];
+	struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
+	unsigned int i;
+	unsigned int n = xstats_n;
+	uint64_t counters[n];
 
-    if (priv_read_dev_counters(priv, counters) < 0)
-        return -1;
-    for (i = 0; i != xstats_n; ++i) {
-        stats[i].id = i;
-        stats[i].value = (counters[i] - xstats_ctrl->base[i]);
-    }
-    return n;
+	if (priv_read_dev_counters(priv, counters) < 0)
+		return -1;
+	for (i = 0; i != xstats_n; ++i) {
+		stats[i].id = i;
+		stats[i].value = (counters[i] - xstats_ctrl->base[i]);
+	}
+	return n;
 }
 
 /**
@@ -503,22 +501,21 @@ priv_xstats_get(struct priv *priv, struct rte_eth_xstat *stats)
 static void
 priv_xstats_reset(struct priv *priv)
 {
-    struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
-    unsigned int i;
-    unsigned int n = xstats_n;
-    uint64_t counters[n];
+	struct mlx5_xstats_ctrl *xstats_ctrl = &priv->xstats_ctrl;
+	unsigned int i;
+	unsigned int n = xstats_n;
+	uint64_t counters[n];
 
-    if (priv_read_dev_counters(priv, counters) < 0)
-        return;
-    for (i = 0; i != n; ++i)
-        xstats_ctrl->base[i] = counters[i];
+	if (priv_read_dev_counters(priv, counters) < 0)
+		return;
+	for (i = 0; i != n; ++i)
+		xstats_ctrl->base[i] = counters[i];
 }
 
-// TREX_PATCH replaced the entire function
 void
 mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 {
-    struct priv *priv = mlx5_get_priv(dev);
+	struct priv *priv = mlx5_get_priv(dev);
 
     struct mlx5_stats_priv * lps = &priv->m_stats;
     priv_lock(priv);
@@ -534,7 +531,7 @@ mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
                     &tmp,
                     &lps->m_shadow);
 
-    priv_unlock(priv);
+	priv_unlock(priv);
 }
 
 /**
@@ -543,11 +540,10 @@ mlx5_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
  * @param dev
  *   Pointer to Ethernet device structure.
  */
-// TREX_PATCH replaced the entire function
 void
 mlx5_stats_reset(struct rte_eth_dev *dev)
 {
-    struct priv *priv = dev->data->dev_private;
+	struct priv *priv = dev->data->dev_private;
     struct mlx5_stats_priv * lps = &priv->m_stats;
 
     priv_lock(priv);
@@ -563,7 +559,7 @@ mlx5_stats_reset(struct rte_eth_dev *dev)
     /* copy to shadow */
     lps->m_shadow = tmp;
 
-    priv_unlock(priv);
+	priv_unlock(priv);
 }
 
 
@@ -582,17 +578,17 @@ mlx5_stats_reset(struct rte_eth_dev *dev)
  */
 int
 mlx5_xstats_get(struct rte_eth_dev *dev,
-        struct rte_eth_xstat *stats, unsigned int n)
+		struct rte_eth_xstat *stats, unsigned int n)
 {
-    struct priv *priv = mlx5_get_priv(dev);
-    int ret = xstats_n;
+	struct priv *priv = mlx5_get_priv(dev);
+	int ret = xstats_n;
 
-    if (n >= xstats_n && stats) {
-        priv_lock(priv);
-        ret = priv_xstats_get(priv, stats);
-        priv_unlock(priv);
-    }
-    return ret;
+	if (n >= xstats_n && stats) {
+		priv_lock(priv);
+		ret = priv_xstats_get(priv, stats);
+		priv_unlock(priv);
+	}
+	return ret;
 }
 
 /**
@@ -604,11 +600,11 @@ mlx5_xstats_get(struct rte_eth_dev *dev,
 void
 mlx5_xstats_reset(struct rte_eth_dev *dev)
 {
-    struct priv *priv = mlx5_get_priv(dev);
+	struct priv *priv = mlx5_get_priv(dev);
 
-    priv_lock(priv);
-    priv_xstats_reset(priv);
-    priv_unlock(priv);
+	priv_lock(priv);
+	priv_xstats_reset(priv);
+	priv_unlock(priv);
 }
 
 /**
@@ -626,20 +622,20 @@ mlx5_xstats_reset(struct rte_eth_dev *dev)
  */
 int
 mlx5_xstats_get_names(struct rte_eth_dev *dev,
-        struct rte_eth_xstat_name *xstats_names, unsigned int n)
+		struct rte_eth_xstat_name *xstats_names, unsigned int n)
 {
-    struct priv *priv = mlx5_get_priv(dev);
-    unsigned int i;
+	struct priv *priv = mlx5_get_priv(dev);
+	unsigned int i;
 
-    if (n >= xstats_n && xstats_names) {
-        priv_lock(priv);
-        for (i = 0; i != xstats_n; ++i) {
-            strncpy(xstats_names[i].name,
-                mlx5_counters_init[i].dpdk_name,
-                RTE_ETH_XSTATS_NAME_SIZE);
-            xstats_names[i].name[RTE_ETH_XSTATS_NAME_SIZE - 1] = 0;
-        }
-        priv_unlock(priv);
-    }
-    return xstats_n;
+	if (n >= xstats_n && xstats_names) {
+		priv_lock(priv);
+		for (i = 0; i != xstats_n; ++i) {
+			strncpy(xstats_names[i].name,
+				mlx5_counters_init[i].dpdk_name,
+				RTE_ETH_XSTATS_NAME_SIZE);
+			xstats_names[i].name[RTE_ETH_XSTATS_NAME_SIZE - 1] = 0;
+		}
+		priv_unlock(priv);
+	}
+	return xstats_n;
 }
