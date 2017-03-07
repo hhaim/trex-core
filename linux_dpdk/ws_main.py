@@ -360,6 +360,21 @@ version_src = SrcGroup(
     ])
 
 
+tldk_src = SrcGroup(dir='src/tldk/lib',
+                src_list=[
+                 'libtle_timer/timer.c',
+
+                 'libtle_l4p/ctx.c',
+                 'libtle_l4p/event.c',
+                 'libtle_l4p/stream_table.c',
+                 'libtle_l4p/tcp_ofo.c',
+                 'libtle_l4p/tcp_stream.c',
+                 'libtle_l4p/tcp_rxtx.c',
+                 'libtle_l4p/udp_stream.c',
+                 'libtle_l4p/udp_rxtx.c',
+                 'libtle_dring/dring.c'
+            ]);
+
 dpdk_src = SrcGroup(dir='src/dpdk/',
                 src_list=[
                  '../dpdk_funcs.c',
@@ -537,6 +552,10 @@ bp_dpdk =SrcGroups([
                 dpdk_src
                 ]);
 
+bp_tldk =SrcGroups([
+                tldk_src
+                ]);
+
 mlx5_dpdk =SrcGroups([
                 mlx5_dpdk_src
                 ]);
@@ -665,8 +684,22 @@ includes_path =''' ../src/pal/linux_dpdk/
 ../src/dpdk/lib/librte_net/
 ../src/dpdk/lib/librte_pipeline/
 ../src/dpdk/lib/librte_ring/
+../src/dpdk/lib/librte_ip_frag/
+
+../src/tldk/lib/libtle_timer/
+../src/tldk/lib/libtle_l4p/
+../src/tldk/lib/libtle_dring/
+
+
               ''';
 
+tldk_includes_path = '''
+
+../src/tldk/lib/libtle_timer/
+../src/tldk/lib/libtle_l4p/
+../src/tldk/lib/libtle_dring/
+
+'''
 
 dpdk_includes_verb_path =''
 
@@ -725,6 +758,7 @@ dpdk_includes_path =''' ../src/
 ../src/dpdk/lib/librte_mempool/
 ../src/dpdk/lib/librte_pipeline/
 ../src/dpdk/lib/librte_ring/
+../src/dpdk/lib/librte_ip_frag/
 ../src/dpdk/lib/librte_net/
 ../src/dpdk/lib/librte_port/
 ../src/dpdk/lib/librte_pipeline/
@@ -818,6 +852,9 @@ class build_option:
     def get_dpdk_target (self):
         return self.update_executable_name("dpdk");
 
+    def get_tldk_target (self):
+        return self.update_executable_name("tldk");
+
     def get_mlx5_target (self):
         return self.update_executable_name("mlx5");
 
@@ -908,6 +945,15 @@ def build_prog (bld, build_obj):
       target=build_obj.get_dpdk_target() 
       );
 
+    bld.objects(
+      features='c ',
+      includes = dpdk_includes_path +tldk_includes_path,
+
+      cflags   = (build_obj.get_c_flags()+DPDK_FLAGS ),
+      source   = bp_tldk.file_list(top),
+      target=build_obj.get_tldk_target() 
+      );
+
     if bld.env.NO_MLX == False:
         bld.shlib(
           features='c',
@@ -924,7 +970,7 @@ def build_prog (bld, build_obj):
                 cxxflags =(build_obj.get_cxx_flags()+['-std=gnu++11',]),
                 linkflags = build_obj.get_link_flags() ,
                 lib=['pthread','dl', 'z'],
-                use =[build_obj.get_dpdk_target(),'zmq'],
+                use =[build_obj.get_dpdk_target(),build_obj.get_tldk_target(),'zmq'],
                 source = bp.file_list(top) + debug_file_list,
                 rpath = rpath_linkage,
                 target = build_obj.get_target())
