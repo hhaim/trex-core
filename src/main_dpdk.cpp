@@ -118,6 +118,9 @@ static inline int get_is_rx_thread_enabled() {
     return ((CGlobalInfo::m_options.is_rx_enabled() || CGlobalInfo::m_options.is_stateless()) ?1:0);
 }
 
+void  test_tcp_session();
+
+
 struct port_cfg_t;
 
 #define MAX_DPDK_ARGS 50
@@ -5797,6 +5800,11 @@ int main_test(int argc , char * argv[]){
     bool wd_enable = (CGlobalInfo::m_options.preview.getWDDisable() ? false : true);
     TrexWatchDog::getInstance().init(wd_enable);
 
+
+    /* init TCP */
+    test_tcp_session();
+
+
     g_trex.m_sl_rx_running = false;
     if ( get_is_stateless() ) {
         g_trex.start_master_stateless();
@@ -7576,4 +7584,56 @@ DpdkTRexPortAttrMlnx5G::set_link_up(bool up) {
 void TrexDpdkPlatformApi::mark_for_shutdown() const {
     g_trex.mark_for_shutdown(CGlobalTRex::SHUTDOWN_RPC_REQ);
 }
+
+// POC ////////////////
+//////////////////////////////////////////////////////////////////////////
+#include "tle_ctx.h"
+
+class CTcpPerCore {
+
+public:
+    struct tle_ctx *ctx;
+public:
+
+    bool Create();
+    void Delete();
+
+public:
+};
+
+bool CTcpPerCore::Create(){
+    struct tle_ctx_param ctx_prm;
+    memset(&ctx_prm, 0, sizeof(ctx_prm));
+
+    ctx_prm.socket_id = 0;  /* socket id */
+    ctx_prm.proto = TLE_PROTO_TCP;
+    ctx_prm.max_streams = 10;      
+    ctx_prm.max_stream_rbufs = 100000;
+    ctx_prm.max_stream_sbufs = 100000;
+    ctx_prm.send_bulk_size   = 100000;
+    ctx_prm.lookup4          = NULL;
+    ctx_prm.lookup4_data     = NULL;
+    ctx_prm.lookup6          = NULL;
+    ctx_prm.lookup6_data     = NULL;
+
+    ctx = tle_ctx_create(&ctx_prm);
+
+    return(true);
+}
+
+void CTcpPerCore::Delete(){
+    if (ctx){
+        tle_ctx_destroy(ctx);
+        ctx=NULL;
+    }
+}
+
+
+CTcpPerCore m_tcp_core;
+
+void  test_tcp_session(){
+    m_tcp_core.Create();
+    m_tcp_core.Delete();
+}
+
 
