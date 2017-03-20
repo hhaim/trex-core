@@ -1,3 +1,6 @@
+#ifndef BSD44_BR_TCP
+#define BSD44_BR_TCP
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -96,3 +99,5 @@ struct tcphdr {
  */
 #define	TCP_NODELAY	0x01	/* don't delay send to coalesce packets */
 #define	TCP_MAXSEG	0x02	/* set maximum segment size */
+
+#endif
