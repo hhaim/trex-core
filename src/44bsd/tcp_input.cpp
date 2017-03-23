@@ -55,42 +55,15 @@
 
 #if TCP_REAS
 
-/*
- * Insert segment ti into reassembly queue of tcp with
- * control block tp.  Return TH_FIN if reassembly now includes
- * a segment with FIN.  The macro form does the common case inline
- * (segment is the next to be received on an established connection,
- * and the queue is empty), avoiding linkage into and removal
- * from the queue and repetition of various conversions.
- * Set DELACK for segments received in order, but ack immediately
- * when segments are out of order (so fast retransmit can work).
- */
-#define	TCP_REASS(tp, ti, m, so, flags) { \
-	if ((ti)->ti_seq == (tp)->rcv_nxt && \
-	    (tp)->seg_next == (struct tcpiphdr *)(tp) && \
-	    (tp)->t_state == TCPS_ESTABLISHED) { \
-		tp->t_flags |= TF_DELACK; \
-		(tp)->rcv_nxt += (ti)->ti_len; \
-		flags = (ti)->ti_flags & TH_FIN; \
-		tcpstat.tcps_rcvpack++;\
-		tcpstat.tcps_rcvbyte += (ti)->ti_len;\
-		sbappend(&(so)->so_rcv, (m)); \
-		sorwakeup(so); \
-	} else { \
-		(flags) = tcp_reass((tp), (ti), (m)); \
-		tp->t_flags |= TF_ACKNOW; \
-	} \
-}
-
 
 int
-tcp_reass(tp, ti, m)
-	register struct tcpcb *tp;
-	register struct tcpiphdr *ti;
-	struct mbuf *m;
-{
-	register struct tcpiphdr *q;
-	struct socket *so = tp->t_inpcb->inp_socket;
+tcp_reass(CTcpPerThreadCtx * ctx,
+          struct tcpcb *tp, 
+          struct tcpiphdr *ti,
+          struct rte_mbuf *m){
+
+    struct tcpiphdr *q;
+    struct tcp_socket * so = &tp->m_socket;
 	int flags;
 
 	/*
@@ -188,23 +161,64 @@ present:
 	return (flags);
 }
 
+/*
+ * Insert segment ti into reassembly queue of tcp with
+ * control block tp.  Return TH_FIN if reassembly now includes
+ * a segment with FIN.  The macro form does the common case inline
+ * (segment is the next to be received on an established connection,
+ * and the queue is empty), avoiding linkage into and removal
+ * from the queue and repetition of various conversions.
+ * Set DELACK for segments received in order, but ack immediately
+ * when segments are out of order (so fast retransmit can work).
+ */
+inline void TCP_REASS(CTcpPerThreadCtx * ctx,
+                      struct tcpcb *tp,
+                      struct tcpiphdr *ti,
+                      struct rte_mbuf *m,
+                      struct socket *so,
+                      int &tiflags) { 
+	if (ti->ti_seq == tp->rcv_nxt && 
+	    tp->seg_next == (struct tcpiphdr *)(tp) && 
+	    tp->t_state == TCPS_ESTABLISHED) { 
+		tp->t_flags |= TF_DELACK; 
+		tp->rcv_nxt += ti->ti_len; 
+		tiflags = ti->ti_flags & TH_FIN; 
+        INC_STAT(ctx,tcps_rcvpack);
+        INC_STAT_CNT(ctx,ti->ti_len);
+		sbappend(&so->so_rcv, m); 
+		sorwakeup(so); 
+	} else { 
+		tiflags = tcp_reass(ctx,tp, ti, m); 
+		tp->t_flags |= TF_ACKNOW; 
+	} 
+}
+
+
 #else 
-int
-tcp_reass(struct tcpcb *tp, 
-          struct tcpiphdr *ti, 
-          struct rte_mbuf *m)
-	
-{
+
+
+int tcp_reass(CTcpPerThreadCtx * ctx,
+              struct tcpcb *tp, 
+              struct tcpiphdr *ti, 
+              struct rte_mbuf *m){
 
     return (0);
+}
+
+inline void TCP_REASS(CTcpPerThreadCtx * ctx,
+                      struct tcpcb *tp,
+                      struct tcpiphdr *ti,
+                      struct rte_mbuf *m,
+                      struct tcp_socket *so,
+                      int &tiflags) { 
+    tiflags=0;
 }
 
 
 #endif
 
 
-void
-tcp_dooptions(CTcpPerThreadCtx * ctx,
+void tcp_dooptions(CTcpPerThreadCtx * ctx,
               struct tcpcb *tp, 
               uint8_t *cp, 
               int cnt, 
@@ -273,6 +287,8 @@ tcp_dooptions(CTcpPerThreadCtx * ctx,
 	}
 }
 
+#if SUPPORT_OF_URG
+
 /*
  * Pull out of band byte out of a segment so
  * it doesn't appear in the user's data queue.
@@ -285,7 +301,6 @@ tcp_pulloutofband(struct tcp_socket *so,
                   struct rte_mbuf *m){
     /* not supported */
     assert(0);
-#if 0
 	int cnt = ti->ti_urp - 1;
 	
 	while (cnt >= 0) {
@@ -305,15 +320,15 @@ tcp_pulloutofband(struct tcp_socket *so,
 			break;
 	}
 	panic("tcp_pulloutofband");
-#endif
 }
 
+#endif
 
 //void tcp_input(m, iphlen)
 
 
 /* assuming we found the flow */
-void tcp_flow_input(CTcpPerThreadCtx * ctx,
+int tcp_flow_input(CTcpPerThreadCtx * ctx,
                     struct tcpcb *tp, 
                     struct rte_mbuf *m,
                     TCPHeader *tcp,
@@ -329,16 +344,17 @@ void tcp_flow_input(CTcpPerThreadCtx * ctx,
     u_long tiwin, ts_val, ts_ecr;
     int ts_present = 0;
     int dropsocket = 0;
-    short ostate;
+    short ostate=0;
     int optlen;
     int todrop, acked, ourfinisacked, needoutput = 0;
-    int len, tlen, off;
+    int off;
 
 
     uint8_t *optp;  // TCP option is exist  
 
     if ( tcp->getHeaderLength()==TCP_HEADER_LEN ){
         optp=NULL;
+        optlen=0;
     }else{
         optp=(uint8_t *)tcp->getOptionPtr();
         optlen=(tcp->getHeaderLength()-TCP_HEADER_LEN);
@@ -476,7 +492,7 @@ void tcp_flow_input(CTcpPerThreadCtx * ctx,
                 }
                 if (so->so_snd.sb_cc)
                     (void) tcp_output(ctx,tp);
-                return;
+                return 0;
             }
         } else if (ti->ti_ack == tp->snd_una &&
             /*tp->seg_next == (struct tcpiphdr *)tp &&*/
@@ -498,7 +514,7 @@ void tcp_flow_input(CTcpPerThreadCtx * ctx,
             sbappend(&so->so_rcv, m);
             sorwakeup(so);
             tp->t_flags |= TF_DELACK;
-            return;
+            return 0;
         }
     }
 
@@ -575,8 +591,9 @@ void tcp_flow_input(CTcpPerThreadCtx * ctx,
              SEQ_GT(ti->ti_ack, tp->snd_max)))
             goto dropwithreset;
         if (tiflags & TH_RST) {
-            if (tiflags & TH_ACK)
-                tp = tcp_drop(ctx,tp, ECONNREFUSED);
+            if (tiflags & TH_ACK){
+                tp = tcp_drop_now(ctx,tp, TCP_US_ECONNREFUSED);
+            }
             goto drop;
         }
         if ((tiflags & TH_SYN) == 0)
@@ -600,16 +617,17 @@ void tcp_flow_input(CTcpPerThreadCtx * ctx,
                 tp->snd_scale = tp->requested_s_scale;
                 tp->rcv_scale = tp->request_r_scale;
             }
-            (void) tcp_reass(tp, (struct tcpiphdr *)0,
-                (struct mbuf *)0);
+            (void) tcp_reass(ctx,tp, (struct tcpiphdr *)0,
+                (struct rte_mbuf *)0);
             /*
              * if we didn't have to retransmit the SYN,
              * use its rtt as our initial srtt & rtt var.
              */
             if (tp->t_rtt)
                 tcp_xmit_timer(ctx,tp, tp->t_rtt);
-        } else
+        } else {
             tp->t_state = TCPS_SYN_RECEIVED;
+        }
 
 trimthenstep6:
         /*
@@ -786,7 +804,7 @@ trimthenstep6:
     if (ts_present && SEQ_LEQ(ti->ti_seq, tp->last_ack_sent) &&
         SEQ_LT(tp->last_ack_sent, ti->ti_seq + ti->ti_len +
            ((tiflags & (TH_SYN|TH_FIN)) != 0))) {
-        tp->ts_recent_age = tcp_now;
+        tp->ts_recent_age = ctx->tcp_now;
         tp->ts_recent = ts_val;
     }
 
@@ -831,7 +849,7 @@ trimthenstep6:
      * error and we send an RST and drop the connection.
      */
     if (tiflags & TH_SYN) {
-        tp = tcp_drop(tp, ECONNRESET);
+        tp = tcp_drop_now(ctx,tp, TCP_US_ECONNRESET);
         goto dropwithreset;
     }
 
@@ -864,7 +882,7 @@ trimthenstep6:
             tp->snd_scale = tp->requested_s_scale;
             tp->rcv_scale = tp->request_r_scale;
         }
-        (void) tcp_reass(tp, (struct tcpiphdr *)0, (struct mbuf *)0);
+        (void) tcp_reass(ctx,tp, (struct tcpiphdr *)0, (struct rte_mbuf *)0);
         tp->snd_wl1 = ti->ti_seq - 1;
         /* fall into ... */
 
@@ -967,7 +985,7 @@ trimthenstep6:
          * Recompute the initial retransmit timer.
          */
         if (ts_present){
-            tcp_xmit_timer(ctx,tp, tcp_now-ts_ecr+1);
+            tcp_xmit_timer(ctx,tp, ctx->tcp_now-ts_ecr+1);
         }else if (tp->t_rtt && SEQ_GT(ti->ti_ack, tp->t_rtseq)){
             tcp_xmit_timer(ctx,tp,tp->t_rtt);
         }
@@ -1029,9 +1047,9 @@ trimthenstep6:
                  * specification, but if we don't get a FIN
                  * we'll hang forever.
                  */
-                if (so->so_state & SS_CANTRCVMORE) {
+                if (so->so_state & US_SS_CANTRCVMORE) {
                     soisdisconnected(so);
-                    tp->t_timer[TCPT_2MSL] = tcp_maxidle;
+                    tp->t_timer[TCPT_2MSL] = ctx->tcp_maxidle;
                 }
                 tp->t_state = TCPS_FIN_WAIT_2;
             }
@@ -1081,13 +1099,14 @@ step6:
 	 * Update window information.
 	 * Don't look at window if no ACK: TAC's send garbage on first SYN.
 	 */
-	if ((tiflags & TH_ACK) &&
-	    (SEQ_LT(tp->snd_wl1, ti->ti_seq) || tp->snd_wl1 == ti->ti_seq &&
-	    (SEQ_LT(tp->snd_wl2, ti->ti_ack) ||
-	     tp->snd_wl2 == ti->ti_ack && tiwin > tp->snd_wnd))) {
+	if ( (tiflags & TH_ACK) &&
+	     (SEQ_LT(tp->snd_wl1, ti->ti_seq) || ( 
+           (tp->snd_wl1 == ti->ti_seq) &&
+           ( SEQ_LT(tp->snd_wl2, ti->ti_ack) || ((tp->snd_wl2 == ti->ti_ack) && (tiwin > tp->snd_wnd)) )
+          ))) {
 		/* keep track of pure window updates */
-		if (ti->ti_len == 0 &&
-		    tp->snd_wl2 == ti->ti_ack && tiwin > tp->snd_wnd){
+		if ( (ti->ti_len == 0) &&
+		    (tp->snd_wl2 == ti->ti_ack) && (tiwin > tp->snd_wnd)){
             INC_STAT(ctx,tcps_rcvwinupd);
         }
 		tp->snd_wnd = tiwin;
@@ -1165,7 +1184,7 @@ step6:
 
 #endif
 
-dodata:							/* XXX */
+//dodata:							/* XXX */
 
 	/*
 	 * Process the segment text, merging it into the TCP sequencing queue,
@@ -1177,13 +1196,13 @@ dodata:							/* XXX */
 	 */
 	if ((ti->ti_len || (tiflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-		TCP_REASS(tp, ti, m, so, tiflags);
+		TCP_REASS(ctx,tp, ti, m, so, tiflags);
 		/*
 		 * Note the amount of data that peer has sent into
 		 * our window, in order to estimate the sender's
 		 * buffer size.
 		 */
-		len = so->so_rcv.sb_hiwat - (tp->rcv_adv - tp->rcv_nxt);
+		//len = so->so_rcv.sb_hiwat - (tp->rcv_adv - tp->rcv_nxt);
 	} else {
         rte_pktmbuf_free(m);
 		tiflags &= ~TH_FIN;
@@ -1239,7 +1258,7 @@ dodata:							/* XXX */
 		}
 	}
 	if (so->so_options & US_SO_DEBUG){
-        tcp_trace(ctx,TA_INPUT, ostate, tp, &tcp_saveti, 0);
+        tcp_trace(ctx,TA_INPUT, ostate, tp, &ctx->tcp_saveti, 0);
     }
 
 	/*
@@ -1247,7 +1266,7 @@ dodata:							/* XXX */
 	 */
 	if (needoutput || (tp->t_flags & TF_ACKNOW))
 		(void) tcp_output(ctx,tp);
-	return;
+	return 0;
 
 dropafterack:
 	/*
@@ -1259,7 +1278,7 @@ dropafterack:
     rte_pktmbuf_free(m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(ctx,tp);
-	return;
+	return 0;
 
 dropwithreset:
 	/*
@@ -1267,138 +1286,41 @@ dropwithreset:
 	 * Make ACK acceptable to originator of segment.
 	 * Don't bother to respond if destination was broadcast/multicast.
 	 */
-	if ((tiflags & TH_RST) || m->m_flags & (M_BCAST|M_MCAST) ||
-	    IN_MULTICAST(ntohl(ti->ti_dst.s_addr)))
+	if ((tiflags & TH_RST) )
 		goto drop;
 	if (tiflags & TH_ACK)
-		tcp_respond(tp, ti, m, (tcp_seq)0, ti->ti_ack, TH_RST);
+		tcp_respond(ctx,tp, ti, m, (tcp_seq)0, ti->ti_ack, TH_RST);
 	else {
 		if (tiflags & TH_SYN)
 			ti->ti_len++;
-		tcp_respond(tp, ti, m, ti->ti_seq+ti->ti_len, (tcp_seq)0,
+		tcp_respond(ctx,tp, ti, m, ti->ti_seq+ti->ti_len, (tcp_seq)0,
 		    TH_RST|TH_ACK);
 	}
 	/* destroy temporarily created socket */
 	if (dropsocket)
 		(void) soabort(so);
-	return;
+	return 0;
 
 drop:
 	/*
 	 * Drop space held by incoming segment and return.
 	 */
-	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
-		tcp_trace(TA_DROP, ostate, tp, &tcp_saveti, 0);
-	m_freem(m);
+	if (tp && (so->so_options & US_SO_DEBUG)){
+        tcp_trace(ctx,TA_DROP, ostate, tp, &ctx->tcp_saveti, 0);
+    }
+	rte_pktmbuf_free(m);
 	/* destroy temporarily created socket */
-	if (dropsocket)
-		(void) soabort(so);
-	return;
+	if (dropsocket){
+        (void)soabort(so);
+    }
+
+
+findpcb:
+    /* SYN packet that need to reopen the flow as the flow was closed already and free .. */
+    return 1;
 }
 
 
-void
-tcp_dooptions(tp, cp, cnt, ti, ts_present, ts_val, ts_ecr)
-	struct tcpcb *tp;
-	u_char *cp;
-	int cnt;
-	struct tcpiphdr *ti;
-	int *ts_present;
-	u_long *ts_val, *ts_ecr;
-{
-	u_short mss;
-	int opt, optlen;
-
-	for (; cnt > 0; cnt -= optlen, cp += optlen) {
-		opt = cp[0];
-		if (opt == TCPOPT_EOL)
-			break;
-		if (opt == TCPOPT_NOP)
-			optlen = 1;
-		else {
-			optlen = cp[1];
-			if (optlen <= 0)
-				break;
-		}
-		switch (opt) {
-
-		default:
-			continue;
-
-		case TCPOPT_MAXSEG:
-			if (optlen != TCPOLEN_MAXSEG)
-				continue;
-			if (!(ti->ti_flags & TH_SYN))
-				continue;
-			bcopy((char *) cp + 2, (char *) &mss, sizeof(mss));
-			NTOHS(mss);
-			(void) tcp_mss(tp, mss);	/* sets t_maxseg */
-			break;
-
-		case TCPOPT_WINDOW:
-			if (optlen != TCPOLEN_WINDOW)
-				continue;
-			if (!(ti->ti_flags & TH_SYN))
-				continue;
-			tp->t_flags |= TF_RCVD_SCALE;
-			tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
-			break;
-
-		case TCPOPT_TIMESTAMP:
-			if (optlen != TCPOLEN_TIMESTAMP)
-				continue;
-			*ts_present = 1;
-			bcopy((char *)cp + 2, (char *) ts_val, sizeof(*ts_val));
-			NTOHL(*ts_val);
-			bcopy((char *)cp + 6, (char *) ts_ecr, sizeof(*ts_ecr));
-			NTOHL(*ts_ecr);
-
-			/* 
-			 * A timestamp received in a SYN makes
-			 * it ok to send timestamp requests and replies.
-			 */
-			if (ti->ti_flags & TH_SYN) {
-				tp->t_flags |= TF_RCVD_TSTMP;
-				tp->ts_recent = *ts_val;
-				tp->ts_recent_age = tcp_now;
-			}
-			break;
-		}
-	}
-}
-
-/*
- * Pull out of band byte out of a segment so
- * it doesn't appear in the user's data queue.
- * It is still reflected in the segment length for
- * sequencing purposes.
- */
-void
-tcp_pulloutofband(so, ti, m)
-	struct socket *so;
-	struct tcpiphdr *ti;
-	register struct mbuf *m;
-{
-	int cnt = ti->ti_urp - 1;
-	
-	while (cnt >= 0) {
-		if (m->m_len > cnt) {
-			char *cp = mtod(m, caddr_t) + cnt;
-			struct tcpcb *tp = sototcpcb(so);
-
-			tp->t_iobc = *cp;
-			tp->t_oobflags |= TCPOOB_HAVEDATA;
-			bcopy(cp+1, cp, (unsigned)(m->m_len - cnt - 1));
-			m->m_len--;
-			return;
-		}
-		cnt -= m->m_len;
-		m = m->m_next;
-		if (m == 0)
-			break;
-	}
-	panic("tcp_pulloutofband");
-}
 
 /*
  * Collect new round-trip time estimate
@@ -1491,7 +1413,7 @@ int tcp_mss(CTcpPerThreadCtx * ctx,
         struct tcpcb *tp, 
         u_int offer){
 
-	return (tcp_mssdflt);
+	return (ctx->tcp_mssdflt);
 }
 
-#endif
+

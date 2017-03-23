@@ -410,14 +410,18 @@ public:
 int	 tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
 int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcpcb *, int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
 struct tcpcb * tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
-struct tcpcb * tcp_drop(CTcpPerThreadCtx * ctx,struct tcpcb * tp, int errno);
 void tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
-void	 tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *,struct tcpiphdr *, struct mbuf *, uint64_t, uint64_t, int);
+void	 tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *,struct tcpiphdr *, struct rte_mbuf *, uint64_t, uint64_t, int);
 uint16_t tcp_mss(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int offer);
 void	 tcp_trace(CTcpPerThreadCtx * ctx,int, int, struct tcpcb *, struct tcpiphdr *, int);
 void tcp_quench(struct tcpcb *tp);
 void tcp_template(struct tcpcb *tp);
 void	 tcp_xmit_timer(CTcpPerThreadCtx * ctx,struct tcpcb *, int);
+void tcp_canceltimers(struct tcpcb *tp);
+
+struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
+                         struct tcpcb * tp, 
+                         int my);
 
 
 

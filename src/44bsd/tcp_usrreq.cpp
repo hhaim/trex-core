@@ -31,39 +31,28 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_usrreq.c	8.5 (Berkeley) 6/21/95
+
  */
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <common/basic_utils.h>
+#include "tcp_fsm.h"
+#include "tcp_seq.h"
+#include "tcp_timer.h"
+#include "tcp_var.h"
+#include "tcpip.h"
+#include "tcp_debug.h"
+#include "tcp_socket.h"
 
-#include <net/if.h>
-#include <net/route.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_debug.h>
 
 /*
  * TCP protocol interface to socket abstraction.
  */
 extern	char *tcpstates[];
 
+#if 0
 /*
  * Process a TCP user request for TCP tb.  If this is a send request
  * then m is the mbuf chain of send data.  If this is a timer expiration
@@ -71,13 +60,15 @@ extern	char *tcpstates[];
  */
 /*ARGSUSED*/
 int
-tcp_usrreq(so, req, m, nam, control)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
-{
-	register struct inpcb *inp;
-	register struct tcpcb *tp;
+tcp_usrreq(CTcpPerThreadCtx * ctx,
+           struct tcp_socket *so, 
+           int req, 
+           struct rte_mbuf *m, 
+           struct rte_mbuf * nam, 
+           struct rte_mbuf * control){
+
+    struct inpcb *inp;
+	struct tcpcb *tp;
 	int s;
 	int error = 0;
 	int ostate;
@@ -272,7 +263,7 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Abort the TCP.
 	 */
 	case PRU_ABORT:
-		tp = tcp_drop(tp, ECONNABORTED);
+		tp = tcp_drop_now(tp, TCP_US_ECONNABORTED);
 		break;
 
 	case PRU_SENSE:
@@ -344,6 +335,8 @@ tcp_usrreq(so, req, m, nam, control)
 	splx(s);
 	return (error);
 }
+
+#endif
 
 int
 tcp_ctloutput(op, so, level, optname, mp)
@@ -479,7 +472,7 @@ tcp_disconnect(tp)
 	if (tp->t_state < TCPS_ESTABLISHED)
 		tp = tcp_close(tp);
 	else if ((so->so_options & SO_LINGER) && so->so_linger == 0)
-		tp = tcp_drop(tp, 0);
+		tp = tcp_drop_now(tp, 0);
 	else {
 		soisdisconnecting(so);
 		sbflush(&so->so_rcv);
@@ -527,3 +520,5 @@ tcp_usrclosed(tp)
 		soisdisconnected(tp->t_inpcb->inp_socket);
 	return (tp);
 }
+
+#endif

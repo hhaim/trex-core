@@ -79,7 +79,7 @@ void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp)
     for (i = 0; i < TCPT_NTIMERS; i++) {
         if (tp->t_timer[i] && --tp->t_timer[i] == 0) {
 
-            (void) tcp_usrreq(&tp->m_socket,
+            (void) tcp_usrreq(ctx,&tp->m_socket,
                 PRU_SLOWTIMO, (struct rte_mbuf *)0,
                 (struct rte_mbuf *)i, (struct rte_mbuf *)0);
         }
@@ -96,10 +96,11 @@ void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp)
  * Cancel all timers for TCP tp.
  */
 void tcp_canceltimers(struct tcpcb *tp){
-	register int i;
+	int i;
 
-	for (i = 0; i < TCPT_NTIMERS; i++)
-		tp->t_timer[i] = 0;
+	for (i = 0; i < TCPT_NTIMERS; i++){
+        tp->t_timer[i] = 0;
+    }
 }
 
 
@@ -138,8 +139,8 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 		if (++tp->t_rxtshift > TCP_MAXRXTSHIFT) {
 			tp->t_rxtshift = TCP_MAXRXTSHIFT;
 			INC_STAT(ctx,tcps_timeoutdrop);
-			tp = tcp_drop(ctx,tp, tp->t_softerror ?
-			    tp->t_softerror : ETIMEDOUT);
+			tp = tcp_drop_now(ctx,tp, tp->t_softerror ?
+			    tp->t_softerror : TCP_US_ETIMEDOUT);
 			break;
 		}
 		INC_STAT(ctx,tcps_rexmttimeo);
@@ -217,7 +218,7 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 		    (tp->t_idle >= ctx->tcp_maxpersistidle ||
 		    tp->t_idle >= TCP_REXMTVAL(tp) * tcp_totbackoff)) {
 			INC_STAT(ctx,tcps_persistdrop);
-			tp = tcp_drop(ctx,tp, ETIMEDOUT);
+			tp = tcp_drop_now(ctx,tp, TCP_US_ETIMEDOUT);
 			break;
 		}
 		tcp_setpersist(ctx,tp);
@@ -256,10 +257,10 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 			 * The keepalive packet must have nonzero length
 			 * to get a 4.2 host to respond.
 			 */
-			tcp_respond(tp, tp->t_template, (struct mbuf *)NULL,
+			tcp_respond(ctx,tp, tp->t_template, (struct rte_mbuf *)NULL,
 			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
 #else
-			tcp_respond(ctx,tp, tp->t_template, (struct mbuf *)NULL,
+			tcp_respond(ctx,tp, tp->t_template, (struct rte_mbuf *)NULL,
 			    tp->rcv_nxt, tp->snd_una - 1, 0);
 #endif
 			tp->t_timer[TCPT_KEEP] = ctx->tcp_keepintvl;
@@ -268,7 +269,7 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 		break;
 	dropit:
 		INC_STAT(ctx,tcps_keepdrops);
-		tp = tcp_drop(ctx,tp, ETIMEDOUT);
+		tp = tcp_drop_now(ctx,tp, TCP_US_ETIMEDOUT);
 		break;
 	}
 	return (tp);

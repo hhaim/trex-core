@@ -244,7 +244,7 @@ struct tcpcb * tcp_newtcpcb(CTcpPerThreadCtx * ctx){
  * then send a RST to peer.
  */
 struct tcpcb *
-tcp_drop(CTcpPerThreadCtx * ctx,
+tcp_drop_now(CTcpPerThreadCtx * ctx,
          struct tcpcb *tp, 
          int errno){
 	struct tcp_socket *so = &tp->m_socket;

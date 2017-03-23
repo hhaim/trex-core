@@ -48,6 +48,8 @@ struct	sockbuf {
     //short	sb_timeo;	/* timeout for read/write */
 };
 
+// so_state
+#define US_SS_CANTRCVMORE  1
 
 /*
  * Kernel structure per socket.
@@ -58,6 +60,7 @@ struct	sockbuf {
 struct tcp_socket {
 	short	so_options;	
     int     so_error;
+    int     so_state;
 /*
  * Variables for socket buffering.
  */
@@ -135,6 +138,7 @@ void	sbappend(struct sockbuf *sb, struct rte_mbuf *m);
 #endif            
 
 void	soisconnected(struct tcp_socket *so);
+void	socantrcvmore(struct tcp_socket *so);
 
 
 //#define	IN_CLASSD(i)		(((u_int32_t)(i) & 0xf0000000) == 0xe0000000)
@@ -147,7 +151,15 @@ void	soisconnected(struct tcp_socket *so);
 
 typedef uint8_t tcp_l2_pkt_flags_t ;
 
+int	soabort(struct tcp_socket *so);
 
+
+#define TCP_US_ECONNREFUSED  (7)
+#define TCP_US_ECONNRESET    (8)
+
+#define TCP_US_ETIMEDOUT     (9)
+#define TCP_US_ECONNABORTED  (10)
+#define TCP_US_ENOBUFS       (11)
 
 
 
