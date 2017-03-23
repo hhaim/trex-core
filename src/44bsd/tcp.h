@@ -36,6 +36,9 @@
  *	@(#)tcp.h	8.1 (Berkeley) 6/10/93
  */
 
+#include <common/basic_utils.h>
+        
+             
 typedef	u_long	tcp_seq;
 /*
  * TCP header.

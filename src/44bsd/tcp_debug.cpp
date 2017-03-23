@@ -41,63 +41,74 @@
 #define	TANAMES
 #endif
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/mbuf.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/protosw.h>
-#include <sys/errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <common/basic_utils.h>
 
-#include <net/route.h>
-#include <net/if.h>
+#include "tcp_fsm.h"
+#include "tcp_seq.h"
+#include "tcp_timer.h"
+#include "tcp_var.h"
+#include "tcpip.h"
+#include "tcp_debug.h"
+#include "tcp_socket.h"
+                         
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_debug.h>
+struct	tcp_debug {
+	dsec_t 	td_time;
+	short	td_act;
+	short	td_ostate;
+	void *	td_tcb;
+	struct	tcpiphdr td_ti;
+	short	td_req;
+	struct	tcpcb td_cb;
+};
+
+              
+
+const char *tcptimers[] =
+    { "REXMT", "PERSIST", "KEEP", "2MSL" };
+
+const char	*tanames[] =
+    { "input", "output", "user", "respond", "drop" };
+
 
 #ifdef TCPDEBUG
+/* one thread debug */
 int	tcpconsdebug = 0;
-#endif
+#define	TCP_NDEBUG 100
+struct	tcp_debug tcp_debug[TCP_NDEBUG];
+int	tcp_debx;
+
 /*
  * Tcp debug routines
  */
-void
-tcp_trace(act, ostate, tp, ti, req)
-	short act, ostate;
-	struct tcpcb *tp;
-	struct tcpiphdr *ti;
-	int req;
-{
+void tcp_trace(CTcpPerThreadCtx * ctx,
+          short act, 
+          short ostate, 
+          struct tcpcb * tp, 
+          struct tcpiphdr * ti, 
+          int req){
 	tcp_seq seq, ack;
 	int len, flags;
-	struct tcp_debug *td = &tcp_debug[tcp_debx++];
+	struct tcp_debug *td = &ctx->tcp_debug[tcp_debx++];
 
 	if (tcp_debx == TCP_NDEBUG)
 		tcp_debx = 0;
-	td->td_time = iptime();
+	td->td_time = now_sec();
 	td->td_act = act;
 	td->td_ostate = ostate;
 	td->td_tcb = (caddr_t)tp;
 	if (tp)
 		td->td_cb = *tp;
 	else
-		bzero((caddr_t)&td->td_cb, sizeof (*tp));
+		memset((void *)&td->td_cb, 0,sizeof (*tp));
 	if (ti)
 		td->td_ti = *ti;
 	else
-		bzero((caddr_t)&td->td_ti, sizeof (*ti));
+		memset((void *)&td->td_ti,0, sizeof (*ti));
 	td->td_req = req;
-#ifdef TCPDEBUG
 	if (tcpconsdebug == 0)
 		return;
 	if (tp)
@@ -155,5 +166,18 @@ tcp_trace(act, ostate, tp, ti, req)
 	    tp->snd_max);
 	printf("\tsnd_(wl1,wl2,wnd) (%x,%x,%x)\n",
 	    tp->snd_wl1, tp->snd_wl2, tp->snd_wnd);
-#endif /* TCPDEBUG */
 }
+
+#else
+
+void tcp_trace(CTcpPerThreadCtx * ctx,
+          short act, 
+          short ostate, 
+          struct tcpcb * tp, 
+          struct tcpiphdr * ti, 
+          int req){
+}
+
+
+#endif
+

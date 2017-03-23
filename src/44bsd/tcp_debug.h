@@ -1,3 +1,6 @@
+#ifndef BSD44_BR_TCP_DEBUG
+#define BSD44_BR_TCP_DEBUG
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -33,15 +36,9 @@
  *	@(#)tcp_debug.h	8.1 (Berkeley) 6/10/93
  */
 
-struct	tcp_debug {
-	n_time	td_time;
-	short	td_act;
-	short	td_ostate;
-	caddr_t	td_tcb;
-	struct	tcpiphdr td_ti;
-	short	td_req;
-	struct	tcpcb td_cb;
-};
+#include "os_time.h"
+#include "tcp_var.h"
+#include "tcpip.h"
 
 #define	TA_INPUT 	0
 #define	TA_OUTPUT	1
@@ -49,11 +46,5 @@ struct	tcp_debug {
 #define	TA_RESPOND	3
 #define	TA_DROP		4
 
-#ifdef TANAMES
-char	*tanames[] =
-    { "input", "output", "user", "respond", "drop" };
-#endif
 
-#define	TCP_NDEBUG 100
-struct	tcp_debug tcp_debug[TCP_NDEBUG];
-int	tcp_debx;
+#endif

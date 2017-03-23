@@ -1,3 +1,6 @@
+#ifndef BSD44_BR_TCP_FSM
+#define BSD44_BR_TCP_FSM
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -58,28 +61,10 @@
 #define	TCPS_HAVERCVDSYN(s)	((s) >= TCPS_SYN_RECEIVED)
 #define	TCPS_HAVERCVDFIN(s)	((s) >= TCPS_TIME_WAIT)
 
-#ifdef	TCPOUTFLAGS
-/*
- * Flags used when sending segments in tcp_output.
- * Basic flags (TH_RST,TH_ACK,TH_SYN,TH_FIN) are totally
- * determined by state, with the proviso that TH_FIN is sent only
- * if all data queued for output is included in the segment.
- */
-u_char	tcp_outflags[TCP_NSTATES] = {
-    TH_RST|TH_ACK, 0, TH_SYN, TH_SYN|TH_ACK,
-    TH_ACK, TH_ACK,
-    TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
-};
-#endif
 
 #ifdef KPROF
 int	tcp_acounts[TCP_NSTATES][PRU_NREQ];
 #endif
 
-#ifdef	TCPSTATES
-char *tcpstates[] = {
-	"CLOSED",	"LISTEN",	"SYN_SENT",	"SYN_RCVD",
-	"ESTABLISHED",	"CLOSE_WAIT",	"FIN_WAIT_1",	"CLOSING",
-	"LAST_ACK",	"FIN_WAIT_2",	"TIME_WAIT",
-};
+
 #endif

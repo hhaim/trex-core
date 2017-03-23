@@ -33,53 +33,64 @@
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
  */
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <common/basic_utils.h>
+#include "tcp_fsm.h"
+#include "tcp_seq.h"
+#include "tcp_timer.h"
+#include "tcp_var.h"
+#include "tcpip.h"
+#include "tcp_debug.h"
+#include "tcp_socket.h"
 
-#include <net/route.h>
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#include <netinet/tcp.h>
-#define	TCPOUTFLAGS
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
-#include <netinet/tcp_var.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_debug.h>
-
-#ifdef notyet
-extern struct mbuf *m_copypack();
-#endif
-
+#include <assert.h>
 
 #define MAX_TCPOPTLEN	32	/* max # bytes that go in options */
+
+                      
+/*
+ * Flags used when sending segments in tcp_output.
+ * Basic flags (TH_RST,TH_ACK,TH_SYN,TH_FIN) are totally
+ * determined by state, with the proviso that TH_FIN is sent only
+ * if all data queued for output is included in the segment.
+ */
+const u_char	tcp_outflags[TCP_NSTATES] = {
+    TH_RST|TH_ACK, 0, TH_SYN, TH_SYN|TH_ACK,
+    TH_ACK, TH_ACK,
+    TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
+};
+
+const char *tcpstates[] = {
+	"CLOSED",	"LISTEN",	"SYN_SENT",	"SYN_RCVD",
+	"ESTABLISHED",	"CLOSE_WAIT",	"FIN_WAIT_1",	"CLOSING",
+	"LAST_ACK",	"FIN_WAIT_2",	"TIME_WAIT",
+};
+
 
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */
-int
-tcp_output(tp)
-	register struct tcpcb *tp;
-{
-	register struct socket *so = tp->t_inpcb->inp_socket;
-	register long len, win;
-	int off, flags, error;
-	register struct mbuf *m;
-	register struct tcpiphdr *ti;
+int tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb *tp) {
+
+    struct tcp_socket *so = &tp->m_socket;
+
+	long len, win;
+	int off, flags, error=0;
+	struct rte_mbuf *m;
+	struct tcpiphdr *ti;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
+
+
+    // TBD need to remove 
+    ti=(struct tcpiphdr*)0;
+    m=(struct rte_mbuf *)0;
+    // TBD need to remove 
+
 
 	/*
 	 * Determine length of data that should be transmitted,
@@ -251,7 +262,7 @@ again:
 	if (so->so_snd.sb_cc && tp->t_timer[TCPT_REXMT] == 0 &&
 	    tp->t_timer[TCPT_PERSIST] == 0) {
 		tp->t_rxtshift = 0;
-		tcp_setpersist(tp);
+		tcp_setpersist(ctx,tp);
 	}
 
 	/*
@@ -277,8 +288,8 @@ send:
 
 			opt[0] = TCPOPT_MAXSEG;
 			opt[1] = 4;
-			mss = htons((u_short) tcp_mss(tp, 0));
-			bcopy((caddr_t)&mss, (caddr_t)(opt + 2), sizeof(mss));
+			mss = htons((u_short) tcp_mss(ctx,tp, 0));
+            *(uint16_t*)(opt + 2)=mss;
 			optlen = 4;
 	 
 			if ((tp->t_flags & TF_REQ_SCALE) &&
@@ -307,7 +318,7 @@ send:
  
  		/* Form timestamp option as shown in appendix A of RFC 1323. */
  		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
- 		*lp++ = htonl(tcp_now);
+ 		*lp++ = htonl(ctx->tcp_now);
  		*lp   = htonl(tp->ts_recent);
  		optlen += TCPOLEN_TSTAMP_APPA;
  	}
@@ -336,14 +347,14 @@ send:
 	 * the template for sends on this connection.
 	 */
 	if (len) {
-		if (tp->t_force && len == 1)
-			tcpstat.tcps_sndprobe++;
-		else if (SEQ_LT(tp->snd_nxt, tp->snd_max)) {
-			tcpstat.tcps_sndrexmitpack++;
-			tcpstat.tcps_sndrexmitbyte += len;
+		if (tp->t_force && len == 1){
+            INC_STAT(ctx,tcps_sndprobe);
+        } else if (SEQ_LT(tp->snd_nxt, tp->snd_max)) {
+			INC_STAT(ctx,tcps_sndrexmitpack);
+			INC_STAT_CNT(ctx,tcps_sndrexmitbyte,len);
 		} else {
-			tcpstat.tcps_sndpack++;
-			tcpstat.tcps_sndbyte += len;
+			INC_STAT(ctx,tcps_sndpack);
+			INC_STAT_CNT(ctx,tcps_sndbyte,len);
 		}
 #ifdef notyet
 		if ((m = m_copypack(so->so_snd.sb_mb, off,
@@ -357,6 +368,12 @@ send:
 		m->m_len += hdrlen;
 		m->m_data -= hdrlen;
 #else
+       // TBD  remove this from packet building 
+       goto out;
+       ti=(struct tcpiphdr*)0;
+       // TBD need to remove 
+
+       #if MBUF_BUILD
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m == NULL) {
 			error = ENOBUFS;
@@ -376,6 +393,7 @@ send:
 				goto out;
 			}
 		}
+        #endif
 #endif
 		/*
 		 * If we're sending everything we've got, set PUSH.
@@ -386,14 +404,17 @@ send:
 		if (off + len == so->so_snd.sb_cc)
 			flags |= TH_PUSH;
 	} else {
-		if (tp->t_flags & TF_ACKNOW)
-			tcpstat.tcps_sndacks++;
-		else if (flags & (TH_SYN|TH_FIN|TH_RST))
-			tcpstat.tcps_sndctrl++;
-		else if (SEQ_GT(tp->snd_up, tp->snd_una))
-			tcpstat.tcps_sndurg++;
-		else
-			tcpstat.tcps_sndwinup++;
+		if (tp->t_flags & TF_ACKNOW){
+            INC_STAT(ctx,tcps_sndacks);
+        } else if (flags & (TH_SYN|TH_FIN|TH_RST)){
+            INC_STAT(ctx,tcps_sndctrl);
+        } else if (SEQ_GT(tp->snd_up, tp->snd_una)){
+            INC_STAT(ctx,tcps_sndurg);
+        } else{
+            INC_STAT(ctx,tcps_sndwinup);
+        }
+
+       #if MBUF_BUILD
 
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m == NULL) {
@@ -402,12 +423,15 @@ send:
 		}
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
+        #endif
 	}
+    #if MBUF_BUILD
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	ti = mtod(m, struct tcpiphdr *);
 	if (tp->t_template == 0)
 		panic("tcp_output");
 	bcopy((caddr_t)tp->t_template, (caddr_t)ti, sizeof (struct tcpiphdr));
+    #endif
 
 	/*
 	 * Fill in fields, remembering maximum advertised
@@ -436,7 +460,7 @@ send:
 		ti->ti_seq = htonl(tp->snd_max);
 	ti->ti_ack = htonl(tp->rcv_nxt);
 	if (optlen) {
-		bcopy((caddr_t)opt, (caddr_t)(ti + 1), optlen);
+		memcpy((ti + 1),opt,  optlen);
 		ti->ti_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
 	ti->ti_flags = flags;
@@ -500,7 +524,7 @@ send:
 			if (tp->t_rtt == 0) {
 				tp->t_rtt = 1;
 				tp->t_rtseq = startseq;
-				tcpstat.tcps_segstimed++;
+				INC_STAT(ctx,tcps_segstimed);
 			}
 		}
 
@@ -527,9 +551,11 @@ send:
 	/*
 	 * Trace.
 	 */
-	if (so->so_options & SO_DEBUG)
-		tcp_trace(TA_OUTPUT, tp->t_state, tp, ti, 0);
+	if (so->so_options & US_SO_DEBUG){
+        tcp_trace(ctx,TA_OUTPUT, tp->t_state, tp, ti, 0);
+    }
 
+#if MBUF_BUILD
 	/*
 	 * Fill in IP length and desired time to live and
 	 * send to IP level.  There should be a better way
@@ -537,27 +563,22 @@ send:
 	 * the template, but need a way to checksum without them.
 	 */
 	m->m_pkthdr.len = hdrlen + len;
-#ifdef TUBA
-	if (tp->t_tuba_pcb)
-		error = tuba_output(m, tp);
-	else
-#endif
     {
 	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
 	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
 	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
-#if BSD >= 43
-	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    so->so_options & SO_DONTROUTE, 0);
-#else
-	error = ip_output(m, (struct mbuf *)0, &tp->t_inpcb->inp_route, 
-	    so->so_options & SO_DONTROUTE);
-#endif
+
+    error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
+	    0, 0);
     }
+#else
+    utl_k12_pkt_format(stdout,ti,  20+20) ;
+    utl_DumpBuffer(stdout,ti,  20+20);
+#endif
 	if (error) {
 out:
 		if (error == ENOBUFS) {
-			tcp_quench(tp->t_inpcb, 0);
+			tcp_quench(tp);
 			return (0);
 		}
 		if ((error == EHOSTUNREACH || error == ENETDOWN)
@@ -567,7 +588,7 @@ out:
 		}
 		return (error);
 	}
-	tcpstat.tcps_sndtotal++;
+	INC_STAT(ctx,tcps_sndtotal);
 
 	/*
 	 * Data sent (as far as we can tell).
@@ -584,15 +605,15 @@ out:
 	return (0);
 }
 
-void
-tcp_setpersist(tp)
-	register struct tcpcb *tp;
-{
-	register t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
+    #if 0
 
-	if (tp->t_timer[TCPT_REXMT])
-		panic("tcp_output REXMT");
-	/*
+void tcp_setpersist(CTcpPerThreadCtx * ctx,
+                    struct tcpcb *tp){
+	int16_t t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
+
+	assert(tp->t_timer[TCPT_REXMT]==0);
+
+    /*
 	 * Start/restart persistance timer.
 	 */
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
@@ -601,3 +622,6 @@ tcp_setpersist(tp)
 	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
 		tp->t_rxtshift++;
 }
+
+    #endif
+

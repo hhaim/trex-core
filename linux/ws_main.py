@@ -106,6 +106,13 @@ bp_sim_gtest = SrcGroup(dir='src',
 
 main_src = SrcGroup(dir='src',
         src_list=[
+             '44bsd/tcp_output.cpp',
+             '44bsd/tcp_timer.cpp',
+             '44bsd/tcp_debug.cpp',
+             '44bsd/tcp_subr.cpp',
+             '44bsd/tcp_input.cpp',
+
+
              'inet_pton.cpp',
              'bp_sim.cpp',
              'os_time.cpp',

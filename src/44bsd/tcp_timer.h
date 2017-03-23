@@ -1,3 +1,6 @@
+#ifndef BSD44_BR_TCP_TIMER
+#define BSD44_BR_TCP_TIMER
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -83,6 +86,11 @@
 /*
  * Time constants.
  */
+
+#define	PR_SLOWHZ	2		/* 2 slow timeouts per second */
+#define	PR_FASTHZ	5		/* 5 fast timeouts per second */
+
+ 
 #define	TCPTV_MSL	( 30*PR_SLOWHZ)		/* max seg lifetime (hah!) */
 #define	TCPTV_SRTTBASE	0			/* base roundtrip time;
 						   if 0, no idea yet */
@@ -103,10 +111,7 @@
 
 #define	TCP_MAXRXTSHIFT	12			/* maximum retransmits */
 
-#ifdef	TCPTIMERS
-char *tcptimers[] =
-    { "REXMT", "PERSIST", "KEEP", "2MSL" };
-#endif
+
 
 /*
  * Force a time value to be in a certain range.
@@ -119,10 +124,8 @@ char *tcptimers[] =
 		(tv) = (tvmax); \
 }
 
-#ifdef KERNEL
-extern int tcp_keepidle;		/* time before keepalive probes begin */
-extern int tcp_keepintvl;		/* time between keepalive probes */
-extern int tcp_maxidle;			/* time to drop after starting probes */
-extern int tcp_ttl;			/* time to live for TCP segs */
-extern int tcp_backoff[];
+
+extern const int tcp_backoff[];
+
+
 #endif

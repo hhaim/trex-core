@@ -1,3 +1,6 @@
+#ifndef BSD44_BR_TCP_SEQ
+#define BSD44_BR_TCP_SEQ
+
 /*
  * Copyright (c) 1982, 1986, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -55,7 +58,6 @@
 	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
 	    (tp)->iss
 
-#ifdef KERNEL
 /*
  * Increment for tcp_iss each second.
  * This is designed to increment at the standard 250 KB/s,
@@ -65,12 +67,12 @@
  * If defined, the tcp_random18() macro should produce a
  * number in the range [0-0x3ffff] that is hard to predict.
  */
-#ifndef tcp_random18
-#define	tcp_random18()	((random() >> 14) & 0x3ffff)
-#endif
+//TBDFIXME
+#define	tcp_random18()	(0)
+
 #define	TCP_ISSINCR	(122*1024 + tcp_random18())
 
-tcp_seq	tcp_iss;		/* tcp initial send seq # */
-#else
-#define	TCP_ISSINCR	(250*1024)	/* increment for tcp_iss each second */
+
 #endif
+
+

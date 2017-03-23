@@ -25,6 +25,16 @@ limitations under the License.
 #include <common/utl_gcc_diag.h>
 #include <cmath>
 
+#include "44bsd/tcp.h"
+#include "44bsd/tcp_var.h"
+#include "44bsd/tcp.h"
+#include "44bsd/tcp_fsm.h"
+#include "44bsd/tcp_seq.h"
+#include "44bsd/tcp_timer.h"
+#include "44bsd/tcp_socket.h"
+#include "44bsd/tcpip.h"
+#include "mbuf.h"
+
 
 class gt_tcp  : public testing::Test {
 
@@ -38,41 +48,74 @@ public:
 };
 
 
-// base tick in msec
-#define TCP_TIMER_TICK_BASE_MS 200 
-#define TCP_TIMER_W_TICK       50
-
-#define TCP_FAST_TICK (TCP_TIMER_TICK_BASE_MS/TCP_TIMER_W_TICK)
+#define MYC(f) if (m_sts.f)  fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
+#define MYC_A(f)     fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
 
 
-class CTcpFlow {
+void tcpstat::Clear(){
+    memset(&m_sts,0,sizeof(tcpstat_int_t));
+}
 
-public:
-    void Create();
-    void Delete();
 
-    void on_slow_tick(){
-        printf(" slow tick \n");
-    }
+void tcpstat::Dump(FILE *fd){
 
-    void on_fast_tick(){
-        printf(" fast tick \n");
-    }
+    MYC(tcps_connattempt);
+    MYC(tcps_accepts);	   
+    MYC(tcps_connects);	   
+    MYC(tcps_drops);	       
+    MYC(tcps_conndrops);
+    MYC(tcps_closed); 
+    MYC(tcps_segstimed);	   
+    MYC(tcps_rttupdated);   
+    MYC(tcps_delack); 
+    MYC(tcps_timeoutdrop);
+    MYC(tcps_rexmttimeo);
+    MYC(tcps_persisttimeo);
+    MYC(tcps_keeptimeo);
+    MYC(tcps_keepprobe);   
+    MYC(tcps_keepdrops);   
 
-    void on_tick(){
-        on_fast_tick();
-        if (m_tick==1) {
-            m_tick=0;
-            on_slow_tick();
-        }else{
-            m_tick++;
-        }
-    }
+    MYC(tcps_sndtotal);	   
+    MYC(tcps_sndpack);	   
+    MYC(tcps_sndbyte);	   
+    MYC(tcps_sndrexmitpack);
+    MYC(tcps_sndrexmitbyte);
+    MYC(tcps_sndacks);
+    MYC(tcps_sndprobe);	   
+    MYC(tcps_sndurg);
+    MYC(tcps_sndwinup);
+    MYC(tcps_sndctrl);
 
-public:
-    uint8_t     m_tick; /* 0 and 1 */
-    CHTimerObj  m_timer;
-};
+    MYC(tcps_rcvtotal);	   
+    MYC(tcps_rcvpack);	   
+    MYC(tcps_rcvbyte);	   
+    MYC(tcps_rcvbadsum);	   
+    MYC(tcps_rcvbadoff);	   
+    MYC(tcps_rcvshort);	   
+    MYC(tcps_rcvduppack);   
+    MYC(tcps_rcvdupbyte);   
+    MYC(tcps_rcvpartduppack);  
+    MYC(tcps_rcvpartdupbyte);  
+    MYC(tcps_rcvoopack);		
+    MYC(tcps_rcvoobyte);		
+    MYC(tcps_rcvpackafterwin);  
+    MYC(tcps_rcvbyteafterwin);  
+    MYC(tcps_rcvafterclose);	   
+    MYC(tcps_rcvwinprobe);	   
+    MYC(tcps_rcvdupack);		   
+    MYC(tcps_rcvacktoomuch);	   
+    MYC(tcps_rcvackpack);	   
+    MYC(tcps_rcvackbyte);	   
+    MYC(tcps_rcvwinupd);		   
+    MYC(tcps_pawsdrop);		   
+    MYC(tcps_predack);		   
+    MYC(tcps_preddat);		   
+    MYC(tcps_pcbcachemiss);
+    MYC(tcps_persistdrop);	   
+    MYC(tcps_badsyn);		   
+}
+
+
 
 void CTcpFlow::Create(){
     m_tick=0;
@@ -82,24 +125,6 @@ void CTcpFlow::Create(){
 void CTcpFlow::Delete(){
 }
 
-class CTcpPerThreadCtx {
-public:
-    bool Create(void);
-    void Delete();
-    RC_HTW_t timer_w_start(CTcpFlow * flow){
-        return (m_timer_w.timer_start(&flow->m_timer,TCP_FAST_TICK));
-    }
-
-    RC_HTW_t timer_w_stop(CTcpFlow * flow){
-        return (m_timer_w.timer_stop(&flow->m_timer));
-    }
-
-    void timer_w_on_tick();
-
-private:
-
-    CHTimerWheel  m_timer_w; /* TBD-FIXME*/
-};
 
 #define unsafe_container_of(var,ptr, type, member)              \
     ((type *) ((uint8_t *)(ptr) - offsetof(type, member)))
@@ -117,27 +142,23 @@ static void tcp_timer(void *userdata,
 
 void CTcpPerThreadCtx::timer_w_on_tick(){
     m_timer_w.on_tick((void*)this,tcp_timer);
-}
 
+    if ( m_tick==TCP_SLOW_RATIO_TICK ) {
+        tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
 
-bool CTcpPerThreadCtx::Create(void){
-
-    RC_HTW_t tw_res;
-    tw_res = m_timer_w.Create(512,1);
-    if (tw_res != RC_HTW_OK ){
-        CHTimerWheelErrorStr err(tw_res);
-        printf("Timer wheel configuration error,please look into the manual for details  \n");
-        printf("ERROR  %-30s  - %s \n",err.get_str(),err.get_help_str());
-        return(false);
+        tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
+    #ifdef TCP_COMPAT_42
+        if ((int)tcp_iss < 0)
+            tcp_iss = TCP_ISSINCR;			/* XXX */
+    #endif
+        tcp_now++;					/* for timestamps */
+        m_tick=0;
+    } else{
+        m_tick++;
     }
-    return(true);
 }
 
 
-
-void CTcpPerThreadCtx::Delete(){
-    m_timer_w.Delete();
-}
 
 
 
@@ -165,6 +186,29 @@ TEST_F(gt_tcp, tst1) {
     flow.on_tick();
     flow.Delete();
 }
+
+
+
+TEST_F(gt_tcp, tst3) {
+    printf(" MSS %d \n",(int)TCP_MSS);
+    printf(" sizeof_tcpcb %d \n",(int)sizeof(tcpcb));
+    tcpstat tcp_stats;
+    tcp_stats.Clear();
+    tcp_stats.m_sts.tcps_accepts++;
+    tcp_stats.m_sts.tcps_connects++;
+    tcp_stats.m_sts.tcps_connects++;
+    tcp_stats.Dump(stdout);
+}
+
+TEST_F(gt_tcp, tst4) {
+    tcp_socket socket;
+    socket.so_options=0;
+    printf(" %d \n", (int)sizeof(socket));
+}
+
+
+
+
 
 
 
