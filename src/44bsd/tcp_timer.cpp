@@ -48,7 +48,6 @@ const int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
 
 int tcp_totbackoff = 511;	/* sum of tcp_backoff[] */
 
-#if 0
 
 /*
  * Fast timeout routine for processing delayed acks
@@ -81,7 +80,7 @@ void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp)
 
             (void) tcp_usrreq(ctx,&tp->m_socket,
                 PRU_SLOWTIMO, (struct rte_mbuf *)0,
-                (struct rte_mbuf *)i, (struct rte_mbuf *)0);
+                (struct rte_mbuf *)((uintptr_t)i), (struct rte_mbuf *)0);
         }
     }
     tp->t_idle++;
@@ -257,10 +256,10 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 			 * The keepalive packet must have nonzero length
 			 * to get a 4.2 host to respond.
 			 */
-			tcp_respond(ctx,tp, tp->t_template, (struct rte_mbuf *)NULL,
+			tcp_respond(ctx,tp, 
 			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
 #else
-			tcp_respond(ctx,tp, tp->t_template, (struct rte_mbuf *)NULL,
+			tcp_respond(ctx,tp, 
 			    tp->rcv_nxt, tp->snd_una - 1, 0);
 #endif
 			tp->t_timer[TCPT_KEEP] = ctx->tcp_keepintvl;
@@ -276,4 +275,4 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
 }
 
 
-#endif
+

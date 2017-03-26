@@ -38,10 +38,10 @@
                  
 
 struct	sockbuf {
-    uint64_t	sb_cc;		/* actual chars in buffer */
-    uint64_t	sb_hiwat;	/* max actual char count */
-    uint64_t	sb_mbcnt;	/* chars of mbufs used */
-    uint64_t	sb_mbmax;	/* max chars of mbufs to use */
+    uint32_t	sb_cc;		/* actual chars in buffer */
+    uint32_t	sb_hiwat;	/* max actual char count */
+    uint32_t	sb_mbcnt;	/* chars of mbufs used */
+    uint32_t	sb_mbmax;	/* max chars of mbufs to use */
     //int64_t	    sb_lowat;	/* low water mark */
     struct	rte_mbuf *sb_mb;	/* the mbuf chain */
     short	sb_flags;	/* flags, see below */
@@ -115,11 +115,11 @@ struct tcp_socket {
 #define	US_SO_NO_DDP	0x8000		/* disable direct data placement */
 
 struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus);
+
 void	sbdrop(struct sockbuf *sb, int len);
+void sowwakeup(struct tcp_socket *so);
+void sorwakeup(struct tcp_socket *so);
 
-//#define	sowwakeup(so)	sowakeup((so), &(so)->so_snd)
-
-void sowwakeup(struct tcp_socket *head);
 
 void	soisdisconnected(struct tcp_socket *so);
 
@@ -133,7 +133,6 @@ void	sbappend(struct sockbuf *sb, struct rte_mbuf *m);
 			}
 #else
 
-#define	sorwakeup(so)	{ printf("FIXME .. \n");}
 
 #endif            
 

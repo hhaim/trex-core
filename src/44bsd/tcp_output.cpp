@@ -99,13 +99,14 @@ int tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb *tp) {
 	 * to send, then transmit; otherwise, investigate further.
 	 */
 	idle = (tp->snd_max == tp->snd_una);
-	if (idle && tp->t_idle >= tp->t_rxtcur)
-		/*
-		 * We have been idle for "a while" and no acks are
-		 * expected to clock out any data we send --
-		 * slow start to get ack "clock" running again.
-		 */
-		tp->snd_cwnd = tp->t_maxseg;
+	if (idle && tp->t_idle >= tp->t_rxtcur){
+        /*
+         * We have been idle for "a while" and no acks are
+         * expected to clock out any data we send --
+         * slow start to get ack "clock" running again.
+         */
+        tp->snd_cwnd = tp->t_maxseg;
+    }
 again:
 	sendalot = 0;
 	off = tp->snd_nxt - tp->snd_una;
@@ -605,8 +606,6 @@ out:
 	return (0);
 }
 
-    #if 0
-
 void tcp_setpersist(CTcpPerThreadCtx * ctx,
                     struct tcpcb *tp){
 	int16_t t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> 1;
@@ -619,9 +618,11 @@ void tcp_setpersist(CTcpPerThreadCtx * ctx,
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
 	    t * tcp_backoff[tp->t_rxtshift],
 	    TCPTV_PERSMIN, TCPTV_PERSMAX);
-	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
-		tp->t_rxtshift++;
+
+    if (tp->t_rxtshift < TCP_MAXRXTSHIFT){
+        tp->t_rxtshift++;
+    }
 }
 
-    #endif
+
 

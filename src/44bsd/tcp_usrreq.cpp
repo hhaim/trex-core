@@ -336,7 +336,6 @@ tcp_usrreq(CTcpPerThreadCtx * ctx,
 	return (error);
 }
 
-#endif
 
 int
 tcp_ctloutput(op, so, level, optname, mp)
@@ -520,5 +519,6 @@ tcp_usrclosed(tp)
 		soisdisconnected(tp->t_inpcb->inp_socket);
 	return (tp);
 }
+
 
 #endif

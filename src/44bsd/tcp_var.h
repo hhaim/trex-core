@@ -394,7 +394,7 @@ public:
 
     //struct	inpcb tcb;		/* head of queue of active tcpcb's */
     struct	    tcpstat m_tcpstat;	/* tcp statistics */
-    uint64_t	tcp_now;		/* for RFC 1323 timestamps */
+    u_long	    tcp_now;		/* for RFC 1323 timestamps */
     tcp_seq	    tcp_iss;		    /* tcp initial send seq # */
     uint8_t     m_tick;
 
@@ -408,21 +408,23 @@ public:
 
 
 int	 tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
-int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcpcb *, int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
+int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcp_socket *so,  int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
 struct tcpcb * tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
-void tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
-void	 tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *,struct tcpiphdr *, struct rte_mbuf *, uint64_t, uint64_t, int);
-uint16_t tcp_mss(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int offer);
-void	 tcp_trace(CTcpPerThreadCtx * ctx,int, int, struct tcpcb *, struct tcpiphdr *, int);
+void  tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+void  tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *tp, tcp_seq ack, tcp_seq seq, int flags);
+int  tcp_mss(CTcpPerThreadCtx * ctx,struct tcpcb *tp, u_int offer);
+
+void tcp_trace(CTcpPerThreadCtx * ctx,short act, short ostate, struct tcpcb * tp, struct tcpiphdr * ti, int req);
+
 void tcp_quench(struct tcpcb *tp);
 void tcp_template(struct tcpcb *tp);
-void	 tcp_xmit_timer(CTcpPerThreadCtx * ctx,struct tcpcb *, int);
+void	 tcp_xmit_timer(CTcpPerThreadCtx * ctx,struct tcpcb *, int16_t rtt);
+
 void tcp_canceltimers(struct tcpcb *tp);
 
 struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
-                         struct tcpcb * tp, 
-                         int my);
-
+                            struct tcpcb *tp, 
+                            int res);
 
 
 

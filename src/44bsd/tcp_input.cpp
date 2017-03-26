@@ -462,7 +462,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                  */
                 INC_STAT(ctx,tcps_predack)
                 if (ts_present)
-                    tcp_xmit_timer(ctx,tp, ctx->tcp_now-ts_ecr+1);
+                    tcp_xmit_timer(ctx,tp, (int16_t)(ctx->tcp_now-ts_ecr+1));
                 else if (tp->t_rtt &&
                         SEQ_GT(ti->ti_ack, tp->t_rtseq))
                     tcp_xmit_timer(ctx,tp, tp->t_rtt);
@@ -985,7 +985,7 @@ trimthenstep6:
          * Recompute the initial retransmit timer.
          */
         if (ts_present){
-            tcp_xmit_timer(ctx,tp, ctx->tcp_now-ts_ecr+1);
+            tcp_xmit_timer(ctx,tp, (int16_t)(ctx->tcp_now-ts_ecr+1));
         }else if (tp->t_rtt && SEQ_GT(ti->ti_ack, tp->t_rtseq)){
             tcp_xmit_timer(ctx,tp,tp->t_rtt);
         }
@@ -1288,12 +1288,17 @@ dropwithreset:
 	 */
 	if ((tiflags & TH_RST) )
 		goto drop;
-	if (tiflags & TH_ACK)
-		tcp_respond(ctx,tp, ti, m, (tcp_seq)0, ti->ti_ack, TH_RST);
-	else {
-		if (tiflags & TH_SYN)
-			ti->ti_len++;
-		tcp_respond(ctx,tp, ti, m, ti->ti_seq+ti->ti_len, (tcp_seq)0,
+
+    /* want to use 64B mbuf for response and free big MBUF */
+    rte_pktmbuf_free(m);
+
+	if (tiflags & TH_ACK){
+        tcp_respond(ctx,tp,   (tcp_seq)0, ti->ti_ack, TH_RST);
+    }else {
+		if (tiflags & TH_SYN){
+            ti->ti_len++;
+        }
+		tcp_respond(ctx,tp,  ti->ti_seq+ti->ti_len, (tcp_seq)0,
 		    TH_RST|TH_ACK);
 	}
 	/* destroy temporarily created socket */
@@ -1328,7 +1333,7 @@ findpcb:
  */
 void tcp_xmit_timer(CTcpPerThreadCtx * ctx,
                     struct tcpcb *tp,
-                    short rtt){
+                    int16_t rtt){
 	short delta;
 
 	INC_STAT(ctx,tcps_rttupdated);

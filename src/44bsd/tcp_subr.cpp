@@ -138,9 +138,8 @@ void tcp_template(struct tcpcb *tp){
  * segment are as specified by the parameters.
  */
 void
-tcp_respond(struct tcpcb *tp, 
-            struct tcpiphdr *ti, 
-            struct rte_mbuf *m, 
+tcp_respond(CTcpPerThreadCtx * ctx,
+            struct tcpcb *tp, 
             tcp_seq ack, 
             tcp_seq seq, 
             int flags){
@@ -152,6 +151,7 @@ tcp_respond(struct tcpcb *tp,
 	}
 
 
+    /* TBD always generate a new buffer- hhaim and fill it from template  -- tp->template_pkt */
 	if (m == 0) {
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
@@ -238,15 +238,16 @@ struct tcpcb * tcp_newtcpcb(CTcpPerThreadCtx * ctx){
 	return (tp);
 }
 
+
+
 /*
  * Drop a TCP connection, reporting
  * the specified error.  If connection is synchronized,
  * then send a RST to peer.
  */
-struct tcpcb *
-tcp_drop_now(CTcpPerThreadCtx * ctx,
-         struct tcpcb *tp, 
-         int errno){
+struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp, 
+                            int res){
 	struct tcp_socket *so = &tp->m_socket;
 
 	if (TCPS_HAVERCVDSYN(tp->t_state)) {
@@ -256,9 +257,10 @@ tcp_drop_now(CTcpPerThreadCtx * ctx,
 	} else{
         INC_STAT(ctx,tcps_conndrops);
     }
-	if (errno == ETIMEDOUT && tp->t_softerror)
-		errno = tp->t_softerror;
-	so->so_error = errno;
+	if (res == ETIMEDOUT && tp->t_softerror){
+        res = tp->t_softerror;
+    }
+	so->so_error = res;
 	return (tcp_close(ctx,tp));
 }
 
@@ -435,4 +437,40 @@ void tcp_quench(struct tcpcb *tp){
     tp->snd_cwnd = tp->t_maxseg;
 }
 
+
+struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus){
+    return ((struct tcp_socket *)0);
+}
+
+void	sbdrop(struct sockbuf *sb, int len){
+}
+void sowwakeup(struct tcp_socket *so){
+}
+void sorwakeup(struct tcp_socket *so){
+}
+
+
+void	soisdisconnected(struct tcp_socket *so){
+}
+
+void	sbappend(struct sockbuf *sb, struct rte_mbuf *m){
+}
+
+
+void	soisconnected(struct tcp_socket *so){
+}
+void	socantrcvmore(struct tcp_socket *so){
+}
+
+int  tcp_usrreq(CTcpPerThreadCtx * ctx, 
+                struct tcp_socket *so,  
+                int req, 
+                struct rte_mbuf *m, 
+                struct rte_mbuf *nam, 
+                struct rte_mbuf *control){
+    return (0);
+}
+
+
+/* stubs */
 
