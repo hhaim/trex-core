@@ -52,6 +52,7 @@
 
 bool CTcpPerThreadCtx::Create(void){
     sb_max = SB_MAX;		/* patchable */
+    tcprexmtthresh = 3 ;
     tcp_mssdflt = TCP_MSS;
     tcp_rttdflt = TCPTV_SRTTDFLT / PR_SLOWHZ;
     tcp_do_rfc1323 = 1;
@@ -469,6 +470,13 @@ int  tcp_usrreq(CTcpPerThreadCtx * ctx,
                 struct rte_mbuf *nam, 
                 struct rte_mbuf *control){
     return (0);
+}
+
+
+/* delete a socket */
+int soabort(struct tcp_socket *so)
+{
+    return(0);
 }
 
 

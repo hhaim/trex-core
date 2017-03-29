@@ -145,6 +145,9 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 
     if ( m_tick==TCP_SLOW_RATIO_TICK ) {
         tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
+        if (tcp_maxidle > UINT8_MAX) {
+            tcp_maxidle = UINT8_MAX;
+        }
 
         tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
     #ifdef TCP_COMPAT_42

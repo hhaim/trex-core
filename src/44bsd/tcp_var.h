@@ -110,13 +110,14 @@ struct tcpcb {
 	struct	tcpiphdr *seg_prev;
 #endif
 
-	int16_t	t_state;		/* state of this connection */
-	int16_t	t_timer[TCPT_NTIMERS];	/* tcp timers */
+    uint8_t	t_timer[TCPT_NTIMERS];	/* tcp timers */
+    char	t_force;		/* 1 if forcing out a byte */
+    uint8_t	t_dupacks;		/* consecutive dup acks recd */
+
+    int16_t	t_state;		/* state of this connection */
 	int16_t	t_rxtshift;		/* log(2) of rexmt exp. backoff */
 	int16_t	t_rxtcur;		/* current retransmit value */
-	int16_t	t_dupacks;		/* consecutive dup acks recd */
 	u_short	t_maxseg;		/* maximum segment size */
-	char	t_force;		/* 1 if forcing out a byte */
 	u_short	t_flags;
 #define	TF_ACKNOW	0x0001		/* ack peer immediately */
 #define	TF_DELACK	0x0002		/* ack, but try to delay it */
@@ -180,8 +181,10 @@ struct tcpcb {
 	u_long	max_sndwnd;		/* largest window peer has offered */
 
 /* out-of-band data */
+#if 0
 	char	t_oobflags;		/* have some */
 	char	t_iobc;			/* input character */
+#endif
 #define	TCPOOB_HAVEDATA	0x01
 #define	TCPOOB_HADDATA	0x02
 	int16_t	t_softerror;		/* possible error not yet reported */
