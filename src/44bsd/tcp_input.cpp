@@ -205,13 +205,29 @@ int tcp_reass(CTcpPerThreadCtx * ctx,
     return (0);
 }
 
+
 inline void TCP_REASS(CTcpPerThreadCtx * ctx,
                       struct tcpcb *tp,
                       struct tcpiphdr *ti,
                       struct rte_mbuf *m,
                       struct tcp_socket *so,
                       int &tiflags) { 
-    tiflags=0;
+#if 0
+    if (ti->ti_seq == tp->rcv_nxt && 
+        tp->seg_next == (struct tcpiphdr *)(tp) && 
+        tp->t_state == TCPS_ESTABLISHED) { 
+        tp->t_flags |= TF_DELACK; 
+        tp->rcv_nxt += ti->ti_len; 
+        tiflags = ti->ti_flags & TH_FIN; 
+        INC_STAT(ctx,tcps_rcvpack);
+        INC_STAT_CNT(ctx,ti->ti_len);
+        sbappend(&so->so_rcv, m); 
+        sorwakeup(so); 
+    } else { 
+        tiflags = tcp_reass(ctx,tp, ti, m); 
+        tp->t_flags |= TF_ACKNOW; 
+    }
+#endif
 }
 
 

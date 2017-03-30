@@ -211,6 +211,96 @@ TEST_F(gt_tcp, tst4) {
 
 
 
+class CTcpReassBlock {
+
+public:
+  void Dump(FILE *fd);
+  uint32_t m_seq;  
+  uint32_t m_len;
+
+  uint32_t get_seq_end(void){
+      return(m_seq+m_len);
+  }
+
+  void merge_segment(uint16_t len){
+      m_len+=len;
+  }
+
+};
+
+#define MAX_TCP_REASS_BLOCKS (4)
+
+class CTcpReass {
+
+public:
+ CTcpReass(){
+     m_active_blocks=0;
+     m_drop_mbufs=0;
+ }
+
+ bool add_mbuf(CTcpPerThreadCtx * ctx,
+              struct tcpcb *tp, 
+              struct tcpiphdr *ti, 
+              struct rte_mbuf *m){
+     return(true);
+ }
+ void Dump(FILE *fd);
+
+private:
+  uint32_t m_active_blocks;
+  uint32_t m_drop_mbufs;
+  CTcpReassBlock  m_blocks[MAX_TCP_REASS_BLOCKS];
+};
+
+
+
+void CTcpReassBlock::Dump(FILE *fd){
+    fprintf(fd,"seq : %lu(%lu) \n",(ulong)m_seq,(ulong)m_len);
+}
+
+
+void CTcpReass::Dump(FILE *fd){
+    int i; 
+    fprintf(fd,"active blocks : %d \n",m_active_blocks);
+    for (i=0;i<m_active_blocks;i++) {
+        m_blocks[i].Dump(fd);
+    }
+}
+
+
+
+int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
+                         struct tcpcb *tp, 
+                         struct tcpiphdr *ti, 
+                         struct rte_mbuf *m){
+
+    assert(ti);
+    assert(m);
+
+    if (m_active_blocks==0) {
+        /* first one - just add it to the list */
+        CTcpReassBlock * lpb=&m_blocks[0];
+        lpb->m_seq = ti->ti_seq;
+        lpb->m_len = ti->ti_len;
+        return(0);
+    }
+
+    int i;
+    for (i=0; i<m_active_blocks; i++) {
+        CTcpReassBlock * lpb=&m_blocks[i];
+        if (lpb->get_seq_end() == ti->ti_seq)) {
+            /* merge it */
+            lpb->merge_segment(ti->ti_len);
+        }else{
+
+            if ( SEQ_GT(lpb->m_seq,ti->ti_seq) ) {
+            }
+
+        }
+    }
+
+     return(true);
+ }
 
 
 
