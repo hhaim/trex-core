@@ -127,9 +127,15 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
     m_tick=0;
     m_timer.reset();
 
+    
+
         /* TCP_OPTIM  */
     tcpcb *tp=&m_tcp;
 	memset((char *) tp, 0,sizeof(struct tcpcb));
+
+    /* build template */
+    tcp_template(tp);
+
     tp->t_maxseg = ctx->tcp_mssdflt;
 
 	tp->t_flags = ctx->tcp_do_rfc1323 ? (TF_REQ_SCALE|TF_REQ_TSTMP) : 0;
