@@ -124,6 +124,7 @@ void sorwakeup(struct tcp_socket *so);
 void	soisdisconnected(struct tcp_socket *so);
 
 void	sbappend(struct sockbuf *sb, struct rte_mbuf *m);
+void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
 
 #ifdef FIXME
 #define	sorwakeup(so)	{ sowakeup((so), &(so)->so_rcv); \

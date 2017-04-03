@@ -48,118 +48,6 @@ public:
 };
 
 
-#define MYC(f) if (m_sts.f)  fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
-#define MYC_A(f)     fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
-
-
-void tcpstat::Clear(){
-    memset(&m_sts,0,sizeof(tcpstat_int_t));
-}
-
-
-void tcpstat::Dump(FILE *fd){
-
-    MYC(tcps_connattempt);
-    MYC(tcps_accepts);	   
-    MYC(tcps_connects);	   
-    MYC(tcps_drops);	       
-    MYC(tcps_conndrops);
-    MYC(tcps_closed); 
-    MYC(tcps_segstimed);	   
-    MYC(tcps_rttupdated);   
-    MYC(tcps_delack); 
-    MYC(tcps_timeoutdrop);
-    MYC(tcps_rexmttimeo);
-    MYC(tcps_persisttimeo);
-    MYC(tcps_keeptimeo);
-    MYC(tcps_keepprobe);   
-    MYC(tcps_keepdrops);   
-
-    MYC(tcps_sndtotal);	   
-    MYC(tcps_sndpack);	   
-    MYC(tcps_sndbyte);	   
-    MYC(tcps_sndrexmitpack);
-    MYC(tcps_sndrexmitbyte);
-    MYC(tcps_sndacks);
-    MYC(tcps_sndprobe);	   
-    MYC(tcps_sndurg);
-    MYC(tcps_sndwinup);
-    MYC(tcps_sndctrl);
-
-    MYC(tcps_rcvtotal);	   
-    MYC(tcps_rcvpack);	   
-    MYC(tcps_rcvbyte);	   
-    MYC(tcps_rcvbadsum);	   
-    MYC(tcps_rcvbadoff);	   
-    MYC(tcps_rcvshort);	   
-    MYC(tcps_rcvduppack);   
-    MYC(tcps_rcvdupbyte);   
-    MYC(tcps_rcvpartduppack);  
-    MYC(tcps_rcvpartdupbyte);  
-    MYC(tcps_rcvoopack);		
-    MYC(tcps_rcvoobyte);		
-    MYC(tcps_rcvpackafterwin);  
-    MYC(tcps_rcvbyteafterwin);  
-    MYC(tcps_rcvafterclose);	   
-    MYC(tcps_rcvwinprobe);	   
-    MYC(tcps_rcvdupack);		   
-    MYC(tcps_rcvacktoomuch);	   
-    MYC(tcps_rcvackpack);	   
-    MYC(tcps_rcvackbyte);	   
-    MYC(tcps_rcvwinupd);		   
-    MYC(tcps_pawsdrop);		   
-    MYC(tcps_predack);		   
-    MYC(tcps_preddat);		   
-    MYC(tcps_pcbcachemiss);
-    MYC(tcps_persistdrop);	   
-    MYC(tcps_badsyn);		   
-}
-
-
-
-void CTcpFlow::Create(){
-    m_tick=0;
-    m_timer.reset();
-}
-
-void CTcpFlow::Delete(){
-}
-
-
-#define unsafe_container_of(var,ptr, type, member)              \
-    ((type *) ((uint8_t *)(ptr) - offsetof(type, member)))
-
-
-static void tcp_timer(void *userdata,
-                       CHTimerObj *tmr){
-    CTcpPerThreadCtx * tcp_ctx=(CTcpPerThreadCtx * )userdata;
-    UNSAFE_CONTAINER_OF_PUSH;
-    CTcpFlow * tcp_flow=unsafe_container_of(tcp_flow,tmr,CTcpFlow,m_timer);
-    UNSAFE_CONTAINER_OF_POP;
-    tcp_flow->on_tick();
-    tcp_ctx->timer_w_start(tcp_flow);
-}
-
-void CTcpPerThreadCtx::timer_w_on_tick(){
-    m_timer_w.on_tick((void*)this,tcp_timer);
-
-    if ( m_tick==TCP_SLOW_RATIO_TICK ) {
-        tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
-        if (tcp_maxidle > UINT8_MAX) {
-            tcp_maxidle = UINT8_MAX;
-        }
-
-        tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
-    #ifdef TCP_COMPAT_42
-        if ((int)tcp_iss < 0)
-            tcp_iss = TCP_ISSINCR;			/* XXX */
-    #endif
-        tcp_now++;					/* for timestamps */
-        m_tick=0;
-    } else{
-        m_tick++;
-    }
-}
 
 
 
@@ -168,7 +56,7 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 TEST_F(gt_tcp, tst2) {
     CTcpPerThreadCtx tcp_ctx;
     CTcpFlow   flow;
-    flow.Create();
+    flow.Create(&tcp_ctx);
 
     tcp_ctx.Create();
     tcp_ctx.timer_w_start(&flow);
@@ -182,12 +70,13 @@ TEST_F(gt_tcp, tst2) {
 
 
 TEST_F(gt_tcp, tst1) {
-
+#if 0
     CTcpFlow   flow;
     flow.Create();
     flow.on_tick();
     flow.on_tick();
     flow.Delete();
+#endif
 }
 
 
@@ -211,98 +100,265 @@ TEST_F(gt_tcp, tst4) {
 
 
 
-class CTcpReassBlock {
+
+
+
+
+
+
+
+class CTcpReassTest  {
 
 public:
-  void Dump(FILE *fd);
-  uint32_t m_seq;  
-  uint32_t m_len;
-
-  uint32_t get_seq_end(void){
-      return(m_seq+m_len);
-  }
-
-  void merge_segment(uint16_t len){
-      m_len+=len;
-  }
-
-};
-
-#define MAX_TCP_REASS_BLOCKS (4)
-
-class CTcpReass {
+    bool Create();
+    void Delete();
+    void add_pkts(vec_tcp_reas_t & list);
+    void expect(vec_tcp_reas_t & list,FILE *fd);
 
 public:
- CTcpReass(){
-     m_active_blocks=0;
-     m_drop_mbufs=0;
- }
+    bool                    m_verbose;
 
- bool add_mbuf(CTcpPerThreadCtx * ctx,
-              struct tcpcb *tp, 
-              struct tcpiphdr *ti, 
-              struct rte_mbuf *m){
-     return(true);
- }
- void Dump(FILE *fd);
-
-private:
-  uint32_t m_active_blocks;
-  uint32_t m_drop_mbufs;
-  CTcpReassBlock  m_blocks[MAX_TCP_REASS_BLOCKS];
+    CTcpPerThreadCtx        m_ctx;
+    CTcpReass               m_tcp_res;
+    CTcpFlow                m_flow;
 };
 
-
-
-void CTcpReassBlock::Dump(FILE *fd){
-    fprintf(fd,"seq : %lu(%lu) \n",(ulong)m_seq,(ulong)m_len);
+bool CTcpReassTest::Create(){
+    m_ctx.Create();
+    m_flow.Create(&m_ctx);
+    return(true);
 }
 
-
-void CTcpReass::Dump(FILE *fd){
-    int i; 
-    fprintf(fd,"active blocks : %d \n",m_active_blocks);
-    for (i=0;i<m_active_blocks;i++) {
-        m_blocks[i].Dump(fd);
-    }
+void CTcpReassTest::Delete(){
+    m_flow.Delete();
+    m_ctx.Delete();
 }
 
-
-
-int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
-                         struct tcpcb *tp, 
-                         struct tcpiphdr *ti, 
-                         struct rte_mbuf *m){
-
-    assert(ti);
-    assert(m);
-
-    if (m_active_blocks==0) {
-        /* first one - just add it to the list */
-        CTcpReassBlock * lpb=&m_blocks[0];
-        lpb->m_seq = ti->ti_seq;
-        lpb->m_len = ti->ti_len;
-        return(0);
-    }
-
+void CTcpReassTest::add_pkts(vec_tcp_reas_t & lpkt){
     int i;
-    for (i=0; i<m_active_blocks; i++) {
-        CTcpReassBlock * lpb=&m_blocks[i];
-        if (lpb->get_seq_end() == ti->ti_seq)) {
-            /* merge it */
-            lpb->merge_segment(ti->ti_len);
-        }else{
+    tcpiphdr ti;
 
-            if ( SEQ_GT(lpb->m_seq,ti->ti_seq) ) {
-            }
-
+    for (i=0; i<lpkt.size(); i++) {
+        ti.ti_seq  = lpkt[i].m_seq;
+        ti.ti_len  = (uint16_t)lpkt[i].m_len;
+        ti.ti_flags =lpkt[i].m_flags;
+        m_tcp_res.pre_tcp_reass(&m_ctx,&m_flow.m_tcp,&ti,(struct rte_mbuf *)0);
+        if (m_verbose) {
+            fprintf(stdout," inter %d \n",i);
+            m_tcp_res.Dump(stdout);
         }
     }
+}
 
-     return(true);
- }
+void CTcpReassTest::expect(vec_tcp_reas_t & lpkt,FILE *fd){
+    m_tcp_res.expect(lpkt,fd);
+}
+
+
+TEST_F(gt_tcp, tst5) {
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=2000,.m_len=20,.m_flags=0} };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=20,.m_flags=0},
+                              {.m_seq=2000,.m_len=20,.m_flags=0}
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,2);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,40);
+
+    tst.Delete();
+}
 
 
 
 
+
+TEST_F(gt_tcp, tst6) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=1000,.m_len=20,.m_flags=0} };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=20,.m_flags=0}
+                              
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvduppack,1);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvdupbyte,20);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,2);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,40);
+    tst.Delete();
+
+}
+
+TEST_F(gt_tcp, tst7) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=1001,.m_len=20,.m_flags=0} };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=21,.m_flags=0}
+
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvpartduppack,1);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvpartdupbyte,1);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,2);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,40);
+
+    tst.Delete();
+}
+
+TEST_F(gt_tcp, tst8) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=2000,.m_len=20,.m_flags=0},
+                               {.m_seq=900,.m_len=3000,.m_flags=0} };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=900,.m_len=3000,.m_flags=0}
+
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvduppack,2);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvdupbyte,40);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,3);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,3040);
+
+    tst.Delete();
+}
+
+TEST_F(gt_tcp, tst9) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=TH_FIN},
+                               {.m_seq=2000,.m_len=20,.m_flags=0},
+                               {.m_seq=2000,.m_len=21,.m_flags=0} };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=20,.m_flags=TH_FIN},
+                              {.m_seq=2000,.m_len=21,.m_flags=0}
+
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+
+
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvpartduppack,1);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvpartdupbyte,1);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,3);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,61);
+    tst.Delete();
+}
+
+TEST_F(gt_tcp, tst10) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=2000,.m_len=20,.m_flags=0},
+                               {.m_seq=3000,.m_len=20,.m_flags=0},
+                               {.m_seq=4000,.m_len=20,.m_flags=0},
+                               {.m_seq=5000,.m_len=20,.m_flags=0},
+
+                                };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=2000,.m_len=20,.m_flags=0},
+                               {.m_seq=3000,.m_len=20,.m_flags=0},
+                               {.m_seq=4000,.m_len=20,.m_flags=0},
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopack,5);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoobyte,100);
+    EXPECT_EQ(tst.m_ctx.m_tcpstat.m_sts.tcps_rcvoopackdrop,1);
+    tst.Delete();
+}
+
+
+TEST_F(gt_tcp, tst11) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=1020,.m_len=20,.m_flags=0},
+                               {.m_seq=1040,.m_len=20,.m_flags=0}
+
+                                };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=60,.m_flags=0},
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+    tst.Delete();
+}
+
+TEST_F(gt_tcp, tst12) {
+
+    vec_tcp_reas_t in_pkts = { {.m_seq=1000,.m_len=20,.m_flags=0},
+                               {.m_seq=1020,.m_len=20,.m_flags=0},
+                               {.m_seq=1040,.m_len=20,.m_flags=0},
+                                };
+
+    vec_tcp_reas_t out_pkts={ {.m_seq=1000,.m_len=60,.m_flags=0},
+    };
+
+    CTcpReassTest tst;
+    tst.Create();
+    tst.m_flow.m_tcp.rcv_nxt =500;
+    tst.m_flow.m_tcp.t_state =TCPS_ESTABLISHED;
+
+    tst.m_verbose=true;
+    tst.add_pkts(in_pkts);
+    tst.expect(out_pkts,stdout);
+
+    tcpiphdr ti;
+
+    ti.ti_seq  = 500;
+    ti.ti_len  = 500;
+    ti.ti_flags =0;
+
+    tst.m_tcp_res.tcp_reass(&tst.m_ctx,&tst.m_flow.m_tcp,&ti,(struct rte_mbuf *)0);
+
+    EXPECT_EQ(tst.m_tcp_res.get_active_blocks(),0);
+    EXPECT_EQ(tst.m_flow.m_tcp.rcv_nxt,500+560);
+
+    tst.m_ctx.m_tcpstat.Dump(stdout);
+    tst.Delete();
+}
 

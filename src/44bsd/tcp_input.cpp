@@ -53,6 +53,175 @@
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
 
+bool CTcpReassBlock::operator==(CTcpReassBlock& rhs)const{
+    return  ((m_seq == rhs.m_seq) && (m_flags==rhs.m_flags) && (m_len ==rhs.m_len));
+}
+
+
+void CTcpReassBlock::Dump(FILE *fd){
+    fprintf(fd,"seq : %lu(%lu)(%s) \n",(ulong)m_seq,(ulong)m_len,m_flags?"FIN":"");
+}
+
+
+
+bool CTcpReass::expect(vec_tcp_reas_t & lpkts,FILE * fd){
+    int i; 
+    if (lpkts.size() !=m_active_blocks) {
+        fprintf(fd,"ERROR not the same size");
+        return(false);
+    }
+    for (i=0;i<m_active_blocks;i++) {
+        if ( !(m_blocks[i] == lpkts[i] )){
+            fprintf(fd,"ERROR object are not the same \n");
+            fprintf(fd,"Exists :\n");
+            m_blocks[i].Dump(fd);
+            fprintf(fd,"Expected :\n");
+            lpkts[i].Dump(fd);
+        }
+    }
+    return(true);
+}
+
+void CTcpReass::Dump(FILE *fd){
+    int i; 
+    fprintf(fd,"active blocks : %d \n",m_active_blocks);
+    for (i=0;i<m_active_blocks;i++) {
+        m_blocks[i].Dump(fd);
+    }
+}
+
+
+
+int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
+                         struct tcpcb *tp, 
+                         struct tcpiphdr *ti, 
+                         struct rte_mbuf *m){
+    int flags=0;
+    pre_tcp_reass(ctx,tp,ti,m);
+
+    if (TCPS_HAVERCVDSYN(tp->t_state) == 0)
+        return (0);
+    if (m_blocks[0].m_seq != tp->rcv_nxt) {
+        return(0);
+    }
+    tp->rcv_nxt += m_blocks[0].m_len;
+    flags = (m_blocks[0].m_flags==1) ? TH_FIN :0;
+    sbappend_bytes(&tp->m_socket.so_rcv ,m_blocks[0].m_len);
+
+    /* remove the first block */
+    int i;
+    for (i=0; i<m_active_blocks-1; i++) {
+        m_blocks[i]=m_blocks[i+1];
+    }
+    m_active_blocks-=1;
+    sorwakeup(&tp->m_socket);
+    return (flags);
+}
+
+
+int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
+                         struct tcpcb *tp, 
+                         struct tcpiphdr *ti, 
+                         struct rte_mbuf *m){
+
+    assert(ti);
+    if (m) {
+        rte_pktmbuf_free(m);
+    }
+
+    INC_STAT(ctx,tcps_rcvoopack);
+    INC_STAT_CNT(ctx,tcps_rcvoobyte,ti->ti_len);
+
+    if (m_active_blocks==0) {
+        /* first one - just add it to the list */
+        CTcpReassBlock * lpb=&m_blocks[0];
+        lpb->m_seq = ti->ti_seq;
+        lpb->m_len = (uint64_t)ti->ti_len;
+        lpb->m_flags = (ti->ti_flags & TH_FIN) ?1:0;
+        m_active_blocks=1;
+        return(0);
+    }
+    /* we have at least 1 block */
+
+    int ci=0;
+    int li=0;
+    CTcpReassBlock  tblocks[MAX_TCP_REASS_BLOCKS+1];
+    bool save_ptr=false;
+
+
+    CTcpReassBlock cur;
+
+    while (true) {
+
+        if (save_ptr==false) {
+            if (li==(m_active_blocks)) {
+                cur.m_seq = ti->ti_seq;
+                cur.m_len = ti->ti_len;
+                cur.m_flags = (ti->ti_flags & TH_FIN) ?1:0;
+                save_ptr=true;
+            }else{
+                if (SEQ_GT(m_blocks[li].m_seq,ti->ti_seq)) {
+                  cur.m_seq = ti->ti_seq;
+                  cur.m_len = ti->ti_len;
+                  cur.m_flags = (ti->ti_flags & TH_FIN) ?1:0;
+                  save_ptr=true;
+                }else{
+                    cur=m_blocks[li];
+                    li++;
+                }
+            }
+        }else{
+            cur=m_blocks[li];
+            li++;
+        }
+
+        if (ci==0) {
+            tblocks[ci]=cur;
+            ci++;
+        }else{
+            int32 q = tblocks[ci-1].m_seq + tblocks[ci-1].m_len - cur.m_seq;
+            if (q<0) {
+                tblocks[ci]=cur;
+                ci++;
+            }else{
+
+                if (q>0) {
+                    if (q>=cur.m_len) {
+                        /* all packet is duplicate */
+                        INC_STAT(ctx,tcps_rcvduppack);
+                        INC_STAT_CNT(ctx,tcps_rcvdupbyte,cur.m_len);
+                    }else{
+                        /* part of it duplicate */
+                        INC_STAT(ctx,tcps_rcvpartduppack);
+                        INC_STAT_CNT(ctx,tcps_rcvpartdupbyte,(cur.m_len-q));
+                    }
+                }
+                if (cur.m_len>q) {
+                    tblocks[ci-1].m_len+=(cur.m_len-q);
+                    tblocks[ci-1].m_flags |=cur.m_flags; /* or the overlay FIN */
+                }
+            }
+
+            if ( (save_ptr==true) && (li==m_active_blocks) ) {
+                break;
+            }
+        }
+    }
+
+    if (ci>MAX_TCP_REASS_BLOCKS) {
+        /* drop last segment */
+        INC_STAT(ctx,tcps_rcvoopackdrop);
+    }
+    
+    m_active_blocks = min(ci,MAX_TCP_REASS_BLOCKS);
+    for (li=0; li<m_active_blocks; li++ ) {
+        m_blocks[li]= tblocks[li];
+    }
+
+    return(0);
+}
+
+
 #if TCP_REAS
 
 

@@ -7,7 +7,7 @@
 #include "mbuf.h"
 #include "tcp_socket.h"
 #include "tcp_debug.h"
-
+#include <vector>
 
 /*
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
@@ -99,6 +99,7 @@ static __inline u_int min(u_int a, u_int b)
 {
 	return (a < b ? a : b);
 }
+
 
 
 struct tcpcb {
@@ -288,6 +289,8 @@ struct	tcpstat_int_t {
     uint64_t	tcps_rcvdupbyte;	/* duplicate-only bytes received */
     uint64_t	tcps_rcvpartduppack;	/* packets with some duplicate data */
     uint64_t	tcps_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
+    uint64_t	tcps_rcvoopackdrop;     /* OOO packet drop due to queue len */
+
     uint64_t	tcps_rcvoopack;		/* out-of-order packets received */
     uint64_t	tcps_rcvoobyte;		/* out-of-order bytes received */
     uint64_t	tcps_rcvpackafterwin;	/* packets with data after window */
@@ -332,10 +335,11 @@ public:
 
 #include "h_timer.h"
 
+class CTcpPerThreadCtx ;
 class CTcpFlow {
 
 public:
-    void Create();
+    void Create(CTcpPerThreadCtx *ctx);
     void Delete();
 
     void on_slow_tick(){
@@ -405,6 +409,56 @@ public:
     struct	tcpiphdr tcp_saveti;
 
 };
+
+
+class CTcpReassBlock {
+
+public:
+  void Dump(FILE *fd);
+  bool operator==(CTcpReassBlock& rhs)const;
+
+  uint32_t m_seq;  
+  uint32_t m_len;  /* scale option require 32bit maximum adv window */
+  uint32_t m_flags; /* only 1 bit is needed, for align*/
+};
+
+typedef std::vector<CTcpReassBlock> vec_tcp_reas_t;
+
+
+#define MAX_TCP_REASS_BLOCKS (4)
+
+class CTcpReass {
+
+public:
+ CTcpReass(){
+     m_active_blocks=0;
+ }
+
+ int pre_tcp_reass(CTcpPerThreadCtx * ctx,
+              struct tcpcb *tp, 
+              struct tcpiphdr *ti, 
+              struct rte_mbuf *m);
+
+ int tcp_reass(CTcpPerThreadCtx * ctx,
+                          struct tcpcb *tp, 
+                          struct tcpiphdr *ti, 
+                          struct rte_mbuf *m);
+
+
+ inline uint8_t   get_active_blocks(void){
+     return (m_active_blocks);
+ }
+
+ void Dump(FILE *fd);
+
+ bool expect(vec_tcp_reas_t & lpkts,FILE * fd);
+
+private:
+  uint8_t         m_active_blocks;
+  CTcpReassBlock  m_blocks[MAX_TCP_REASS_BLOCKS];
+};
+
+
 
 #define INC_STAT(ctx,p) {ctx->m_tcpstat.m_sts.p++; }
 #define INC_STAT_CNT(ctx,p,cnt) {ctx->m_tcpstat.m_sts.p += cnt; }

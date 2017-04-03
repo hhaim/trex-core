@@ -45,9 +45,148 @@
 #include "tcpip.h"
 #include "tcp_debug.h"
 #include "tcp_socket.h"
+#include <common/utl_gcc_diag.h>
+#include <common/basic_utils.h>
+#include "h_timer.h"
+#include <stddef.h> 
            
 
 //extern	struct inpcb *tcp_last_inpcb;
+
+#define MYC(f) if (m_sts.f)  fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
+#define MYC_A(f)     fprintf(fd," %-40s: %llu \n",#f,(unsigned long long)m_sts.f)
+
+
+void tcpstat::Clear(){
+    memset(&m_sts,0,sizeof(tcpstat_int_t));
+}
+
+
+void tcpstat::Dump(FILE *fd){
+
+    MYC(tcps_connattempt);
+    MYC(tcps_accepts);	   
+    MYC(tcps_connects);	   
+    MYC(tcps_drops);	       
+    MYC(tcps_conndrops);
+    MYC(tcps_closed); 
+    MYC(tcps_segstimed);	   
+    MYC(tcps_rttupdated);   
+    MYC(tcps_delack); 
+    MYC(tcps_timeoutdrop);
+    MYC(tcps_rexmttimeo);
+    MYC(tcps_persisttimeo);
+    MYC(tcps_keeptimeo);
+    MYC(tcps_keepprobe);   
+    MYC(tcps_keepdrops);   
+
+    MYC(tcps_sndtotal);	   
+    MYC(tcps_sndpack);	   
+    MYC(tcps_sndbyte);	   
+    MYC(tcps_sndrexmitpack);
+    MYC(tcps_sndrexmitbyte);
+    MYC(tcps_sndacks);
+    MYC(tcps_sndprobe);	   
+    MYC(tcps_sndurg);
+    MYC(tcps_sndwinup);
+    MYC(tcps_sndctrl);
+
+    MYC(tcps_rcvtotal);	   
+    MYC(tcps_rcvpack);	   
+    MYC(tcps_rcvbyte);	   
+    MYC(tcps_rcvbadsum);	   
+    MYC(tcps_rcvbadoff);	   
+    MYC(tcps_rcvshort);	   
+    MYC(tcps_rcvduppack);   
+    MYC(tcps_rcvdupbyte);   
+    MYC(tcps_rcvpartduppack);  
+    MYC(tcps_rcvpartdupbyte);  
+    MYC(tcps_rcvoopack);		
+    MYC(tcps_rcvoobyte);		
+    MYC(tcps_rcvoopackdrop);
+    MYC(tcps_rcvpackafterwin);  
+    MYC(tcps_rcvbyteafterwin);  
+    MYC(tcps_rcvafterclose);	   
+    MYC(tcps_rcvwinprobe);	   
+    MYC(tcps_rcvdupack);		   
+    MYC(tcps_rcvacktoomuch);	   
+    MYC(tcps_rcvackpack);	   
+    MYC(tcps_rcvackbyte);	   
+    MYC(tcps_rcvwinupd);		   
+    MYC(tcps_pawsdrop);		   
+    MYC(tcps_predack);		   
+    MYC(tcps_preddat);		   
+    MYC(tcps_pcbcachemiss);
+    MYC(tcps_persistdrop);	   
+    MYC(tcps_badsyn);		   
+}
+
+
+
+void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
+    m_tick=0;
+    m_timer.reset();
+
+        /* TCP_OPTIM  */
+    tcpcb *tp=&m_tcp;
+	memset((char *) tp, 0,sizeof(struct tcpcb));
+    tp->t_maxseg = ctx->tcp_mssdflt;
+
+	tp->t_flags = ctx->tcp_do_rfc1323 ? (TF_REQ_SCALE|TF_REQ_TSTMP) : 0;
+
+    /*
+	 * Init srtt to TCPTV_SRTTBASE (0), so we can tell that we have no
+	 * rtt estimate.  Set rttvar so that srtt + 2 * rttvar gives
+	 * reasonable initial retransmit time.
+	 */
+	tp->t_srtt = TCPTV_SRTTBASE;
+	tp->t_rttvar = ctx->tcp_rttdflt * PR_SLOWHZ << 2;
+	tp->t_rttmin = TCPTV_MIN;
+	TCPT_RANGESET(tp->t_rxtcur, 
+	    ((TCPTV_SRTTBASE >> 2) + (TCPTV_SRTTDFLT << 2)) >> 1,
+	    TCPTV_MIN, TCPTV_REXMTMAX);
+	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
+	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
+}
+
+void CTcpFlow::Delete(){
+}
+
+
+#define my_unsafe_container_of(ptr, type, member)              \
+    ((type *) ((uint8_t *)(ptr) - offsetof(type, member)))
+
+
+static void tcp_timer(void *userdata,
+                       CHTimerObj *tmr){
+    CTcpPerThreadCtx * tcp_ctx=(CTcpPerThreadCtx * )userdata;
+    UNSAFE_CONTAINER_OF_PUSH;
+    CTcpFlow * tcp_flow=my_unsafe_container_of(tmr,CTcpFlow,m_timer);
+    UNSAFE_CONTAINER_OF_POP;
+    tcp_flow->on_tick();
+    tcp_ctx->timer_w_start(tcp_flow);
+}
+
+void CTcpPerThreadCtx::timer_w_on_tick(){
+    m_timer_w.on_tick((void*)this,tcp_timer);
+
+    if ( m_tick==TCP_SLOW_RATIO_TICK ) {
+        tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
+        if (tcp_maxidle > UINT8_MAX) {
+            tcp_maxidle = UINT8_MAX;
+        }
+
+        tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
+    #ifdef TCP_COMPAT_42
+        if ((int)tcp_iss < 0)
+            tcp_iss = TCP_ISSINCR;			/* XXX */
+    #endif
+        tcp_now++;					/* for timestamps */
+        m_tick=0;
+    } else{
+        m_tick++;
+    }
+}
 
 
 bool CTcpPerThreadCtx::Create(void){
@@ -64,6 +203,7 @@ bool CTcpPerThreadCtx::Create(void){
     tcp_maxidle=0;
     tcp_ttl=0;
     tcp_iss = rand();	/* wrong, but better than a constant */
+    m_tcpstat.Clear();
 
     RC_HTW_t tw_res;
     tw_res = m_timer_w.Create(512,1);
@@ -73,6 +213,7 @@ bool CTcpPerThreadCtx::Create(void){
         printf("ERROR  %-30s  - %s \n",err.get_str(),err.get_help_str());
         return(false);
     }
+    
     return(true);
 }
 
@@ -455,6 +596,9 @@ void	soisdisconnected(struct tcp_socket *so){
 }
 
 void	sbappend(struct sockbuf *sb, struct rte_mbuf *m){
+}
+
+void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes){
 }
 
 
