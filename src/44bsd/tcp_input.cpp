@@ -222,113 +222,41 @@ int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
 }
 
 
-#if TCP_REAS
 
-
-int
-tcp_reass(CTcpPerThreadCtx * ctx,
-          struct tcpcb *tp, 
-          struct tcpiphdr *ti,
-          struct rte_mbuf *m){
-
-    struct tcpiphdr *q;
-    struct tcp_socket * so = &tp->m_socket;
-	int flags;
-
-	/*
-	 * Call with ti==0 after become established to
-	 * force pre-ESTABLISHED data up to user socket.
-	 */
-	if (ti == 0)
-		goto present;
-
-	/*
-	 * Find a segment which begins after this one does.
-	 */
-	for (q = tp->seg_next; q != (struct tcpiphdr *)tp;
-	    q = (struct tcpiphdr *)q->ti_next)
-		if (SEQ_GT(q->ti_seq, ti->ti_seq))
-			break;
-
-	/*
-	 * If there is a preceding segment, it may provide some of
-	 * our data already.  If so, drop the data from the incoming
-	 * segment.  If it provides all of our data, drop us.
-	 */
-	if ((struct tcpiphdr *)q->ti_prev != (struct tcpiphdr *)tp) {
-		register int i;
-		q = (struct tcpiphdr *)q->ti_prev;
-		/* conversion to int (in i) handles seq wraparound */
-		i = q->ti_seq + q->ti_len - ti->ti_seq;
-		if (i > 0) {
-			if (i >= ti->ti_len) {
-				tcpstat.tcps_rcvduppack++;
-				tcpstat.tcps_rcvdupbyte += ti->ti_len;
-                rte_pktmbuf_free(m);
-				return (0);
-			}
-			m_adj(m, i);
-			ti->ti_len -= i;
-			ti->ti_seq += i;
-		}
-		q = (struct tcpiphdr *)(q->ti_next);
-	}
-	tcpstat.tcps_rcvoopack++;
-	tcpstat.tcps_rcvoobyte += ti->ti_len;
-	REASS_MBUF(ti) = m;		/* XXX */
-
-	/*
-	 * While we overlap succeeding segments trim them or,
-	 * if they are completely covered, dequeue them.
-	 */
-	while (q != (struct tcpiphdr *)tp) {
-		register int i = (ti->ti_seq + ti->ti_len) - q->ti_seq;
-		if (i <= 0)
-			break;
-		if (i < q->ti_len) {
-			q->ti_seq += i;
-			q->ti_len -= i;
-			m_adj(REASS_MBUF(q), i);
-			break;
-		}
-		q = (struct tcpiphdr *)q->ti_next;
-		m = REASS_MBUF((struct tcpiphdr *)q->ti_prev);
-		remque(q->ti_prev);
-        rte_pktmbuf_free(m);
-	}
-
-	/*
-	 * Stick new segment in its place.
-	 */
-	insque(ti, q->ti_prev);
-
-present:
-	/*
-	 * Present data to user, advancing rcv_nxt through
-	 * completed sequence space.
-	 */
-	if (TCPS_HAVERCVDSYN(tp->t_state) == 0)
-		return (0);
-	ti = tp->seg_next;
-	if (ti == (struct tcpiphdr *)tp || ti->ti_seq != tp->rcv_nxt)
-		return (0);
-	if (tp->t_state == TCPS_SYN_RECEIVED && ti->ti_len)
-		return (0);
-	do {
-		tp->rcv_nxt += ti->ti_len;
-		flags = ti->ti_flags & TH_FIN;
-		remque(ti);
-		m = REASS_MBUF(ti);
-		ti = (struct tcpiphdr *)ti->ti_next;
-		if (so->so_state & SS_CANTRCVMORE){
-            rte_pktmbuf_free(m);
-        } else{
-            sbappend(&so->so_rcv, m);
-        }
-	} while (ti != (struct tcpiphdr *)tp && ti->ti_seq == tp->rcv_nxt);
-	sorwakeup(so);
-	return (flags);
+inline bool tcp_reass_is_exists(struct tcpcb *tp){
+    return (tp->m_tpc_reass == ((CTcpReass *)0));
 }
+
+inline void tcp_reass_alloc(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp){
+    INC_STAT(ctx,tcps_reasalloc);
+    tp->m_tpc_reass = new CTcpReass();
+}
+
+inline void tcp_reass_free(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp){
+    INC_STAT(ctx,tcps_reasfree);
+    delete tp->m_tpc_reass;
+    tp->m_tpc_reass=(CTcpReass *)0;
+}
+
+
+int tcp_reass(CTcpPerThreadCtx * ctx,
+              struct tcpcb *tp, 
+              struct tcpiphdr *ti, 
+              struct rte_mbuf *m){
+
+    if (tcp_reass_is_exists(tp)==false ){
+        tcp_reass_alloc(ctx,tp);
+    }
+
+    int res=tp->m_tpc_reass->tcp_reass(ctx,tp,ti,m);
+    if (tp->m_tpc_reass->get_active_blocks()==0) {
+        tcp_reass_free(ctx,tp);
+    }
+    return (res);
+}
+
 
 /*
  * Insert segment ti into reassembly queue of tcp with
@@ -344,63 +272,24 @@ inline void TCP_REASS(CTcpPerThreadCtx * ctx,
                       struct tcpcb *tp,
                       struct tcpiphdr *ti,
                       struct rte_mbuf *m,
-                      struct socket *so,
-                      int &tiflags) { 
-	if (ti->ti_seq == tp->rcv_nxt && 
-	    tp->seg_next == (struct tcpiphdr *)(tp) && 
-	    tp->t_state == TCPS_ESTABLISHED) { 
-		tp->t_flags |= TF_DELACK; 
-		tp->rcv_nxt += ti->ti_len; 
-		tiflags = ti->ti_flags & TH_FIN; 
-        INC_STAT(ctx,tcps_rcvpack);
-        INC_STAT_CNT(ctx,ti->ti_len);
-		sbappend(&so->so_rcv, m); 
-		sorwakeup(so); 
-	} else { 
-		tiflags = tcp_reass(ctx,tp, ti, m); 
-		tp->t_flags |= TF_ACKNOW; 
-	} 
-}
-
-
-#else 
-
-
-int tcp_reass(CTcpPerThreadCtx * ctx,
-              struct tcpcb *tp, 
-              struct tcpiphdr *ti, 
-              struct rte_mbuf *m){
-
-    return (0);
-}
-
-
-inline void TCP_REASS(CTcpPerThreadCtx * ctx,
-                      struct tcpcb *tp,
-                      struct tcpiphdr *ti,
-                      struct rte_mbuf *m,
                       struct tcp_socket *so,
                       int &tiflags) { 
-#if 0
     if (ti->ti_seq == tp->rcv_nxt && 
-        tp->seg_next == (struct tcpiphdr *)(tp) && 
+       (tcp_reass_is_exists(tp)==false) && 
         tp->t_state == TCPS_ESTABLISHED) { 
         tp->t_flags |= TF_DELACK; 
         tp->rcv_nxt += ti->ti_len; 
         tiflags = ti->ti_flags & TH_FIN; 
         INC_STAT(ctx,tcps_rcvpack);
-        INC_STAT_CNT(ctx,ti->ti_len);
+        INC_STAT_CNT(ctx,tcps_rcvbyte,ti->ti_len);
         sbappend(&so->so_rcv, m); 
         sorwakeup(so); 
     } else { 
         tiflags = tcp_reass(ctx,tp, ti, m); 
         tp->t_flags |= TF_ACKNOW; 
     }
-#endif
 }
 
-
-#endif
 
 
 void tcp_dooptions(CTcpPerThreadCtx * ctx,

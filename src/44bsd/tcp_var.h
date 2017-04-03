@@ -101,11 +101,13 @@ static __inline u_int min(u_int a, u_int b)
 }
 
 
+class CTcpReass;
 
 struct tcpcb {
 
     tcp_socket m_socket; 
 
+    CTcpReass * m_tpc_reass; /* tcp reassembley object, allocated only when needed */
 #ifdef TBD
 	struct	tcpiphdr *seg_next;	/* sequencing queue */
 	struct	tcpiphdr *seg_prev;
@@ -308,6 +310,10 @@ struct	tcpstat_int_t {
     uint64_t	tcps_pcbcachemiss;
     uint64_t	tcps_persistdrop;	/* timeout in persist state */
     uint64_t	tcps_badsyn;		/* bogus SYN, e.g. premature ACK */
+
+    uint64_t	tcps_reasalloc;     /* allocate tcp reasembly object */
+    uint64_t	tcps_reasfree;      /* free tcp reasembly object  */
+
 };
 
 /*
