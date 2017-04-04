@@ -172,7 +172,7 @@ again:
 	if (SEQ_LT(tp->snd_nxt + len, tp->snd_una + so->so_snd.sb_cc))
 		flags &= ~TH_FIN;
 
-	win = sbspace(&so->so_rcv);
+	win = sbspace(&so->so_rcv);               
 
 	/*
 	 * Sender silly window avoidance.  If connection is idle

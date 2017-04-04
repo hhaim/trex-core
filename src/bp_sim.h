@@ -1254,6 +1254,7 @@ public:
     /* for simulation */
     static void free_pools();
 
+
     static inline rte_mbuf_t   * pktmbuf_alloc_small(socket_id_t socket){
         return ( m_mem_pool[socket].pktmbuf_alloc_small() );
     }

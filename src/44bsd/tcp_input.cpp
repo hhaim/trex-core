@@ -223,22 +223,6 @@ int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
 
 
 
-inline bool tcp_reass_is_exists(struct tcpcb *tp){
-    return (tp->m_tpc_reass == ((CTcpReass *)0));
-}
-
-inline void tcp_reass_alloc(CTcpPerThreadCtx * ctx,
-                            struct tcpcb *tp){
-    INC_STAT(ctx,tcps_reasalloc);
-    tp->m_tpc_reass = new CTcpReass();
-}
-
-inline void tcp_reass_free(CTcpPerThreadCtx * ctx,
-                            struct tcpcb *tp){
-    INC_STAT(ctx,tcps_reasfree);
-    delete tp->m_tpc_reass;
-    tp->m_tpc_reass=(CTcpReass *)0;
-}
 
 
 int tcp_reass(CTcpPerThreadCtx * ctx,
@@ -543,7 +527,8 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                 acked = ti->ti_ack - tp->snd_una;
                 INC_STAT(ctx,tcps_rcvackpack);
                 INC_STAT_CNT(ctx,tcps_rcvackbyte,acked);
-                sbdrop(&so->so_snd, acked);
+                so->so_snd.sbdrop(acked);
+
                 tp->snd_una = ti->ti_ack;
                 rte_pktmbuf_free(m);
 
@@ -1092,10 +1077,10 @@ trimthenstep6:
         }
         if (acked > so->so_snd.sb_cc) {
             tp->snd_wnd -= so->so_snd.sb_cc;
-            sbdrop(&so->so_snd, (int)so->so_snd.sb_cc);
+            so->so_snd.sbdrop_all();
             ourfinisacked = 1;
         } else {
-            sbdrop(&so->so_snd, acked);
+            so->so_snd.sbdrop(acked);
             tp->snd_wnd -= acked;
             ourfinisacked = 0;
         }

@@ -8,6 +8,7 @@
 #include "tcp_socket.h"
 #include "tcp_debug.h"
 #include <vector>
+#include "tcp_dpdk.h"
 
 /*
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
@@ -108,13 +109,10 @@ struct tcpcb {
     tcp_socket m_socket; 
 
     CTcpReass * m_tpc_reass; /* tcp reassembley object, allocated only when needed */
-#ifdef TBD
-	struct	tcpiphdr *seg_next;	/* sequencing queue */
-	struct	tcpiphdr *seg_prev;
-#endif
 
     uint8_t	t_timer[TCPT_NTIMERS];	/* tcp timers */
     char	t_force;		/* 1 if forcing out a byte */
+    uint8_t mbuf_socket;    /* mbuf socket */
     uint8_t	t_dupacks;		/* consecutive dup acks recd */
 
     int16_t	t_state;		/* state of this connection */
@@ -134,11 +132,6 @@ struct tcpcb {
 #define	TF_SACK_PERMIT	0x0200		/* other side said I could SACK */
 
         
-#ifdef TBD
-
-	struct	tcpiphdr *t_template;	/* skeletal packet for transmit */
-	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
-#endif
 /*
  * The following fields are used as in the protocol specification.
  * See RFC783, Dec. 1981, page 21.
@@ -207,6 +200,16 @@ struct tcpcb {
     uint16_t  dst_port;
 
     uint8_t	template_pkt[64];	/* template packet */
+
+public:
+
+    inline rte_mbuf_t   * pktmbuf_alloc_small(void){
+        return (tcp_pktmbuf_alloc_small(mbuf_socket));
+    }
+
+    inline rte_mbuf_t   * pktmbuf_alloc(uint16_t size){
+        return (tcp_pktmbuf_alloc(mbuf_socket,size));
+    }
 };
 
 #define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
@@ -370,7 +373,13 @@ public:
     uint8_t     m_tick;
     tcpcb       m_tcp;
     CHTimerObj  m_timer;
+    CTcpPerThreadCtx *m_ctx;
 };
+
+/*class CTcpCC {
+public:
+    virtual void get_
+};*/
 
 
 class CTcpPerThreadCtx {
@@ -489,6 +498,31 @@ struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
                             struct tcpcb *tp, 
                             int res);
 
+
+
+inline bool tcp_reass_is_exists(struct tcpcb *tp){
+    return (tp->m_tpc_reass == ((CTcpReass *)0));
+}
+
+inline void tcp_reass_alloc(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp){
+    INC_STAT(ctx,tcps_reasalloc);
+    tp->m_tpc_reass = new CTcpReass();
+}
+
+inline void tcp_reass_free(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp){
+    INC_STAT(ctx,tcps_reasfree);
+    delete tp->m_tpc_reass;
+    tp->m_tpc_reass=(CTcpReass *)0;
+}
+
+inline void tcp_reass_clean(CTcpPerThreadCtx * ctx,
+                            struct tcpcb *tp){
+    if (tcp_reass_is_exists(tp) ){
+        tcp_reass_free(ctx,tp);
+    }
+}
 
 
 

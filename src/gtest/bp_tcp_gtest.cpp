@@ -33,6 +33,7 @@ limitations under the License.
 #include "44bsd/tcp_timer.h"
 #include "44bsd/tcp_socket.h"
 #include "44bsd/tcpip.h"
+#include "44bsd/tcp_dpdk.h"
 #include "mbuf.h"
 
 
@@ -354,5 +355,238 @@ TEST_F(gt_tcp, tst12) {
 
     tst.m_ctx.m_tcpstat.Dump(stdout);
     tst.Delete();
+}
+
+
+void set_mbuf_test(struct rte_mbuf  *m,
+                   uint32_t len,
+                   uintptr_t addr){
+    memset(m,0,sizeof(struct rte_mbuf));
+    /* one segment */
+    m->nb_segs=1;
+    m->pkt_len  =len;
+    m->data_len=len;
+    m->buf_len=1024*2+128;
+    m->data_off=128;
+    m->refcnt_reserved=1;
+    m->buf_addr=(void *)addr;
+}
+
+
+
+TEST_F(gt_tcp, tst13) {
+
+    CMbufBuffer buf;
+
+    struct rte_mbuf  mbuf0;
+    struct rte_mbuf  mbuf1;
+    struct rte_mbuf  mbuf2;
+
+    uintptr_t addr1=0x1000;
+    uint32_t blk_size=1024;
+
+    buf.Create(blk_size);
+
+    set_mbuf_test(&mbuf0,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf1,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf2,blk_size-10,addr1);
+
+    CMbufObject  mbuf_obj;
+
+    mbuf_obj.m_mbuf=&mbuf0;
+    mbuf_obj.m_type=MO_CONST;
+
+    buf.Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf1;
+    buf.Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf2;
+    buf.Add_mbuf(mbuf_obj);
+
+
+    buf.Verify();
+
+    CBufMbufRef res;
+
+    buf.get_by_offset(0,res);
+    EXPECT_EQ(res.m_offset,0);
+    EXPECT_EQ(res.m_mbuf,&mbuf0);
+    EXPECT_EQ(res.get_mbuf_size(),blk_size);
+    EXPECT_EQ(res.need_indirect_mbuf(blk_size),false);
+
+    buf.get_by_offset(1,res);
+    EXPECT_EQ(res.m_offset,1);
+    EXPECT_EQ(res.m_mbuf,&mbuf0);
+    EXPECT_EQ(res.get_mbuf_size(),blk_size-1);
+    EXPECT_EQ(res.need_indirect_mbuf(blk_size),true);
+
+    buf.get_by_offset(2048+2,res);
+    EXPECT_EQ(res.m_offset,2);
+    EXPECT_EQ(res.m_mbuf,&mbuf2);
+    EXPECT_EQ(res.get_mbuf_size(),blk_size-2-10);
+    EXPECT_EQ(res.need_indirect_mbuf(blk_size),true);
+
+
+    buf.get_by_offset(2048+1024-11,res);
+    EXPECT_EQ(res.m_offset,1024-11);
+    EXPECT_EQ(res.m_mbuf,&mbuf2);
+    EXPECT_EQ(res.get_mbuf_size(),1);
+    EXPECT_EQ(res.need_indirect_mbuf(blk_size),true);
+
+
+    buf.Dump(stdout);
+    //buf.Delete();
+}
+
+TEST_F(gt_tcp, tst14) {
+
+    CMbufBuffer buf;
+
+    struct rte_mbuf  mbuf0;
+    struct rte_mbuf  mbuf1;
+    struct rte_mbuf  mbuf2;
+
+    uintptr_t addr1=0x1000;
+    uint32_t blk_size=1024;
+
+    buf.Create(blk_size);
+
+    set_mbuf_test(&mbuf0,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf1,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf2,blk_size-10,addr1);
+
+    CMbufObject  mbuf_obj;
+
+    mbuf_obj.m_mbuf=&mbuf0;
+    mbuf_obj.m_type=MO_CONST;
+
+    buf.Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf1;
+    buf.Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf2;
+    buf.Add_mbuf(mbuf_obj);
+
+    buf.Verify();
+
+    buf.Dump(stdout);
+    //buf.Delete();
+}
+
+
+TEST_F(gt_tcp, tst15) {
+
+    CTcpApp app;
+
+    CTcpSockBuf  tx_sock;
+    tx_sock.Create(8*1024);
+    tx_sock.m_app=&app;
+
+    CMbufBuffer * buf =&app.m_write_buf;
+
+    struct rte_mbuf  mbuf0;
+    struct rte_mbuf  mbuf1;
+    struct rte_mbuf  mbuf2;
+
+    uintptr_t addr1=0x1000;
+    uint32_t blk_size=1024;
+
+    buf->Create(blk_size);
+
+    set_mbuf_test(&mbuf0,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf1,blk_size,addr1);
+    addr1+=1024;
+    set_mbuf_test(&mbuf2,blk_size-10,addr1);
+
+    CMbufObject  mbuf_obj;
+
+    mbuf_obj.m_mbuf=&mbuf0;
+    mbuf_obj.m_type=MO_CONST;
+
+    buf->Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf1;
+    buf->Add_mbuf(mbuf_obj);
+
+    mbuf_obj.m_mbuf=&mbuf2;
+    buf->Add_mbuf(mbuf_obj);
+
+    buf->Verify();
+
+    buf->Dump(stdout);
+
+    EXPECT_EQ(tx_sock.get_sbspace(),8*1024);
+
+    
+    tx_sock.sb_start_new_buffer();
+
+    /* append maximum */
+    tx_sock.sbappend(min(buf->m_t_bytes,tx_sock.sb_hiwat));
+    EXPECT_EQ(tx_sock.get_sbspace(),8*1024-(1024*3-10));
+
+    int mss=120;
+    CBufMbufRef res;
+    int i;
+    for (i=0; i<2; i++) {
+        tx_sock.get_by_offset((CTcpPerThreadCtx *)0,mss*i,res);
+        res.Dump(stdout);
+    }
+
+    tx_sock.sbdrop(1024);
+
+    mss=120;
+    for (i=0; i<2; i++) {
+        tx_sock.get_by_offset((CTcpPerThreadCtx *)0,mss*i,res);
+        res.Dump(stdout);
+    }
+
+    tx_sock.sbdrop(1024+1024-10);
+    EXPECT_EQ(tx_sock.sb_cc,0);
+
+
+    //buf.Delete();
+}
+
+int utl_mbuf_buffer_create_and_fill(CMbufBuffer * buf,
+                                    uint32_t blk_size,
+                                    uint32_t size){
+    buf->Create(blk_size);
+    uint8_t cnt=0; 
+    while (size>0) {
+        uint32_t alloc_size=min(blk_size,size);
+        rte_mbuf_t   * m=tcp_pktmbuf_alloc(0,alloc_size);
+        assert(m);
+        char *p=(char *)rte_pktmbuf_append(m, alloc_size);
+        int i;
+        for (i=0;i<alloc_size; i++) {
+            *p=cnt;
+            cnt++;
+            p++;
+        }
+        CMbufObject obj;
+        obj.m_type =MO_CONST;
+        obj.m_mbuf=m;
+        
+        buf->Add_mbuf(obj);
+        size-=alloc_size;
+    }
+
+    return(0);
+}
+
+TEST_F(gt_tcp, tst16) {
+
+    CTcpApp app;
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,2048*5+10);
+    app.m_write_buf.Dump(stdout);
+    app.m_write_buf.Delete();
+
 }
 

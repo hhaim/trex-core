@@ -124,6 +124,7 @@ void tcpstat::Dump(FILE *fd){
 
 
 void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
+    m_ctx=ctx;
     m_tick=0;
     m_timer.reset();
 
@@ -156,6 +157,8 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
 }
 
 void CTcpFlow::Delete(){
+    struct tcpcb *tp=&m_tcp;
+    tcp_reass_clean(m_ctx,tp);
 }
 
 
@@ -219,7 +222,6 @@ bool CTcpPerThreadCtx::Create(void){
         printf("ERROR  %-30s  - %s \n",err.get_str(),err.get_help_str());
         return(false);
     }
-    
     return(true);
 }
 
@@ -588,6 +590,10 @@ void tcp_quench(struct tcpcb *tp){
 
 struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus){
     return ((struct tcp_socket *)0);
+}
+
+long sbspace(struct sockbuf *sb){
+    return(0);
 }
 
 void	sbdrop(struct sockbuf *sb, int len){
