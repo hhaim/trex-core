@@ -108,6 +108,10 @@ class CTcpReass;
 struct CTcpPkt {
     rte_mbuf_t   * m_buf;
     TCPHeader    * lpTcp;
+
+    inline char * get_header_ptr(){
+        return (rte_pktmbuf_mtod(m_buf,char *));
+    }
 };
 
 

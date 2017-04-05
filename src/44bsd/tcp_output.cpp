@@ -70,6 +70,22 @@ const char *tcpstates[] = {
 };
 
 
+static inline void tcp_pkt_update_len(struct tcpcb *tp,
+                                     char *p,
+                                     uint32_t tcp_h_pyld){
+
+
+    if (!tp->is_ipv6){
+        uint16_t tlen=tp->offset_tcp-tp->offset_ip+tcp_h_pyld;
+        IPHeader * lpv4=(IPHeader *)(p+tp->offset_ip);
+        lpv4->setTotalLength(tlen);
+        lpv4->updateCheckSum(0, tlen);
+    }else{
+        uint16_t tlen = tcp_h_pyld;
+        IPv6Header * Ipv6=(IPv6Header *)(p+tp->offset_ip);
+        Ipv6->setPayloadLen(tlen);
+    }
+}
 
 /**
  * build control packet without data
@@ -81,7 +97,7 @@ const char *tcpstates[] = {
  * 
  * @return 
  */
-int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
+static inline int _tcp_build_cpkt(CTcpPerThreadCtx * ctx,
                    struct tcpcb *tp,
                    uint16_t tcphlen,
                    CTcpPkt &pkt){
@@ -100,7 +116,20 @@ int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
     /* copy template */
     memcpy(p,tp->template_pkt,len);
     pkt.lpTcp =(TCPHeader    *)(p+tp->offset_tcp);
+
+
     return(0);
+}
+
+int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint16_t tcphlen,
+                   CTcpPkt &pkt){
+   int res=_tcp_build_cpkt(ctx,tp,tcphlen,pkt);
+   if (res==0){
+       tcp_pkt_update_len(tp,pkt.get_header_ptr(),tcphlen) ;
+   }
+   return(res);
 }
 
 
@@ -136,13 +165,13 @@ static inline uint16_t update_next_mbuf(rte_mbuf_t   *mi,
  * 
  * @return 
  */
-int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
+static inline int tcp_build_dpkt_(CTcpPerThreadCtx * ctx,
                    struct tcpcb *tp,
                    uint32_t offset, 
                    uint32_t dlen,
                    uint16_t tcphlen, 
                    CTcpPkt &pkt){
-    int res=tcp_build_cpkt(ctx,tp,tcphlen,pkt);
+    int res=_tcp_build_cpkt(ctx,tp,tcphlen,pkt);
     if (res<0) {
         return(res);
     }
@@ -204,6 +233,22 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
 
     return(0);
 }
+
+int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint32_t offset, 
+                   uint32_t dlen,
+                   uint16_t tcphlen, 
+                   CTcpPkt &pkt){
+
+    int res = tcp_build_dpkt_(ctx,tp,offset,dlen,tcphlen,pkt);
+    if (res==0){
+        tcp_pkt_update_len(tp,pkt.get_header_ptr(),tcphlen+dlen) ;
+    }
+    return(res);
+}
+
+
 
 
 /*

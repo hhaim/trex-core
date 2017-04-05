@@ -273,6 +273,7 @@ void tcp_template(struct tcpcb *tp){
     tp->is_ipv6    = 0;
     tp->m_pad      = 0;
 
+
     uint8_t *p=tp->template_pkt;
     memcpy(p,default_ipv4_header,sizeof(default_ipv4_header) );
     /* set default value */
@@ -280,6 +281,7 @@ void tcp_template(struct tcpcb *tp){
     IPHeader *lpIpv4=(IPHeader *)(p);
     lpIpv4->setDestIp(0x48000001);
     lpIpv4->setSourceIp(0x16000001);
+    lpIpv4->updateCheckSum();
     p+=20;
     TCPHeader *lpTCP=(TCPHeader *)(p);
     lpTCP->setSourcePort(1024);
