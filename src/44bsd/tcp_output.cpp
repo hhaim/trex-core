@@ -70,6 +70,142 @@ const char *tcpstates[] = {
 };
 
 
+
+/**
+ * build control packet without data
+ * 
+ * @param ctx
+ * @param tp
+ * @param tcphlen
+ * @param pkt
+ * 
+ * @return 
+ */
+int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint16_t tcphlen,
+                   CTcpPkt &pkt){
+    int len= tp->offset_tcp+tcphlen;
+    rte_mbuf_t * m;
+    m=tp->pktmbuf_alloc(len);
+    pkt.m_buf=m;
+    if (m==0) {
+        INC_STAT(ctx,tcps_nombuf);
+        /* drop the packet */
+        return(-1);
+    }
+
+    char *p=rte_pktmbuf_append(m,len);
+
+    /* copy template */
+    memcpy(p,tp->template_pkt,len);
+    pkt.lpTcp =(TCPHeader    *)(p+tp->offset_tcp);
+    return(0);
+}
+
+
+static inline uint16_t update_next_mbuf(rte_mbuf_t   *mi,
+                                        CBufMbufRef &rb,
+                                        rte_mbuf_t * &lastm,
+                                        uint16_t dlen){
+
+    uint16_t bsize = min(rb.get_mbuf_size(),dlen);
+    uint16_t trim=rb.get_mbuf_size()-bsize;
+    if (rb.m_offset) {
+        rte_pktmbuf_adj(mi, rb.m_offset);
+    }
+    if (trim) {
+        rte_pktmbuf_trim(mi, trim);
+    }
+
+    lastm->next =mi;
+    lastm=mi;
+    return(bsize);
+}
+
+
+/**
+ * build packet from socket buffer 
+ * 
+ * @param ctx
+ * @param tp
+ * @param offset
+ * @param dlen
+ * @param tcphlen
+ * @param pkt
+ * 
+ * @return 
+ */
+int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint32_t offset, 
+                   uint32_t dlen,
+                   uint16_t tcphlen, 
+                   CTcpPkt &pkt){
+    int res=tcp_build_cpkt(ctx,tp,tcphlen,pkt);
+    if (res<0) {
+        return(res);
+    }
+    if (dlen==0) {
+        return 0;
+    }
+    rte_mbuf_t   * m=pkt.m_buf;
+    rte_mbuf_t   * lastm=m;
+
+    uint16_t       bsize;
+
+    m->pkt_len += dlen;
+
+    CTcpSockBuf *lptxs=&tp->m_socket.so_snd;
+    while (dlen>0) {
+        /* get blocks from socket buffer */
+        CBufMbufRef  rb;
+        lptxs->get_by_offset(ctx,offset,rb);
+
+        rte_mbuf_t   * mn=rb.m_mbuf;
+        if (rb.m_type==MO_CONST) {
+
+            if (unlikely(!rb.need_indirect_mbuf(dlen))){
+                /* last one */
+                rte_pktmbuf_refcnt_update(mn,1);
+                lastm->next =mn;
+                bsize = rb.get_mbuf_size();
+            }else{
+                /* need to allocate indirect */
+                rte_mbuf_t   * mi=tp->pktmbuf_alloc_small();
+                if (mi==0) {
+                    INC_STAT(ctx,tcps_nombuf);
+                    rte_pktmbuf_free(m);
+                    return(-1);
+                }
+                /* inc mn ref count */
+                rte_pktmbuf_attach(mi,mn);
+
+                bsize = update_next_mbuf(mi,rb,lastm,dlen);
+            }
+        }else{
+            //rb.m_type==MO_RW not supported right now 
+            if (rb.m_type==MO_RW) {
+                /* assume mbuf with one seg */
+                assert(mn->nb_segs==1);
+
+                bsize = update_next_mbuf(mn,rb,lastm,dlen);
+
+                m->nb_segs += 1;
+            }else{
+                assert(0);
+            }
+        }
+
+        m->nb_segs += 1;
+        dlen-=bsize;
+        offset+=bsize;
+    }
+
+    return(0);
+}
+
+
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */

@@ -104,6 +104,13 @@ static __inline u_int min(u_int a, u_int b)
 
 class CTcpReass;
 
+
+struct CTcpPkt {
+    rte_mbuf_t   * m_buf;
+    TCPHeader    * lpTcp;
+};
+
+
 struct tcpcb {
 
     tcp_socket m_socket; 
@@ -199,6 +206,11 @@ struct tcpcb {
     uint16_t  src_port;
     uint16_t  dst_port;
 
+    uint8_t offset_tcp; /* offset of tcp_header, in template */
+    uint8_t offset_ip;  /* offset of ip_header in template */
+    uint8_t is_ipv6;
+    uint8_t m_pad;
+
     uint8_t	template_pkt[64];	/* template packet */
 
 public:
@@ -210,6 +222,7 @@ public:
     inline rte_mbuf_t   * pktmbuf_alloc(uint16_t size){
         return (tcp_pktmbuf_alloc(mbuf_socket,size));
     }
+    
 };
 
 #define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
@@ -316,7 +329,7 @@ struct	tcpstat_int_t {
 
     uint64_t	tcps_reasalloc;     /* allocate tcp reasembly object */
     uint64_t	tcps_reasfree;      /* free tcp reasembly object  */
-
+    uint64_t    tcps_nombuf;        /* no mbuf for tcp - drop the packets */
 };
 
 /*
@@ -376,10 +389,6 @@ public:
     CTcpPerThreadCtx *m_ctx;
 };
 
-/*class CTcpCC {
-public:
-    virtual void get_
-};*/
 
 
 class CTcpPerThreadCtx {
@@ -402,6 +411,9 @@ public:
 public:
 
     /* TUNABLEs */
+    uint32_t  tcp_tx_socket_bsize;
+    uint32_t  tcp_rx_socket_bsize;
+
     u_long	sb_max ; /* socket max char */
     int	tcprexmtthresh;
     int tcp_mssdflt;
@@ -493,6 +505,20 @@ void tcp_template(struct tcpcb *tp);
 void	 tcp_xmit_timer(CTcpPerThreadCtx * ctx,struct tcpcb *, int16_t rtt);
 
 void tcp_canceltimers(struct tcpcb *tp);
+
+int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint16_t tcphlen,
+                   CTcpPkt &pkt);
+
+int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp,
+                   uint32_t offset, 
+                   uint32_t dlen,
+                   uint16_t  tcphlen,
+                   CTcpPkt &pkt);
+
+
 
 struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
                             struct tcpcb *tp, 

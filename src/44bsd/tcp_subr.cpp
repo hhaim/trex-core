@@ -118,8 +118,14 @@ void tcpstat::Dump(FILE *fd){
     MYC(tcps_preddat);		   
     MYC(tcps_pcbcachemiss);
     MYC(tcps_persistdrop);	   
-    MYC(tcps_badsyn);		   
+    MYC(tcps_badsyn); 
+    MYC(tcps_reasalloc);
+    MYC(tcps_reasfree);
+    MYC(tcps_nombuf);
 }
+
+
+
 
 
 
@@ -127,12 +133,12 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
     m_ctx=ctx;
     m_tick=0;
     m_timer.reset();
-
     
-
         /* TCP_OPTIM  */
     tcpcb *tp=&m_tcp;
 	memset((char *) tp, 0,sizeof(struct tcpcb));
+
+    tp->m_socket.so_snd.Create(ctx->tcp_tx_socket_bsize);
 
     /* build template */
     tcp_template(tp);
@@ -199,6 +205,8 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 
 
 bool CTcpPerThreadCtx::Create(void){
+    tcp_tx_socket_bsize=32*1024;
+    tcp_rx_socket_bsize=32*1024 ;
     sb_max = SB_MAX;		/* patchable */
     tcprexmtthresh = 3 ;
     tcp_mssdflt = TCP_MSS;
@@ -259,6 +267,11 @@ void tcp_template(struct tcpcb *tp){
         0x00, 0x00, 0x00, 0x00 // checksum ,urgent pointer
     };
 
+    /* TBD need to fix for IPv6 and IPv4 */
+    tp->offset_tcp = 14+20;
+    tp->offset_ip  = 14;
+    tp->is_ipv6    = 0;
+    tp->m_pad      = 0;
 
     uint8_t *p=tp->template_pkt;
     memcpy(p,default_ipv4_header,sizeof(default_ipv4_header) );

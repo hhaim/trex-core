@@ -583,10 +583,111 @@ int utl_mbuf_buffer_create_and_fill(CMbufBuffer * buf,
 
 TEST_F(gt_tcp, tst16) {
 
+    CTcpPerThreadCtx        m_ctx;
+    CTcpFlow                m_flow;
+
+    m_ctx.Create();
+    m_flow.Create(&m_ctx);
+
+
     CTcpApp app;
     utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,2048*5+10);
     app.m_write_buf.Dump(stdout);
+
+    CMbufBuffer * lpbuf=&app.m_write_buf;
+    CTcpSockBuf *lptxs=&m_flow.m_tcp.m_socket.so_snd;
+    /* hack the code for now */
+    lptxs->m_app=&app;
+
+    /* simulate buf adding */
+    lptxs->sb_start_new_buffer();
+
+    /* add maximum of the buffer */
+    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
+
+    CTcpPkt pkt;
+    uint32_t offset=0;
+    uint32_t diff=250;
+
+    int i;
+    for (i=0; i<10; i++) {
+        printf(" %lu \n",(ulong)offset);
+        tcp_build_dpkt(&m_ctx,
+                       &m_flow.m_tcp,
+                       offset, 
+                       diff,
+                       20, 
+                       pkt);
+        offset+=diff;
+
+        rte_pktmbuf_dump(pkt.m_buf, diff+500);
+        rte_pktmbuf_free(pkt.m_buf);
+    }
+
+
+
+
+    m_flow.Delete();
+    m_ctx.Delete();
+
     app.m_write_buf.Delete();
 
 }
+
+
+TEST_F(gt_tcp, tst17) {
+
+    CTcpPerThreadCtx        m_ctx;
+    CTcpFlow                m_flow;
+
+    m_ctx.Create();
+    m_flow.Create(&m_ctx);
+
+
+    CTcpApp app;
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,10);
+    app.m_write_buf.Dump(stdout);
+
+    CMbufBuffer * lpbuf=&app.m_write_buf;
+    CTcpSockBuf *lptxs=&m_flow.m_tcp.m_socket.so_snd;
+    /* hack the code for now */
+    lptxs->m_app=&app;
+
+    /* simulate buf adding */
+    lptxs->sb_start_new_buffer();
+
+    /* add maximum of the buffer */
+    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
+
+    CTcpPkt pkt;
+    uint32_t offset=0;
+    uint32_t diff=10;
+
+    int i;
+    for (i=0; i<1; i++) {
+        printf(" %lu \n",(ulong)offset);
+        tcp_build_dpkt(&m_ctx,
+                       &m_flow.m_tcp,
+                       offset, 
+                       diff,
+                       20, 
+                       pkt);
+        offset+=diff;
+
+        rte_pktmbuf_dump(pkt.m_buf, diff+500);
+        rte_pktmbuf_free(pkt.m_buf);
+    }
+
+
+
+
+    m_flow.Delete();
+    m_ctx.Delete();
+
+    app.m_write_buf.Delete();
+
+}
+
+
+
 

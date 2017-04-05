@@ -241,6 +241,8 @@ public:
         sb_cc=0;
         sb_flags=0;
     }
+    void Delete(){
+    }
 
     inline bool is_empty(void){
         return (sb_cc==0);
@@ -301,7 +303,7 @@ struct tcp_socket {
  * Variables for socket buffering.
  */
     struct	sockbuf so_rcv;
-    struct	CTcpSockBuf so_snd;
+    CTcpSockBuf     so_snd;
 
 };
 

@@ -304,7 +304,7 @@ rte_pktmbuf_dump(const struct rte_mbuf *m, unsigned dump_len)
         if (len > m->data_len)
             len = m->data_len;
         if (len != 0)
-            rte_pktmbuf_hexdump(m->buf_addr, len);
+            rte_pktmbuf_hexdump(rte_pktmbuf_mtod(m,char *), len);
         dump_len -= len;
         m = m->next;
         nb_segs --;
