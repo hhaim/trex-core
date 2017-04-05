@@ -257,21 +257,11 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
 int tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb *tp) {
 
     struct tcp_socket *so = &tp->m_socket;
-
 	long len, win;
 	int off, flags, error=0;
-	struct rte_mbuf *m;
-	struct tcpiphdr *ti;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot;
-
-
-    // TBD need to remove 
-    ti=(struct tcpiphdr*)0;
-    m=(struct rte_mbuf *)0;
-    // TBD need to remove 
-
 
 	/*
 	 * Determine length of data that should be transmitted,
@@ -453,6 +443,10 @@ again:
 	return (0);
 
 send:
+
+    CTcpPkt     pkt;
+    TCPHeader * ti;
+
 	/*
 	 * Before ESTABLISHED, force sending of initial options
 	 * unless TCP set not to do any options.
@@ -462,7 +456,7 @@ send:
 	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MHLEN
 	 */
 	optlen = 0;
-	hdrlen = sizeof (struct tcpiphdr);
+	hdrlen = TCP_HEADER_LEN;
 	if (flags & TH_SYN) {
 		tp->snd_nxt = tp->iss;
 		if ((tp->t_flags & TF_NOOPT) == 0) {
@@ -538,45 +532,12 @@ send:
 			INC_STAT(ctx,tcps_sndpack);
 			INC_STAT_CNT(ctx,tcps_sndbyte,len);
 		}
-#ifdef notyet
-		if ((m = m_copypack(so->so_snd.sb_mb, off,
-		    (int)len, max_linkhdr + hdrlen)) == 0) {
-			error = ENOBUFS;
-			goto out;
-		}
-		/*
-		 * m_copypack left space for our hdr; use it.
-		 */
-		m->m_len += hdrlen;
-		m->m_data -= hdrlen;
-#else
-       // TBD  remove this from packet building 
-       goto out;
-       ti=(struct tcpiphdr*)0;
-       // TBD need to remove 
 
-       #if MBUF_BUILD
-		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m == NULL) {
-			error = ENOBUFS;
-			goto out;
-		}
-		m->m_data += max_linkhdr;
-		m->m_len = hdrlen;
-		if (len <= MHLEN - hdrlen - max_linkhdr) {
-			m_copydata(so->so_snd.sb_mb, off, (int) len,
-			    mtod(m, caddr_t) + hdrlen);
-			m->m_len += len;
-		} else {
-			m->m_next = m_copy(so->so_snd.sb_mb, off, (int) len);
-			if (m->m_next == 0) {
-				(void) m_free(m);
-				error = ENOBUFS;
-				goto out;
-			}
-		}
-        #endif
-#endif
+        if (tcp_build_dpkt(ctx,tp,off,len,hdrlen,pkt)!=0){
+            error = ENOBUFS;
+            goto out;
+        }
+
 		/*
 		 * If we're sending everything we've got, set PUSH.
 		 * (This will keep happy those implementations which only
@@ -596,24 +557,13 @@ send:
             INC_STAT(ctx,tcps_sndwinup);
         }
 
-       #if MBUF_BUILD
-
-		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m == NULL) {
-			error = ENOBUFS;
-			goto out;
-		}
-		m->m_data += max_linkhdr;
-		m->m_len = hdrlen;
-        #endif
+        if ( tcp_build_cpkt(ctx,tp,hdrlen,pkt)!=0){
+            error = ENOBUFS;
+            goto out;
+        }
 	}
-    #if MBUF_BUILD
-	m->m_pkthdr.rcvif = (struct ifnet *)0;
-	ti = mtod(m, struct tcpiphdr *);
-	if (tp->t_template == 0)
-		panic("tcp_output");
-	bcopy((caddr_t)tp->t_template, (caddr_t)ti, sizeof (struct tcpiphdr));
-    #endif
+
+    ti = pkt.lpTcp;
 
 	/*
 	 * Fill in fields, remembering maximum advertised
@@ -636,16 +586,18 @@ send:
 	 * case, since we know we aren't doing a retransmission.
 	 * (retransmit and persist are mutually exclusive...)
 	 */
-	if (len || (flags & (TH_SYN|TH_FIN)) || tp->t_timer[TCPT_PERSIST])
-		ti->ti_seq = htonl(tp->snd_nxt);
-	else
-		ti->ti_seq = htonl(tp->snd_max);
-	ti->ti_ack = htonl(tp->rcv_nxt);
+	if (len || (flags & (TH_SYN|TH_FIN)) || tp->t_timer[TCPT_PERSIST]){
+        ti->setSeqNumber(tp->snd_nxt);
+    }else{
+        ti->setSeqNumber(tp->snd_max);
+    }
+
+    ti->setAckNumber(tp->rcv_nxt);
 	if (optlen) {
-		memcpy((ti + 1),opt,  optlen);
-		ti->ti_off = (sizeof (struct tcphdr) + optlen) >> 2;
+		memcpy((char *)ti->getOptionPtr(),opt,  optlen);
+        ti->setHeaderLength(TCP_HEADER_LEN+optlen);
 	}
-	ti->ti_flags = flags;
+    ti->setFlag(flags);
 	/*
 	 * Calculate receive window.  Don't shrink window,
 	 * but avoid silly window syndrome.
@@ -656,27 +608,24 @@ send:
 		win = (long)TCP_MAXWIN << tp->rcv_scale;
 	if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
 		win = (long)(tp->rcv_adv - tp->rcv_nxt);
-	ti->ti_win = htons((u_short) (win>>tp->rcv_scale));
+    ti->setWindowSize( (u_short) (win>>tp->rcv_scale));
 	if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
-		ti->ti_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
-		ti->ti_flags |= TH_URG;
-	} else
-		/*
-		 * If no urgent pointer to send, then we pull
-		 * the urgent pointer to the left edge of the send window
-		 * so that it doesn't drift into the send window on sequence
-		 * number wraparound.
-		 */
-		tp->snd_up = tp->snd_una;		/* drag it along */
+        /* not support this for now - hhaim*/
+		//ti->ti_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
+		//ti->ti_flags |= TH_URG;
+	} else{
+        /*
+         * If no urgent pointer to send, then we pull
+         * the urgent pointer to the left edge of the send window
+         * so that it doesn't drift into the send window on sequence
+         * number wraparound.
+         */
+        tp->snd_up = tp->snd_una;		/* drag it along */
+    }
 
-	/*
-	 * Put TCP length in extended header, and then
-	 * checksum extended header and data.
-	 */
-	if (len + optlen)
-		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
-		    optlen + len));
-	ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
+
+    /* TBD will be done by HW */
+    //ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
 
 	/*
 	 * In transmit state, time the transmission and arrange for
@@ -730,12 +679,14 @@ send:
 		if (SEQ_GT(tp->snd_nxt + len, tp->snd_max))
 			tp->snd_max = tp->snd_nxt + len;
 
+#if 0
 	/*
 	 * Trace.
 	 */
 	if (so->so_options & US_SO_DEBUG){
         tcp_trace(ctx,TA_OUTPUT, tp->t_state, tp, ti, 0);
     }
+#endif
 
 #if MBUF_BUILD
 	/*
@@ -754,8 +705,7 @@ send:
 	    0, 0);
     }
 #else
-    utl_k12_pkt_format(stdout,ti,  20+20) ;
-    utl_DumpBuffer(stdout,ti,  20+20);
+    utl_k12_pkt_format(stdout,pkt.get_header_ptr(),  pkt.get_pkt_size()) ;
 #endif
 	if (error) {
 out:

@@ -112,6 +112,11 @@ struct CTcpPkt {
     inline char * get_header_ptr(){
         return (rte_pktmbuf_mtod(m_buf,char *));
     }
+
+    inline uint32_t get_pkt_size(){
+        return (m_buf->pkt_len);
+    }
+
 };
 
 
