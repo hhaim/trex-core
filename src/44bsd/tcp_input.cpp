@@ -465,6 +465,8 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
 
     so = &tp->m_socket;
 
+    ostate = tp->t_state;
+
     if (tp->t_state == TCPS_LISTEN) {
 
         if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
@@ -1336,7 +1338,7 @@ step6:
         }
     }
     if (so->so_options & US_SO_DEBUG){
-        tcp_trace(ctx,TA_INPUT, ostate, tp, &ctx->tcp_saveti, 0);
+        tcp_trace(ctx,TA_INPUT, ostate, tp, &ctx->tcp_saveti, 0,0);
     }
 
     /*
@@ -1389,7 +1391,7 @@ drop:
      * Drop space held by incoming segment and return.
      */
     if (tp && (so->so_options & US_SO_DEBUG)){
-        tcp_trace(ctx,TA_DROP, ostate, tp, &ctx->tcp_saveti, 0);
+        tcp_trace(ctx,TA_DROP, ostate, tp, &ctx->tcp_saveti, 0, 0);
     }
     rte_pktmbuf_free(m);
     /* destroy temporarily created socket */

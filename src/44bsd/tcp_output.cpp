@@ -63,11 +63,15 @@ const u_char    tcp_outflags[TCP_NSTATES] = {
     TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
 };
 
-const char *tcpstates[] = {
+static const char *tcpstates[] = {
     "CLOSED",   "LISTEN",   "SYN_SENT", "SYN_RCVD",
     "ESTABLISHED",  "CLOSE_WAIT",   "FIN_WAIT_1",   "CLOSING",
     "LAST_ACK", "FIN_WAIT_2",   "TIME_WAIT",
 };
+
+const char ** tcp_get_tcpstate(){
+    return (tcpstates);
+}
 
 
 static inline void tcp_pkt_update_len(struct tcpcb *tp,
@@ -719,14 +723,12 @@ send:
         if (SEQ_GT(tp->snd_nxt + len, tp->snd_max))
             tp->snd_max = tp->snd_nxt + len;
 
-#if 0
     /*
      * Trace.
      */
     if (so->so_options & US_SO_DEBUG){
-        tcp_trace(ctx,TA_OUTPUT, tp->t_state, tp, ti, 0);
+        tcp_trace(ctx,TA_OUTPUT, tp->t_state, tp, (struct tcpiphdr *)0, ti,len);
     }
-#endif
 
 
     error = ctx->m_cb->on_tx(ctx,tp,pkt.m_buf);

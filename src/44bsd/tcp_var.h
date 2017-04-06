@@ -553,7 +553,10 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                    int total_l7_len);
 
 
-void tcp_trace(CTcpPerThreadCtx * ctx,short act, short ostate, struct tcpcb * tp, struct tcpiphdr * ti, int req);
+void tcp_trace(CTcpPerThreadCtx * ctx,short act, short ostate, struct tcpcb * tp, struct tcpiphdr * ti, TCPHeader * tio, int req);
+
+const char ** tcp_get_tcpstate();
+
 
 void tcp_quench(struct tcpcb *tp);
 void tcp_template(struct tcpcb *tp);

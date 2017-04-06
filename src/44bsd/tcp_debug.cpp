@@ -33,13 +33,6 @@
  *	@(#)tcp_debug.c	8.1 (Berkeley) 6/10/93
  */
 
-#ifdef TCPDEBUG
-/* load symbolic names */
-#define PRUREQUESTS
-#define TCPSTATES
-#define	TCPTIMERS
-#define	TANAMES
-#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -73,13 +66,25 @@ const char *tcptimers[] =
 const char	*tanames[] =
     { "input", "output", "user", "respond", "drop" };
 
+#define TCPDEBUG
 
 #ifdef TCPDEBUG
 /* one thread debug */
-int	tcpconsdebug = 0;
+int	tcpconsdebug = 1;
 #define	TCP_NDEBUG 100
 struct	tcp_debug tcp_debug[TCP_NDEBUG];
 int	tcp_debx;
+
+
+const char *prurequests[] = {
+	"ATTACH",	"DETACH",	"BIND",		"LISTEN",
+	"CONNECT",	"ACCEPT",	"DISCONNECT",	"SHUTDOWN",
+	"RCVD",		"SEND",		"ABORT",	"CONTROL",
+	"SENSE",	"RCVOOB",	"SENDOOB",	"SOCKADDR",
+	"PEERADDR",	"CONNECT2",	"FASTTIMO",	"SLOWTIMO",
+	"PROTORCV",	"PROTOSEND",	"SEND_EOF",	"SOSETLABEL",
+	"CLOSE",	"FLUSH",
+};
 
 /*
  * Tcp debug routines
@@ -89,10 +94,16 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
           short ostate, 
           struct tcpcb * tp, 
           struct tcpiphdr * ti, 
+          TCPHeader * tio,
           int req){
 	tcp_seq seq, ack;
 	int len, flags;
-	struct tcp_debug *td = &ctx->tcp_debug[tcp_debx++];
+    struct tcp_debug local_td;
+    const char ** tcpstates= tcp_get_tcpstate();
+
+    struct tcp_debug *td = &local_td;
+
+    printf("\n");
 
 	if (tcp_debx == TCP_NDEBUG)
 		tcp_debx = 0;
@@ -108,11 +119,15 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 		td->td_ti = *ti;
 	else
 		memset((void *)&td->td_ti,0, sizeof (*ti));
-	td->td_req = req;
+    if (act==TA_USER) {
+        td->td_req = req;
+    }else{
+        td->td_req = 0;
+    }
 	if (tcpconsdebug == 0)
 		return;
 	if (tp)
-		printf("%x %s:", tp, tcpstates[ostate]);
+		printf("%p %s:", tp, tcpstates[ostate]);
 	else
 		printf("???????? ");
 	printf("%s ", tanames[act]);
@@ -127,23 +142,25 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 		ack = ti->ti_ack;
 		len = ti->ti_len;
 		if (act == TA_OUTPUT) {
-			seq = ntohl(seq);
-			ack = ntohl(ack);
-			len = ntohs((u_short)len);
+			seq = tio->getSeqNumber();
+			ack = tio->getAckNumber();
+			len = req;
 		}
-		if (act == TA_OUTPUT)
-			len -= sizeof (struct tcphdr);
+
+        if (tp)
+            printf(" (%x) -> (%x) %s :", tp->src_ipv4,tp->dst_ipv4,  tcpstates[tp->t_state]);
+
 		if (len)
-			printf("[%x..%x)", seq, seq+len);
+			printf("[%lx..%lx)", (ulong)seq, (ulong)seq+len);
 		else
-			printf("%x", seq);
-		printf("@%x, urp=%x", ack, ti->ti_urp);
+			printf("%lx", (ulong)seq);
+		printf("@%lx, urp=%lx", (ulong)ack, (ulong)ti->ti_urp);
 		flags = ti->ti_flags;
 		if (flags) {
 #ifndef lint
-			char *cp = "<";
-#define pf(f) { if (ti->ti_flags&TH_/**/f) { printf("%s%s", cp, "f"); cp = ","; } }
-			pf(SYN); pf(ACK); pf(FIN); pf(RST); pf(PUSH); pf(URG);
+			char *cp = (char *)"<";
+#define pf(f) { if (ti->ti_flags&f) { printf("%s%s", cp, #f); cp = (char*)","; } }
+			pf(TH_SYN); pf(TH_ACK); pf(TH_FIN); pf(TH_RST); pf(TH_PUSH); pf(TH_URG);
 #endif
 			printf(">");
 		}
@@ -155,17 +172,22 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 			printf("<%s>", tcptimers[req>>8]);
 		break;
 	}
-	if (tp)
-		printf(" -> %s", tcpstates[tp->t_state]);
 	/* print out internal state of tp !?! */
 	printf("\n");
 	if (tp == 0)
 		return;
-	printf("\trcv_(nxt,wnd,up) (%x,%x,%x) snd_(una,nxt,max) (%x,%x,%x)\n",
-	    tp->rcv_nxt, tp->rcv_wnd, tp->rcv_up, tp->snd_una, tp->snd_nxt,
-	    tp->snd_max);
-	printf("\tsnd_(wl1,wl2,wnd) (%x,%x,%x)\n",
-	    tp->snd_wl1, tp->snd_wl2, tp->snd_wnd);
+
+#define sw(f) ((ulong)(tp->f - tp->iss))
+#define rw(f) ((ulong)(tp->f - tp->irs))
+
+	printf("\trcv_(nxt,wnd,up) (%lx,%lx,%lx) snd_(una,nxt,max) (%lx,%lx,%lx)\n",
+	    rw(rcv_nxt), rw(rcv_wnd), rw(rcv_up), sw(snd_una), sw(snd_nxt),
+	    sw(snd_max));
+#if 0
+	printf("\tsnd_(wl1,wl2,wnd) (%lx,%lx,%lx)\n",
+	    sw(snd_wl1), sw(snd_wl2), sw(snd_wnd));
+#endif
+
 }
 
 #else

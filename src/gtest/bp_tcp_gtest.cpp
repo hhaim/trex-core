@@ -759,7 +759,7 @@ int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
         dir=1;
     }
     m_queue[dir].push_back(m);
-    utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now/2)) ;
+    //utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now/2)) ;
     return(0);
 }
 
@@ -809,13 +809,15 @@ TEST_F(gt_tcp, tst19) {
     m_flow_server.Create(&m_ctx);
     m_flow_server.set_tuple(0x30000001,0x10000001,80,1025,false);
     m_flow_server.init();
-    
+
+    m_flow_server.m_tcp.m_socket.so_options |=US_SO_DEBUG;
+    m_flow.m_tcp.m_socket.so_options |=US_SO_DEBUG;
 
 
 #if 1
 
     CTcpApp app;
-    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,64000);
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,1024);
     app.m_write_buf.Dump(stdout);
 
     CMbufBuffer * lpbuf=&app.m_write_buf;
