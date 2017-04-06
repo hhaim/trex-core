@@ -103,7 +103,10 @@ void sorwakeup(struct tcp_socket *so);
 
 
 void	soisdisconnected(struct tcp_socket *so);
+void	soisdisconnecting(struct tcp_socket *so);
 
+
+void sbflush (struct sockbuf *sb);
 void	sbappend(struct sockbuf *sb, struct rte_mbuf *m);
 void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
 
@@ -119,6 +122,8 @@ void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
 #endif            
 
 void	soisconnected(struct tcp_socket *so);
+void	soisconnecting(struct tcp_socket *so);
+
 void	socantrcvmore(struct tcp_socket *so);
 
 

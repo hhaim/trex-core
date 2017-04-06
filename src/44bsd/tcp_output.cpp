@@ -250,6 +250,46 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
 
 
 
+/*
+ * Send a single message to the TCP at address specified by
+ * the given TCP/IP header.  If m == 0, then we make a copy
+ * of the tcpiphdr at ti and send directly to the addressed host.
+ * This is used to force keep alive messages out using the TCP
+ * template for a connection tp->t_template.  If flags are given
+ * then we send a message back to the TCP which originated the
+ * segment ti, and discard the mbuf containing it and any other
+ * attached mbufs.
+ *
+ * In any case the ack and sequence number of the transmitted
+ * segment are as specified by the parameters.
+ */
+void
+tcp_respond(CTcpPerThreadCtx * ctx,
+            struct tcpcb *tp, 
+            tcp_seq ack, 
+            tcp_seq seq, 
+            int flags){
+    assert(tp);
+    uint16_t win = sbspace(&tp->m_socket.so_rcv);
+
+    CTcpPkt pkt;
+    if (tcp_build_cpkt(ctx,tp,TCP_HEADER_LEN,pkt)!=0){
+        return;
+    }
+    TCPHeader * ti=pkt.lpTcp;
+
+    ti->setSeqNumber(seq);
+    ti->setAckFlag(ack);
+    ti->setFlag(flags);
+    ti->setWindowSize((u_short) (win >> tp->rcv_scale));
+
+    /* TBD repace this */
+    utl_k12_pkt_format(stdout,pkt.get_header_ptr(),  pkt.get_pkt_size()) ;
+    // (void) ip_output(m, NULL, ro, 0, NULL);
+}
+
+
+
 
 /*
  * Tcp output routine: figure out what should be sent and send it.

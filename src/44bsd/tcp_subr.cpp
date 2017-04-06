@@ -125,6 +125,103 @@ void tcpstat::Dump(FILE *fd){
 }
 
 
+/*
+ * Initiate connection to peer.
+ * Create a template for use in transmissions on this connection.
+ * Enter SYN_SENT state, and mark socket as connecting.
+ * Start keep-alive timer, and seed output sequence space.
+ * Send initial segment on connection.
+ */
+int tcp_connect(CTcpPerThreadCtx * ctx,
+                struct tcpcb *tp) {
+    int error;
+
+    /* Compute window scaling to request.  */
+    while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
+        (TCP_MAXWIN << tp->request_r_scale) < tp->m_socket.so_rcv.sb_hiwat){
+        tp->request_r_scale++;
+    }
+
+    soisconnecting(&tp->m_socket);
+
+    INC_STAT(ctx,tcps_connattempt);
+    tp->t_state = TCPS_SYN_SENT;
+    tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
+    tp->iss = ctx->tcp_iss; 
+    ctx->tcp_iss += TCP_ISSINCR/4;
+    tcp_sendseqinit(tp);
+    error = tcp_output(ctx,tp);
+    return (error);
+}
+
+
+/*
+ * User issued close, and wish to trail through shutdown states:
+ * if never received SYN, just forget it.  If got a SYN from peer,
+ * but haven't sent FIN, then go to FIN_WAIT_1 state to send peer a FIN.
+ * If already got a FIN from peer, then almost done; go to LAST_ACK
+ * state.  In all other cases, have already sent FIN to peer (e.g.
+ * after PRU_SHUTDOWN), and just have to play tedious game waiting
+ * for peer to send FIN or not respond to keep-alives, etc.
+ * We can let the user exit from the close as soon as the FIN is acked.
+ */
+struct tcpcb * tcp_usrclosed(CTcpPerThreadCtx * ctx,
+                             struct tcpcb *tp){
+
+	switch (tp->t_state) {
+
+	case TCPS_CLOSED:
+	case TCPS_LISTEN:
+	case TCPS_SYN_SENT:
+		tp->t_state = TCPS_CLOSED;
+		tp = tcp_close(ctx,tp);
+		break;
+
+	case TCPS_SYN_RECEIVED:
+	case TCPS_ESTABLISHED:
+		tp->t_state = TCPS_FIN_WAIT_1;
+		break;
+
+	case TCPS_CLOSE_WAIT:
+		tp->t_state = TCPS_LAST_ACK;
+		break;
+	}
+	if (tp && tp->t_state >= TCPS_FIN_WAIT_2){
+        soisdisconnected(&tp->m_socket);
+    }
+	return (tp);
+}
+
+
+
+/*
+ * Initiate (or continue) disconnect.
+ * If embryonic state, just send reset (once).
+ * If in ``let data drain'' option and linger null, just drop.
+ * Otherwise (hard), mark socket disconnecting and drop
+ * current input data; switch states based on user close, and
+ * send segment to peer (with FIN).
+ */
+struct tcpcb * tcp_disconnect(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp){
+
+    struct tcp_socket *so = &tp->m_socket;
+
+	if (tp->t_state < TCPS_ESTABLISHED)
+		tp = tcp_close(ctx,tp);
+	else if (1 /*(so->so_options & SO_LINGER) && so->so_linger == 0*/){
+        tp = tcp_drop_now(ctx,tp, 0);
+    } else {
+		soisdisconnecting(so);
+		sbflush(&so->so_rcv);
+		tp = tcp_usrclosed(ctx,tp);
+		if (tp)
+			(void) tcp_output(ctx,tp);
+	}
+	return (tp);
+}
+
+
 
 
 
@@ -139,6 +236,7 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
 	memset((char *) tp, 0,sizeof(struct tcpcb));
 
     tp->m_socket.so_snd.Create(ctx->tcp_tx_socket_bsize);
+    tp->m_socket.so_rcv.sb_hiwat = ctx->tcp_rx_socket_bsize;
 
     /* build template */
     tcp_template(tp);
@@ -289,121 +387,6 @@ void tcp_template(struct tcpcb *tp){
 }
 
 
-/*
- * Send a single message to the TCP at address specified by
- * the given TCP/IP header.  If m == 0, then we make a copy
- * of the tcpiphdr at ti and send directly to the addressed host.
- * This is used to force keep alive messages out using the TCP
- * template for a connection tp->t_template.  If flags are given
- * then we send a message back to the TCP which originated the
- * segment ti, and discard the mbuf containing it and any other
- * attached mbufs.
- *
- * In any case the ack and sequence number of the transmitted
- * segment are as specified by the parameters.
- */
-void
-tcp_respond(CTcpPerThreadCtx * ctx,
-            struct tcpcb *tp, 
-            tcp_seq ack, 
-            tcp_seq seq, 
-            int flags){
-#if MBUF_BUILD
-	int tlen;
-	int win = 0;
-	if (tp) {
-		win = sbspace(&tp->m_socket.so_rcv);
-	}
-
-
-    /* TBD always generate a new buffer- hhaim and fill it from template  -- tp->template_pkt */
-	if (m == 0) {
-		m = m_gethdr(M_DONTWAIT, MT_HEADER);
-		if (m == NULL)
-			return;
-#ifdef TCP_COMPAT_42
-		tlen = 1;
-#else
-		tlen = 0;
-#endif
-		m->m_data += max_linkhdr;
-		*mtod(m, struct tcpiphdr *) = *ti;
-		ti = mtod(m, struct tcpiphdr *);
-		flags = TH_ACK;
-	} else {
-		m_freem(m->m_next);
-		m->m_next = 0;
-		m->m_data = (caddr_t)ti;
-		m->m_len = sizeof (struct tcpiphdr);
-		tlen = 0;
-#define xchg(a,b,type) { type t; t=a; a=b; b=t; }
-		xchg(ti->ti_dst.s_addr, ti->ti_src.s_addr, u_long);
-		xchg(ti->ti_dport, ti->ti_sport, u_short);
-#undef xchg
-	}
-	ti->ti_len = htons((u_short)(sizeof (struct tcphdr) + tlen));
-	tlen += sizeof (struct tcpiphdr);
-	m->m_len = tlen;
-	m->m_pkthdr.len = tlen;
-	m->m_pkthdr.rcvif = (struct ifnet *) 0;
-	ti->ti_next = ti->ti_prev = 0;
-	ti->ti_x1 = 0;
-	ti->ti_seq = htonl(seq);
-	ti->ti_ack = htonl(ack);
-	ti->ti_x2 = 0;
-	ti->ti_off = sizeof (struct tcphdr) >> 2;
-	ti->ti_flags = flags;
-	if (tp)
-		ti->ti_win = htons((u_short) (win >> tp->rcv_scale));
-	else
-		ti->ti_win = htons((u_short)win);
-	ti->ti_urp = 0;
-	ti->ti_sum = 0;
-	ti->ti_sum = in_cksum(m, tlen);
-	((struct ip *)ti)->ip_len = tlen;
-	((struct ip *)ti)->ip_ttl = 0x80;
-	(void) ip_output(m, NULL, ro, 0, NULL);
-#endif
-}
-
-
-
-/*
- * Create a new TCP control block, making an
- * empty reassembly queue and hooking it to the argument
- * protocol control block.
- */
-struct tcpcb * tcp_newtcpcb(CTcpPerThreadCtx * ctx){
-
-    struct tcpcb *tp;
-
-	tp = (struct tcpcb *)malloc(sizeof(*tp));
-	if (tp == NULL)
-		return ((struct tcpcb *)0);
-    /* TCP_OPTIM  */
-	memset((char *) tp, 0,sizeof(struct tcpcb));
-
-	tp->t_maxseg = ctx->tcp_mssdflt;
-
-	tp->t_flags = ctx->tcp_do_rfc1323 ? (TF_REQ_SCALE|TF_REQ_TSTMP) : 0;
-
-    /*
-	 * Init srtt to TCPTV_SRTTBASE (0), so we can tell that we have no
-	 * rtt estimate.  Set rttvar so that srtt + 2 * rttvar gives
-	 * reasonable initial retransmit time.
-	 */
-	tp->t_srtt = TCPTV_SRTTBASE;
-	tp->t_rttvar = ctx->tcp_rttdflt * PR_SLOWHZ << 2;
-	tp->t_rttmin = TCPTV_MIN;
-	TCPT_RANGESET(tp->t_rxtcur, 
-	    ((TCPTV_SRTTBASE >> 2) + (TCPTV_SRTTDFLT << 2)) >> 1,
-	    TCPTV_MIN, TCPTV_REXMTMAX);
-	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
-	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
-	return (tp);
-}
-
-
 
 /*
  * Drop a TCP connection, reporting
@@ -436,12 +419,10 @@ struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
  *	discard internet protocol block
  *	wake up any sleepers
  */
-struct tcpcb *
+struct tcpcb *  
 tcp_close(CTcpPerThreadCtx * ctx,
           struct tcpcb *tp){
 
-    //register struct tcpiphdr *t;
-	//register struct rte_mbuf *m;
 
 // no need for that , RTT will be calculated again for each flow 
 #ifdef RTV_RTT
@@ -515,19 +496,10 @@ tcp_close(CTcpPerThreadCtx * ctx,
 	}
 #endif /* RTV_RTT */
 	/* free the reassembly queue, if any */
-#if TCP_SEG_QUEUE
-	t = tp->seg_next;
-	while (t != (struct tcpiphdr *)tp) {
-		t = (struct tcpiphdr *)t->ti_next;
-		m = REASS_MBUF((struct tcpiphdr *)t->ti_prev);
-		remque(t->ti_prev);
-		m_freem(m);
-	}
-#endif
 
-    free(tp);
+    /* TBD -- back pointer to flow and delete it */
     INC_STAT(ctx,tcps_closed);
-	return ((struct tcpcb *)0);
+    return((struct tcpcb *)0);
 }
 
 void tcp_drain(){
@@ -608,18 +580,27 @@ struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus){
 }
 
 long sbspace(struct sockbuf *sb){
-    return(0);
+    return(sb->sb_hiwat -sb->sb_cc);
 }
 
 void	sbdrop(struct sockbuf *sb, int len){
+    assert(0);
 }
+
 void sowwakeup(struct tcp_socket *so){
 }
+
 void sorwakeup(struct tcp_socket *so){
 }
 
+void	soisdisconnecting(struct tcp_socket *so){
+}
 
 void	soisdisconnected(struct tcp_socket *so){
+}
+
+void sbflush (struct sockbuf *sb){
+    assert(0);
 }
 
 void	sbappend(struct sockbuf *sb, struct rte_mbuf *m){
@@ -628,6 +609,10 @@ void	sbappend(struct sockbuf *sb, struct rte_mbuf *m){
 void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes){
 }
 
+
+void	soisconnecting(struct tcp_socket *so){
+
+}
 
 void	soisconnected(struct tcp_socket *so){
 }

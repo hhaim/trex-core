@@ -500,9 +500,10 @@ private:
 #define INC_STAT_CNT(ctx,p,cnt) {ctx->m_tcpstat.m_sts.p += cnt; }
 
 
+int tcp_connect(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 int	 tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
 int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcp_socket *so,  int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
-struct tcpcb * tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+struct tcpcb *  tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *tp, tcp_seq ack, tcp_seq seq, int flags);
 int  tcp_mss(CTcpPerThreadCtx * ctx,struct tcpcb *tp, u_int offer);
@@ -526,6 +527,7 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
                    uint32_t dlen,
                    uint16_t  tcphlen,
                    CTcpPkt &pkt);
+
 
 
 

@@ -688,6 +688,42 @@ TEST_F(gt_tcp, tst17) {
 
 }
 
+/* tcp_output simulation .. */
+TEST_F(gt_tcp, tst18) {
+
+    CTcpPerThreadCtx        m_ctx;
+    CTcpFlow                m_flow;
+
+    m_ctx.Create();
+    m_flow.Create(&m_ctx);
+
+#if 0
+
+    CTcpApp app;
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,10);
+    app.m_write_buf.Dump(stdout);
+
+    CMbufBuffer * lpbuf=&app.m_write_buf;
+    CTcpSockBuf *lptxs=&m_flow.m_tcp.m_socket.so_snd;
+    /* hack the code for now */
+    lptxs->m_app=&app;
+
+    /* simulate buf adding */
+    lptxs->sb_start_new_buffer();
+
+    /* add maximum of the buffer */
+    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
+#endif
+
+    tcp_connect(&m_ctx,&m_flow.m_tcp);
+
+
+    m_flow.Delete();
+    m_ctx.Delete();
+
+    //app.m_write_buf.Delete();
+
+}
 
 
 
