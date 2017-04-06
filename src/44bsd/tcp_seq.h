@@ -3,7 +3,7 @@
 
 /*
  * Copyright (c) 1982, 1986, 1993, 1995
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -15,8 +15,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_seq.h	8.3 (Berkeley) 6/21/95
+ *  @(#)tcp_seq.h   8.3 (Berkeley) 6/21/95
  */
 
 /*
@@ -41,22 +41,22 @@
  * on with modular arithmetic.  These macros can be
  * used to compare such integers.
  */
-#define	SEQ_LT(a,b)	((int)((a)-(b)) < 0)
-#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
-#define	SEQ_GT(a,b)	((int)((a)-(b)) > 0)
-#define	SEQ_GEQ(a,b)	((int)((a)-(b)) >= 0)
+#define SEQ_LT(a,b) ((int)((a)-(b)) < 0)
+#define SEQ_LEQ(a,b)    ((int)((a)-(b)) <= 0)
+#define SEQ_GT(a,b) ((int)((a)-(b)) > 0)
+#define SEQ_GEQ(a,b)    ((int)((a)-(b)) >= 0)
 
 /*
  * Macros to initialize tcp sequence numbers for
  * send and receive from initial send and receive
  * sequence numbers.
  */
-#define	tcp_rcvseqinit(tp) \
-	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
+#define tcp_rcvseqinit(tp) \
+    (tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
 
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
+#define tcp_sendseqinit(tp) \
+    (tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
+        (tp)->iss
 
 /*
  * Increment for tcp_iss each second.
@@ -68,9 +68,9 @@
  * number in the range [0-0x3ffff] that is hard to predict.
  */
 //TBDFIXME
-#define	tcp_random18()	(0)
+#define tcp_random18()  (0)
 
-#define	TCP_ISSINCR	(122*1024 + tcp_random18())
+#define TCP_ISSINCR (122*1024 + tcp_random18())
 
 
 #endif

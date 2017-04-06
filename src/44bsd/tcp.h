@@ -91,7 +91,7 @@ struct tcphdr {
  * but 512 is probably more convenient.
  * This should be defined as MIN(512, IP_MSS - sizeof (struct tcpiphdr)).
  */
-#define	TCP_MSS	512
+#define	TCP_MSS	(1500-20-20)
 
 #define	TCP_MAXWIN	65535	/* largest value for (unscaled) window */
 

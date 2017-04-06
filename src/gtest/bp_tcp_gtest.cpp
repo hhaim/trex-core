@@ -697,6 +697,7 @@ TEST_F(gt_tcp, tst18) {
     m_ctx.Create();
     m_flow.Create(&m_ctx);
 
+
 #if 0
 
     CTcpApp app;
@@ -715,7 +716,14 @@ TEST_F(gt_tcp, tst18) {
     lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
 #endif
 
+
     tcp_connect(&m_ctx,&m_flow.m_tcp);
+    int i;
+    for (i=0; i<1000; i++) {
+        printf(" tick %lu \n",(ulong)i);
+        m_ctx.timer_w_on_tick();
+    }
+
 
 
     m_flow.Delete();

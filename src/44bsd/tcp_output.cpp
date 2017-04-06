@@ -729,17 +729,6 @@ send:
 #endif
 
 #if MBUF_BUILD
-	/*
-	 * Fill in IP length and desired time to live and
-	 * send to IP level.  There should be a better way
-	 * to handle ttl and tos; we could keep them in
-	 * the template, but need a way to checksum without them.
-	 */
-	m->m_pkthdr.len = hdrlen + len;
-    {
-	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
-	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;	/* XXX */
-	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip.ip_tos;	/* XXX */
 
     error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
 	    0, 0);

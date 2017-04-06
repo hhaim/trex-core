@@ -3,7 +3,7 @@
 
 /*
  * Copyright (c) 1982, 1986, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -15,8 +15,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_socket.h	8.1 (Berkeley) 6/10/93
+ *  @(#)tcp_socket.h    8.1 (Berkeley) 6/10/93
  */
 
 #include <vector>
@@ -43,51 +43,51 @@
 
                  
 
-struct	sockbuf {
-    uint32_t	sb_cc;		/* actual chars in buffer */
-    uint32_t	sb_hiwat;	/* max actual char count */
-    uint32_t	sb_mbcnt;	/* chars of mbufs used */
-    uint32_t	sb_mbmax;	/* max chars of mbufs to use */
-    //int64_t	    sb_lowat;	/* low water mark */
-    //struct	rte_mbuf *sb_mb;	/* the mbuf chain */
-    short	sb_flags;	/* flags, see below */
-    //short	sb_timeo;	/* timeout for read/write */
+struct  sockbuf {
+    uint32_t    sb_cc;      /* actual chars in buffer */
+    uint32_t    sb_hiwat;   /* max actual char count */
+    uint32_t    sb_mbcnt;   /* chars of mbufs used */
+    uint32_t    sb_mbmax;   /* max chars of mbufs to use */
+    //int64_t       sb_lowat;   /* low water mark */
+    //struct    rte_mbuf *sb_mb;    /* the mbuf chain */
+    short   sb_flags;   /* flags, see below */
+    //short sb_timeo;   /* timeout for read/write */
 };
 
 // so_state
 #define US_SS_CANTRCVMORE  1
 
 
-#define	US_SO_DEBUG	0x0001		/* turn on debugging info recording */
-#define	US_SO_ACCEPTCONN	0x0002		/* socket has had listen() */
-#define	US_SO_REUSEADDR	0x0004		/* allow local address reuse */
-#define	US_SO_KEEPALIVE	0x0008		/* keep connections alive */
-#define	US_SO_DONTROUTE	0x0010		/* just use interface addresses */
-#define	US_SO_BROADCAST	0x0020		/* permit sending of broadcast msgs */
+#define US_SO_DEBUG 0x0001      /* turn on debugging info recording */
+#define US_SO_ACCEPTCONN    0x0002      /* socket has had listen() */
+#define US_SO_REUSEADDR 0x0004      /* allow local address reuse */
+#define US_SO_KEEPALIVE 0x0008      /* keep connections alive */
+#define US_SO_DONTROUTE 0x0010      /* just use interface addresses */
+#define US_SO_BROADCAST 0x0020      /* permit sending of broadcast msgs */
 
-#define	US_SO_LINGER	0x0080		/* linger on close if data present */
-#define	US_SO_OOBINLINE	0x0100		/* leave received OOB data in line */
+#define US_SO_LINGER    0x0080      /* linger on close if data present */
+#define US_SO_OOBINLINE 0x0100      /* leave received OOB data in line */
 //#if __BSD_VISIBLE
 
-#define	US_SO_REUSEPORT	0x0200		/* allow local address & port reuse */
+#define US_SO_REUSEPORT 0x0200      /* allow local address & port reuse */
 
-#define	US_SO_TIMESTAMP	0x0400		/* timestamp received dgram traffic */
-#define	US_SO_NOSIGPIPE	0x0800		/* no SIGPIPE from EPIPE */
-#define	US_SO_ACCEPTFILTER	0x1000		/* there is an accept filter */
-#define	US_SO_BINTIME	0x2000		/* timestamp received dgram traffic */
+#define US_SO_TIMESTAMP 0x0400      /* timestamp received dgram traffic */
+#define US_SO_NOSIGPIPE 0x0800      /* no SIGPIPE from EPIPE */
+#define US_SO_ACCEPTFILTER  0x1000      /* there is an accept filter */
+#define US_SO_BINTIME   0x2000      /* timestamp received dgram traffic */
 //#endif
-#define	US_SO_NO_OFFLOAD	0x4000		/* socket cannot be offloaded */
-#define	US_SO_NO_DDP	0x8000		/* disable direct data placement */
+#define US_SO_NO_OFFLOAD    0x4000      /* socket cannot be offloaded */
+#define US_SO_NO_DDP    0x8000      /* disable direct data placement */
 
 
-#define	SB_MAX		(256*1024)	/* default for max chars in sockbuf */
-#define	SB_LOCK		0x01		/* lock on data queue */
-#define	SB_WANT		0x02		/* someone is waiting to lock */
-#define	SB_WAIT		0x04		/* someone is waiting for data/space */
-#define	SB_SEL		0x08		/* someone is selecting */
-#define	SB_ASYNC	0x10		/* ASYNC I/O, need signals */
-#define	SB_NOTIFY	(SB_WAIT|SB_SEL|SB_ASYNC)
-#define	SB_NOINTR	0x40		/* operations not interruptible */
+#define SB_MAX      (256*1024)  /* default for max chars in sockbuf */
+#define SB_LOCK     0x01        /* lock on data queue */
+#define SB_WANT     0x02        /* someone is waiting to lock */
+#define SB_WAIT     0x04        /* someone is waiting for data/space */
+#define SB_SEL      0x08        /* someone is selecting */
+#define SB_ASYNC    0x10        /* ASYNC I/O, need signals */
+#define SB_NOTIFY   (SB_WAIT|SB_SEL|SB_ASYNC)
+#define SB_NOINTR   0x40        /* operations not interruptible */
 #define SB_DROPCALL 0x80
 
 
@@ -95,45 +95,45 @@ struct	sockbuf {
 struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus);
 
 long    sbspace(struct sockbuf *sb); 
-void	sbdrop(struct sockbuf *sb, int len);
+void    sbdrop(struct sockbuf *sb, int len);
 
-int	soabort(struct tcp_socket *so);
+int soabort(struct tcp_socket *so);
 void sowwakeup(struct tcp_socket *so);
 void sorwakeup(struct tcp_socket *so);
 
 
-void	soisdisconnected(struct tcp_socket *so);
-void	soisdisconnecting(struct tcp_socket *so);
+void    soisdisconnected(struct tcp_socket *so);
+void    soisdisconnecting(struct tcp_socket *so);
 
 
 void sbflush (struct sockbuf *sb);
-void	sbappend(struct sockbuf *sb, struct rte_mbuf *m);
-void	sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
+void    sbappend(struct sockbuf *sb, struct rte_mbuf *m);
+void    sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
 
 #ifdef FIXME
-#define	sorwakeup(so)	{ sowakeup((so), &(so)->so_rcv); \
-			  if ((so)->so_upcall) \
-			    (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
+#define sorwakeup(so)   { sowakeup((so), &(so)->so_rcv); \
+              if ((so)->so_upcall) \
+                (*((so)->so_upcall))((so), (so)->so_upcallarg, M_DONTWAIT); \
                 
-			}
+            }
 #else
 
 
 #endif            
 
-void	soisconnected(struct tcp_socket *so);
-void	soisconnecting(struct tcp_socket *so);
+void    soisconnected(struct tcp_socket *so);
+void    soisconnecting(struct tcp_socket *so);
 
-void	socantrcvmore(struct tcp_socket *so);
+void    socantrcvmore(struct tcp_socket *so);
 
 
-//#define	IN_CLASSD(i)		(((u_int32_t)(i) & 0xf0000000) == 0xe0000000)
+//#define   IN_CLASSD(i)        (((u_int32_t)(i) & 0xf0000000) == 0xe0000000)
 /* send/received as ip/link-level broadcast */
-#define	TCP_PKT_M_BCAST		(1ULL << 1) 
+#define TCP_PKT_M_BCAST     (1ULL << 1) 
 
 /* send/received as iplink-level multicast */
-#define	TCP_PKT_M_MCAST		(1ULL << 2) 
-#define	TCP_PKT_M_B_OR_MCAST	(TCP_PKT_M_BCAST  | TCP_PKT_M_MCAST)
+#define TCP_PKT_M_MCAST     (1ULL << 2) 
+#define TCP_PKT_M_B_OR_MCAST    (TCP_PKT_M_BCAST  | TCP_PKT_M_MCAST)
 
 typedef uint8_t tcp_l2_pkt_flags_t ;
 
@@ -237,7 +237,7 @@ public:
 
 class CTcpPerThreadCtx;
 
-class	CTcpSockBuf {
+class   CTcpSockBuf {
 
 public:
     void Create(uint32_t max_size){
@@ -285,9 +285,9 @@ public:
 
 public:
 
-    uint32_t	sb_cc;		/* actual chars in buffer */
-    uint32_t	sb_hiwat;	/* max actual char count */
-    uint32_t	sb_flags;	/* flags, see below */
+    uint32_t    sb_cc;      /* actual chars in buffer */
+    uint32_t    sb_hiwat;   /* max actual char count */
+    uint32_t    sb_flags;   /* flags, see below */
     uint32_t    m_head_offset; /* offset to head*/
 
     CTcpApp  *  m_app;
@@ -301,13 +301,13 @@ public:
  * private data and error information.
  */
 struct tcp_socket {
-	short	so_options;	
+    short   so_options; 
     int     so_error;
     int     so_state;
 /*
  * Variables for socket buffering.
  */
-    struct	sockbuf so_rcv;
+    struct  sockbuf so_rcv;
     CTcpSockBuf     so_snd;
 
 };

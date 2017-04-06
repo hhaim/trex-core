@@ -3,7 +3,7 @@
 
 /*
  * Copyright (c) 1982, 1986, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -15,8 +15,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcpip.h	8.1 (Berkeley) 6/10/93
+ *  @(#)tcpip.h 8.1 (Berkeley) 6/10/93
  */
 
 /*
@@ -51,17 +51,17 @@
  
 struct tcpiphdr {
     uint16_t  ih_len;
-	struct	    tcphdr ti_t;		/* tcp header */
+    struct      tcphdr ti_t;        /* tcp header */
 };
 
-#define	ti_len		ih_len
-#define	ti_seq		ti_t.th_seq
-#define	ti_ack		ti_t.th_ack
-#define	ti_off		ti_t.th_off
-#define	ti_flags	ti_t.th_flags
-#define	ti_win		ti_t.th_win
-#define	ti_sum		ti_t.th_sum
-#define	ti_urp		ti_t.th_urp
+#define ti_len      ih_len
+#define ti_seq      ti_t.th_seq
+#define ti_ack      ti_t.th_ack
+#define ti_off      ti_t.th_off
+#define ti_flags    ti_t.th_flags
+#define ti_win      ti_t.th_win
+#define ti_sum      ti_t.th_sum
+#define ti_urp      ti_t.th_urp
 
 
 #endif

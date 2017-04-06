@@ -769,9 +769,6 @@ trimthenstep6:
              * but keep on processing for RST or ACK.
              */
             if ((tiflags & TH_FIN && todrop == ti->ti_len + 1)
-#ifdef TCP_COMPAT_42
-              || (tiflags & TH_RST && ti->ti_seq == tp->rcv_nxt - 1)
-#endif
                ) {
                 todrop = ti->ti_len;
                 tiflags &= ~TH_FIN;

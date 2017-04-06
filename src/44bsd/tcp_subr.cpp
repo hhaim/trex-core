@@ -258,11 +258,30 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
 	    TCPTV_MIN, TCPTV_REXMTMAX);
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
+
+    /* register the timer */
+    ctx->timer_w_start(this);
 }
+
+void tcp_fasttimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp);
+void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp);
+
+void CTcpFlow::on_slow_tick(){
+    printf(" slow tick \n");
+    tcp_slowtimo(m_ctx, &m_tcp);
+}
+
+
+void CTcpFlow::on_fast_tick(){
+    tcp_fasttimo(m_ctx, &m_tcp);
+    printf(" fast tick \n");
+}
+
 
 void CTcpFlow::Delete(){
     struct tcpcb *tp=&m_tcp;
     tcp_reass_clean(m_ctx,tp);
+    m_ctx->timer_w_stop(this);
 }
 
 
@@ -290,10 +309,6 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
         }
 
         tcp_iss += TCP_ISSINCR/PR_SLOWHZ;		/* increment iss */
-    #ifdef TCP_COMPAT_42
-        if ((int)tcp_iss < 0)
-            tcp_iss = TCP_ISSINCR;			/* XXX */
-    #endif
         tcp_now++;					/* for timestamps */
         m_tick=0;
     } else{
