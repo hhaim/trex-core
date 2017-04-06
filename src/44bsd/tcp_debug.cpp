@@ -131,36 +131,53 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 	else
 		printf("???????? ");
 	printf("%s ", tanames[act]);
+
+    if (act == TA_OUTPUT) {
+        seq = tio->getSeqNumber();
+        ack = tio->getAckNumber();
+        len = req;
+        flags = tio->getFlags();
+    }else{
+        if (ti) {
+            seq = ti->ti_seq;
+            ack = ti->ti_ack;
+            len = ti->ti_len;
+            flags = ti->ti_flags;
+        }
+    }
+
 	switch (act) {
 
 	case TA_INPUT:
 	case TA_OUTPUT:
 	case TA_DROP:
-		if (ti == 0)
-			break;
-		seq = ti->ti_seq;
-		ack = ti->ti_ack;
-		len = ti->ti_len;
-		if (act == TA_OUTPUT) {
-			seq = tio->getSeqNumber();
-			ack = tio->getAckNumber();
-			len = req;
-		}
 
         if (tp)
             printf(" (%x) -> (%x) %s :", tp->src_ipv4,tp->dst_ipv4,  tcpstates[tp->t_state]);
 
-		if (len)
-			printf("[%lx..%lx)", (ulong)seq, (ulong)seq+len);
-		else
-			printf("%lx", (ulong)seq);
-		printf("@%lx, urp=%lx", (ulong)ack, (ulong)ti->ti_urp);
-		flags = ti->ti_flags;
-		if (flags) {
+        if (act==TA_OUTPUT) {
+            if (len)
+                printf("[%lx..%lx)", (ulong)seq-tp->iss, (ulong)seq+len-tp->iss);
+            else
+                printf("%lx", (ulong)seq-tp->iss);
+            printf("@%lx, urp=%lx", (ulong)ack-tp->irs, (ulong)0);
+        }else{
+            if (act==TA_INPUT) {
+                if ((flags&TH_SYN)==0) {
+                    if (len)
+                        printf("[%lx..%lx)", (ulong)seq-tp->irs, (ulong)seq+len-tp->irs);
+                    else
+                        printf("%lx", (ulong)seq-tp->irs);
+                    printf("@%lx, urp=%lx", (ulong)ack-tp->iss, (ulong)0);
+                }
+            }
+        }
+
+        if (flags) {
 #ifndef lint
 			char *cp = (char *)"<";
-#define pf(f) { if (ti->ti_flags&f) { printf("%s%s", cp, #f); cp = (char*)","; } }
-			pf(TH_SYN); pf(TH_ACK); pf(TH_FIN); pf(TH_RST); pf(TH_PUSH); pf(TH_URG);
+#define pf(f) { if (flags&TH_##f) { printf("%s%s", cp, #f); cp = (char*)","; } }
+			pf(SYN); pf(ACK); pf(FIN); pf(RST); pf(PUSH); pf(URG);
 #endif
 			printf(">");
 		}
@@ -179,15 +196,14 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 
 #define sw(f) ((ulong)(tp->f - tp->iss))
 #define rw(f) ((ulong)(tp->f - tp->irs))
+#define ff(f) ((ulong)(tp->f))
 
-	printf("\trcv_(nxt,wnd,up) (%lx,%lx,%lx) snd_(una,nxt,max) (%lx,%lx,%lx)\n",
-	    rw(rcv_nxt), rw(rcv_wnd), rw(rcv_up), sw(snd_una), sw(snd_nxt),
-	    sw(snd_max));
-#if 0
-	printf("\tsnd_(wl1,wl2,wnd) (%lx,%lx,%lx)\n",
-	    sw(snd_wl1), sw(snd_wl2), sw(snd_wnd));
-#endif
+	printf("\trcv_(nxt,wnd,up) (%lx,%lu,%lx) snd_(una,nxt,max) (%lx,%lx,%lx)\n",
+	    rw(rcv_nxt), ff(rcv_wnd), rw(rcv_up), sw(snd_una), sw(snd_nxt),sw(snd_max));
+	//printf("\tsnd_(wl1,wl2,wnd) (%lu,%lu,%lu)\n",
+	   //ff(snd_wl1), ff(snd_wl2), ff(snd_wnd));
 
+    printf("\tsnd_(wnd) (%lu)\n", ff(snd_wnd));
 }
 
 #else

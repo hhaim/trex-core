@@ -436,6 +436,9 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     int todrop, acked, ourfinisacked, needoutput = 0;
     int off;
 
+    if ((tp->src_ipv4==0x30000001) && ((tp->snd_nxt-tp->iss)==1 )) {
+        printf(" ****\n");
+    }
 
     uint8_t *optp;  // TCP option is exist  
 
@@ -1338,7 +1341,7 @@ step6:
         }
     }
     if (so->so_options & US_SO_DEBUG){
-        tcp_trace(ctx,TA_INPUT, ostate, tp, &ctx->tcp_saveti, 0,0);
+        tcp_trace(ctx,TA_INPUT, ostate, tp, ti, 0,0);
     }
 
     /*
@@ -1391,7 +1394,7 @@ drop:
      * Drop space held by incoming segment and return.
      */
     if (tp && (so->so_options & US_SO_DEBUG)){
-        tcp_trace(ctx,TA_DROP, ostate, tp, &ctx->tcp_saveti, 0, 0);
+        tcp_trace(ctx,TA_DROP, ostate, tp, ti, 0, 0);
     }
     rte_pktmbuf_free(m);
     /* destroy temporarily created socket */
