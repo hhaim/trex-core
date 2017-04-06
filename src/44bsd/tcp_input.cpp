@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1994, 1995
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,8 +12,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
+ *  @(#)tcp_input.c 8.12 (Berkeley) 5/24/95
  */
 
 #include <stdint.h>
@@ -46,11 +46,11 @@
 #include "tcp_socket.h"
 
 
-#define TCP_PAWS_IDLE	(24 * 24 * 60 * 60 * PR_SLOWHZ)
+#define TCP_PAWS_IDLE   (24 * 24 * 60 * 60 * PR_SLOWHZ)
 
 /* for modulo comparisons of timestamps */
-#define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
-#define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
+#define TSTMP_LT(a,b)   ((int)((a)-(b)) < 0)
+#define TSTMP_GEQ(a,b)  ((int)((a)-(b)) >= 0)
 
 
 bool CTcpReassBlock::operator==(CTcpReassBlock& rhs)const{
@@ -91,21 +91,22 @@ void CTcpReass::Dump(FILE *fd){
 }
 
 
-
-int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
-                         struct tcpcb *tp, 
-                         struct tcpiphdr *ti, 
-                         struct rte_mbuf *m){
+int CTcpReass::tcp_reass_no_data(CTcpPerThreadCtx * ctx,
+                                 struct tcpcb *tp){
     int flags=0;
-    pre_tcp_reass(ctx,tp,ti,m);
 
-    if (TCPS_HAVERCVDSYN(tp->t_state) == 0)
+    if (TCPS_HAVERCVDSYN(tp->t_state) == 0){
         return (0);
+    }
+
     if (m_blocks[0].m_seq != tp->rcv_nxt) {
         return(0);
     }
+
     tp->rcv_nxt += m_blocks[0].m_len;
+
     flags = (m_blocks[0].m_flags==1) ? TH_FIN :0;
+
     sbappend_bytes(&tp->m_socket.so_rcv ,m_blocks[0].m_len);
 
     /* remove the first block */
@@ -113,9 +114,20 @@ int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
     for (i=0; i<m_active_blocks-1; i++) {
         m_blocks[i]=m_blocks[i+1];
     }
+
     m_active_blocks-=1;
+
     sorwakeup(&tp->m_socket);
     return (flags);
+}
+
+
+int CTcpReass::tcp_reass(CTcpPerThreadCtx * ctx,
+                         struct tcpcb *tp, 
+                         struct tcpiphdr *ti, 
+                         struct rte_mbuf *m){
+    pre_tcp_reass(ctx,tp,ti,m);
+    return (tcp_reass_no_data(ctx,tp));
 }
 
 
@@ -223,6 +235,23 @@ int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
 
 
 
+int tcp_reass_no_data(CTcpPerThreadCtx * ctx,
+                      struct tcpcb *tp){
+
+    if ( TCPS_HAVERCVDSYN(tp->t_state) == 0 )
+        return (0);
+
+    if ( tcp_reass_is_exists(tp)==false ) {
+        return (0);
+    }
+
+    int res=tp->m_tpc_reass->tcp_reass_no_data(ctx,tp);
+    if (tp->m_tpc_reass->get_active_blocks()==0) {
+        tcp_reass_free(ctx,tp);
+    }
+    return (res);
+}
+
 
 
 int tcp_reass(CTcpPerThreadCtx * ctx,
@@ -284,65 +313,65 @@ void tcp_dooptions(CTcpPerThreadCtx * ctx,
               int *ts_present,
               u_long *ts_val, 
               u_long * ts_ecr){
-	u_short mss;
-	int opt, optlen;
+    u_short mss;
+    int opt, optlen;
 
-	for (; cnt > 0; cnt -= optlen, cp += optlen) {
-		opt = cp[0];
-		if (opt == TCPOPT_EOL)
-			break;
-		if (opt == TCPOPT_NOP)
-			optlen = 1;
-		else {
-			optlen = cp[1];
-			if (optlen <= 0)
-				break;
-		}
-		switch (opt) {
+    for (; cnt > 0; cnt -= optlen, cp += optlen) {
+        opt = cp[0];
+        if (opt == TCPOPT_EOL)
+            break;
+        if (opt == TCPOPT_NOP)
+            optlen = 1;
+        else {
+            optlen = cp[1];
+            if (optlen <= 0)
+                break;
+        }
+        switch (opt) {
 
-		default:
-			continue;
+        default:
+            continue;
 
-		case TCPOPT_MAXSEG:
-			if (optlen != TCPOLEN_MAXSEG)
-				continue;
-			if (!(ti->ti_flags & TH_SYN))
-				continue;
-			memcpy((char *) &mss,(char *) cp + 2, sizeof(mss));
-			mss=ntohs(mss);
-			(void) tcp_mss(ctx,tp, mss);	/* sets t_maxseg */
-			break;
+        case TCPOPT_MAXSEG:
+            if (optlen != TCPOLEN_MAXSEG)
+                continue;
+            if (!(ti->ti_flags & TH_SYN))
+                continue;
+            memcpy((char *) &mss,(char *) cp + 2, sizeof(mss));
+            mss=ntohs(mss);
+            (void) tcp_mss(ctx,tp, mss);    /* sets t_maxseg */
+            break;
 
-		case TCPOPT_WINDOW:
-			if (optlen != TCPOLEN_WINDOW)
-				continue;
-			if (!(ti->ti_flags & TH_SYN))
-				continue;
-			tp->t_flags |= TF_RCVD_SCALE;
-			tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
-			break;
+        case TCPOPT_WINDOW:
+            if (optlen != TCPOLEN_WINDOW)
+                continue;
+            if (!(ti->ti_flags & TH_SYN))
+                continue;
+            tp->t_flags |= TF_RCVD_SCALE;
+            tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
+            break;
 
-		case TCPOPT_TIMESTAMP:
-			if (optlen != TCPOLEN_TIMESTAMP)
-				continue;
-			*ts_present = 1;
-			memcpy((char *) ts_val,(char *)cp + 2, sizeof(*ts_val));
-			*ts_val=ntohl(*ts_val);
-			memcpy((char *) ts_ecr,(char *)cp + 6, sizeof(*ts_ecr));
-			*ts_ecr=ntohl(*ts_ecr);
+        case TCPOPT_TIMESTAMP:
+            if (optlen != TCPOLEN_TIMESTAMP)
+                continue;
+            *ts_present = 1;
+            memcpy((char *) ts_val,(char *)cp + 2, sizeof(*ts_val));
+            *ts_val=ntohl(*ts_val);
+            memcpy((char *) ts_ecr,(char *)cp + 6, sizeof(*ts_ecr));
+            *ts_ecr=ntohl(*ts_ecr);
 
-			/* 
-			 * A timestamp received in a SYN makes
-			 * it ok to send timestamp requests and replies.
-			 */
-			if (ti->ti_flags & TH_SYN) {
-				tp->t_flags |= TF_RCVD_TSTMP;
-				tp->ts_recent = *ts_val;
-				tp->ts_recent_age = ctx->tcp_now;
-			}
-			break;
-		}
-	}
+            /* 
+             * A timestamp received in a SYN makes
+             * it ok to send timestamp requests and replies.
+             */
+            if (ti->ti_flags & TH_SYN) {
+                tp->t_flags |= TF_RCVD_TSTMP;
+                tp->ts_recent = *ts_val;
+                tp->ts_recent_age = ctx->tcp_now;
+            }
+            break;
+        }
+    }
 }
 
 #if SUPPORT_OF_URG
@@ -359,25 +388,25 @@ tcp_pulloutofband(struct tcp_socket *so,
                   struct rte_mbuf *m){
     /* not supported */
     assert(0);
-	int cnt = ti->ti_urp - 1;
-	
-	while (cnt >= 0) {
-		if (m->m_len > cnt) {
-			char *cp = mtod(m, caddr_t) + cnt;
-			struct tcpcb *tp = sototcpcb(so);
+    int cnt = ti->ti_urp - 1;
+    
+    while (cnt >= 0) {
+        if (m->m_len > cnt) {
+            char *cp = mtod(m, caddr_t) + cnt;
+            struct tcpcb *tp = sototcpcb(so);
 
-			tp->t_iobc = *cp;
-			tp->t_oobflags |= TCPOOB_HAVEDATA;
-			bcopy(cp+1, cp, (unsigned)(m->m_len - cnt - 1));
-			m->m_len--;
-			return;
-		}
-		cnt -= m->m_len;
-		m = m->m_next;
-		if (m == 0)
-			break;
-	}
-	panic("tcp_pulloutofband");
+            tp->t_iobc = *cp;
+            tp->t_oobflags |= TCPOOB_HAVEDATA;
+            bcopy(cp+1, cp, (unsigned)(m->m_len - cnt - 1));
+            m->m_len--;
+            return;
+        }
+        cnt -= m->m_len;
+        m = m->m_next;
+        if (m == 0)
+            break;
+    }
+    panic("tcp_pulloutofband");
 }
 
 #endif
@@ -428,21 +457,17 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     ti->ti_flags = tiflags;
     ti->ti_len   = total_l7_len; /* L7 len */
 
-    	/* Unscale the window into a 32-bit value. */
-	if ((tiflags & TH_SYN) == 0)
-		tiwin = ti->ti_win << tp->snd_scale;
-	else
-		tiwin = ti->ti_win;
+        /* Unscale the window into a 32-bit value. */
+    if ((tiflags & TH_SYN) == 0)
+        tiwin = ti->ti_win << tp->snd_scale;
+    else
+        tiwin = ti->ti_win;
 
     so = &tp->m_socket;
 
-    if (so->so_options & (US_SO_DEBUG|US_SO_ACCEPTCONN)) {
-        if (so->so_options & US_SO_DEBUG) {
-            ostate = tp->t_state;
-            ctx->tcp_saveti = *ti;
-        }
-        if (so->so_options & US_SO_ACCEPTCONN) {
-            if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
+    if (tp->t_state == TCPS_LISTEN) {
+
+        if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
                 /*
                  * Note: dropwithreset makes sure we don't
                  * send a reset in response to a RST.
@@ -454,14 +479,12 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                 goto drop;
             }
 
-            tp->t_state = TCPS_LISTEN;
 
-            /* Compute proper scaling value from buffer space
-             */
-            while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
-               TCP_MAXWIN << tp->request_r_scale < so->so_rcv.sb_hiwat)
-                tp->request_r_scale++;
-        }
+        /* Compute proper scaling value from buffer space
+         */
+        while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
+           TCP_MAXWIN << tp->request_r_scale < so->so_rcv.sb_hiwat)
+            tp->request_r_scale++;
     }
 
     /*
@@ -582,19 +605,19 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
      */
     rte_pktmbuf_adj(m, off);
 
-    	/*
-	 * Calculate amount of space in receive window,
-	 * and then do TCP input processing.
-	 * Receive window is amount of space in rcv queue,
-	 * but not less than advertised window.
-	 */
-	{ 
+        /*
+     * Calculate amount of space in receive window,
+     * and then do TCP input processing.
+     * Receive window is amount of space in rcv queue,
+     * but not less than advertised window.
+     */
+    { 
         int win;
-	    win = sbspace(&so->so_rcv);
-	    if (win < 0)
-	      win = 0;
-	    tp->rcv_wnd = max(win, (int)(tp->rcv_adv - tp->rcv_nxt));
-	}
+        win = sbspace(&so->so_rcv);
+        if (win < 0)
+          win = 0;
+        tp->rcv_wnd = max(win, (int)(tp->rcv_adv - tp->rcv_nxt));
+    }
 
     switch (tp->t_state) {
 
@@ -627,22 +650,22 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
         tp->t_flags |= TF_ACKNOW;
         tp->t_state = TCPS_SYN_RECEIVED;
         tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
-        dropsocket = 0;		/* committed to socket */
+        dropsocket = 0;     /* committed to socket */
         INC_STAT(ctx,tcps_accepts);
         goto trimthenstep6;
         }
 
     /*
      * If the state is SYN_SENT:
-     *	if seg contains an ACK, but not for our SYN, drop the input.
-     *	if seg contains a RST, then drop the connection.
-     *	if seg does not contain SYN, then drop it.
+     *  if seg contains an ACK, but not for our SYN, drop the input.
+     *  if seg contains a RST, then drop the connection.
+     *  if seg does not contain SYN, then drop it.
      * Otherwise this is an acceptable SYN segment
-     *	initialize tp->rcv_nxt and tp->irs
-     *	if seg contains ack then advance tp->snd_una
-     *	if SYN has been acked change to ESTABLISHED else SYN_RCVD state
-     *	arrange for segment to be acked (eventually)
-     *	continue processing rest of data/controls, beginning with URG
+     *  initialize tp->rcv_nxt and tp->irs
+     *  if seg contains ack then advance tp->snd_una
+     *  if SYN has been acked change to ESTABLISHED else SYN_RCVD state
+     *  arrange for segment to be acked (eventually)
+     *  continue processing rest of data/controls, beginning with URG
      */
     case TCPS_SYN_SENT:
         if ((tiflags & TH_ACK) &&
@@ -676,8 +699,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                 tp->snd_scale = tp->requested_s_scale;
                 tp->rcv_scale = tp->request_r_scale;
             }
-            (void) tcp_reass(ctx,tp, (struct tcpiphdr *)0,
-                (struct rte_mbuf *)0);
+            tcp_reass_no_data(ctx,tp);
             /*
              * if we didn't have to retransmit the SYN,
              * use its rtt as our initial srtt & rtt var.
@@ -867,12 +889,12 @@ trimthenstep6:
     /*
      * If the RST bit is set examine the state:
      *    SYN_RECEIVED STATE:
-     *	If passive open, return to LISTEN state.
-     *	If active open, inform user that connection was refused.
+     *  If passive open, return to LISTEN state.
+     *  If active open, inform user that connection was refused.
      *    ESTABLISHED, FIN_WAIT_1, FIN_WAIT2, CLOSE_WAIT STATES:
-     *	Inform user that connection was reset, and close tcb.
+     *  Inform user that connection was reset, and close tcb.
      *    CLOSING, LAST_ACK, TIME_WAIT STATES
-     *	Close the tcb.
+     *  Close the tcb.
      */
     if ( tiflags&TH_RST) {
         switch (tp->t_state) {
@@ -938,14 +960,14 @@ trimthenstep6:
             tp->snd_scale = tp->requested_s_scale;
             tp->rcv_scale = tp->request_r_scale;
         }
-        (void) tcp_reass(ctx,tp, (struct tcpiphdr *)0, (struct rte_mbuf *)0);
+        (void) tcp_reass_no_data(ctx,tp);
         tp->snd_wl1 = ti->ti_seq - 1;
         /* fall into ... */
 
     /*
      * In ESTABLISHED state: drop duplicate ACKs; ACK out of range
      * ACKs.  If the ack is in the range
-     *	tp->snd_una < ti->ti_ack <= tp->snd_max
+     *  tp->snd_una < ti->ti_ack <= tp->snd_max
      * then advance tp->snd_una to ti->ti_ack and drop
      * data from the retransmission queue.  If this ACK reflects
      * more up to date window information we update our window information.
@@ -1151,88 +1173,88 @@ trimthenstep6:
     }
 
 step6:
-	/*
-	 * Update window information.
-	 * Don't look at window if no ACK: TAC's send garbage on first SYN.
-	 */
-	if ( (tiflags & TH_ACK) &&
-	     (SEQ_LT(tp->snd_wl1, ti->ti_seq) || ( 
+    /*
+     * Update window information.
+     * Don't look at window if no ACK: TAC's send garbage on first SYN.
+     */
+    if ( (tiflags & TH_ACK) &&
+         (SEQ_LT(tp->snd_wl1, ti->ti_seq) || ( 
            (tp->snd_wl1 == ti->ti_seq) &&
            ( SEQ_LT(tp->snd_wl2, ti->ti_ack) || ((tp->snd_wl2 == ti->ti_ack) && (tiwin > tp->snd_wnd)) )
           ))) {
-		/* keep track of pure window updates */
-		if ( (ti->ti_len == 0) &&
-		    (tp->snd_wl2 == ti->ti_ack) && (tiwin > tp->snd_wnd)){
+        /* keep track of pure window updates */
+        if ( (ti->ti_len == 0) &&
+            (tp->snd_wl2 == ti->ti_ack) && (tiwin > tp->snd_wnd)){
             INC_STAT(ctx,tcps_rcvwinupd);
         }
-		tp->snd_wnd = tiwin;
-		tp->snd_wl1 = ti->ti_seq;
-		tp->snd_wl2 = ti->ti_ack;
-		if (tp->snd_wnd > tp->max_sndwnd)
-			tp->max_sndwnd = tp->snd_wnd;
-		needoutput = 1;
-	}
+        tp->snd_wnd = tiwin;
+        tp->snd_wl1 = ti->ti_seq;
+        tp->snd_wl2 = ti->ti_ack;
+        if (tp->snd_wnd > tp->max_sndwnd)
+            tp->max_sndwnd = tp->snd_wnd;
+        needoutput = 1;
+    }
 
 #if SUPPORT_OF_URG
-	/*
-	 * Process segments with URG.
-	 */
-	if ((tiflags & TH_URG) && ti->ti_urp &&
-	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-		/*
-		 * This is a kludge, but if we receive and accept
-		 * random urgent pointers, we'll crash in
-		 * soreceive.  It's hard to imagine someone
-		 * actually wanting to send this much urgent data.
-		 */
-		if (ti->ti_urp + so->so_rcv.sb_cc > sb_max) {
-			ti->ti_urp = 0;			/* XXX */
-			tiflags &= ~TH_URG;		/* XXX */
-			goto dodata;			/* XXX */
-		}
-		/*
-		 * If this segment advances the known urgent pointer,
-		 * then mark the data stream.  This should not happen
-		 * in CLOSE_WAIT, CLOSING, LAST_ACK or TIME_WAIT STATES since
-		 * a FIN has been received from the remote side. 
-		 * In these states we ignore the URG.
-		 *
-		 * According to RFC961 (Assigned Protocols),
-		 * the urgent pointer points to the last octet
-		 * of urgent data.  We continue, however,
-		 * to consider it to indicate the first octet
-		 * of data past the urgent section as the original 
-		 * spec states (in one of two places).
-		 */
-		if (SEQ_GT(ti->ti_seq+ti->ti_urp, tp->rcv_up)) {
-			tp->rcv_up = ti->ti_seq + ti->ti_urp;
-			so->so_oobmark = so->so_rcv.sb_cc +
-			    (tp->rcv_up - tp->rcv_nxt) - 1;
-			if (so->so_oobmark == 0)
-				so->so_state |= SS_RCVATMARK;
-			sohasoutofband(so);
-			tp->t_oobflags &= ~(TCPOOB_HAVEDATA | TCPOOB_HADDATA);
-		}
-		/*
-		 * Remove out of band data so doesn't get presented to user.
-		 * This can happen independent of advancing the URG pointer,
-		 * but if two URG's are pending at once, some out-of-band
-		 * data may creep in... ick.
-		 */
-		if (ti->ti_urp <= ti->ti_len
+    /*
+     * Process segments with URG.
+     */
+    if ((tiflags & TH_URG) && ti->ti_urp &&
+        TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+        /*
+         * This is a kludge, but if we receive and accept
+         * random urgent pointers, we'll crash in
+         * soreceive.  It's hard to imagine someone
+         * actually wanting to send this much urgent data.
+         */
+        if (ti->ti_urp + so->so_rcv.sb_cc > sb_max) {
+            ti->ti_urp = 0;         /* XXX */
+            tiflags &= ~TH_URG;     /* XXX */
+            goto dodata;            /* XXX */
+        }
+        /*
+         * If this segment advances the known urgent pointer,
+         * then mark the data stream.  This should not happen
+         * in CLOSE_WAIT, CLOSING, LAST_ACK or TIME_WAIT STATES since
+         * a FIN has been received from the remote side. 
+         * In these states we ignore the URG.
+         *
+         * According to RFC961 (Assigned Protocols),
+         * the urgent pointer points to the last octet
+         * of urgent data.  We continue, however,
+         * to consider it to indicate the first octet
+         * of data past the urgent section as the original 
+         * spec states (in one of two places).
+         */
+        if (SEQ_GT(ti->ti_seq+ti->ti_urp, tp->rcv_up)) {
+            tp->rcv_up = ti->ti_seq + ti->ti_urp;
+            so->so_oobmark = so->so_rcv.sb_cc +
+                (tp->rcv_up - tp->rcv_nxt) - 1;
+            if (so->so_oobmark == 0)
+                so->so_state |= SS_RCVATMARK;
+            sohasoutofband(so);
+            tp->t_oobflags &= ~(TCPOOB_HAVEDATA | TCPOOB_HADDATA);
+        }
+        /*
+         * Remove out of band data so doesn't get presented to user.
+         * This can happen independent of advancing the URG pointer,
+         * but if two URG's are pending at once, some out-of-band
+         * data may creep in... ick.
+         */
+        if (ti->ti_urp <= ti->ti_len
 #ifdef SO_OOBINLINE
-		     && (so->so_options & SO_OOBINLINE) == 0
+             && (so->so_options & SO_OOBINLINE) == 0
 #endif
-		     )
-			tcp_pulloutofband(so, ti, m);
-	} else
-		/*
-		 * If no out of band data is expected,
-		 * pull receive urgent pointer along
-		 * with the receive window.
-		 */
-		if (SEQ_GT(tp->rcv_nxt, tp->rcv_up))
-			tp->rcv_up = tp->rcv_nxt;
+             )
+            tcp_pulloutofband(so, ti, m);
+    } else
+        /*
+         * If no out of band data is expected,
+         * pull receive urgent pointer along
+         * with the receive window.
+         */
+        if (SEQ_GT(tp->rcv_nxt, tp->rcv_up))
+            tp->rcv_up = tp->rcv_nxt;
 #else
         /* no need to support URG for now */
         if (SEQ_GT(tp->rcv_nxt, tp->rcv_up))
@@ -1240,138 +1262,138 @@ step6:
 
 #endif
 
-//dodata:							/* XXX */
+//dodata:                           /* XXX */
 
-	/*
-	 * Process the segment text, merging it into the TCP sequencing queue,
-	 * and arranging for acknowledgment of receipt if necessary.
-	 * This process logically involves adjusting tp->rcv_wnd as data
-	 * is presented to the user (this happens in tcp_usrreq.c,
-	 * case PRU_RCVD).  If a FIN has already been received on this
-	 * connection then we just ignore the text.
-	 */
-	if ((ti->ti_len || (tiflags&TH_FIN)) &&
-	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-		TCP_REASS(ctx,tp, ti, m, so, tiflags);
-		/*
-		 * Note the amount of data that peer has sent into
-		 * our window, in order to estimate the sender's
-		 * buffer size.
-		 */
-		//len = so->so_rcv.sb_hiwat - (tp->rcv_adv - tp->rcv_nxt);
-	} else {
+    /*
+     * Process the segment text, merging it into the TCP sequencing queue,
+     * and arranging for acknowledgment of receipt if necessary.
+     * This process logically involves adjusting tp->rcv_wnd as data
+     * is presented to the user (this happens in tcp_usrreq.c,
+     * case PRU_RCVD).  If a FIN has already been received on this
+     * connection then we just ignore the text.
+     */
+    if ((ti->ti_len || (tiflags&TH_FIN)) &&
+        TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+        TCP_REASS(ctx,tp, ti, m, so, tiflags);
+        /*
+         * Note the amount of data that peer has sent into
+         * our window, in order to estimate the sender's
+         * buffer size.
+         */
+        //len = so->so_rcv.sb_hiwat - (tp->rcv_adv - tp->rcv_nxt);
+    } else {
         rte_pktmbuf_free(m);
-		tiflags &= ~TH_FIN;
-	}
+        tiflags &= ~TH_FIN;
+    }
 
-	/*
-	 * If FIN is received ACK the FIN and let the user know
-	 * that the connection is closing.
-	 */
-	if (tiflags & TH_FIN) {
-		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-			socantrcvmore(so);
-			tp->t_flags |= TF_ACKNOW;
-			tp->rcv_nxt++;
-		}
-		switch (tp->t_state) {
+    /*
+     * If FIN is received ACK the FIN and let the user know
+     * that the connection is closing.
+     */
+    if (tiflags & TH_FIN) {
+        if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+            socantrcvmore(so);
+            tp->t_flags |= TF_ACKNOW;
+            tp->rcv_nxt++;
+        }
+        switch (tp->t_state) {
 
-	 	/*
-		 * In SYN_RECEIVED and ESTABLISHED STATES
-		 * enter the CLOSE_WAIT state.
-		 */
-		case TCPS_SYN_RECEIVED:
-		case TCPS_ESTABLISHED:
-			tp->t_state = TCPS_CLOSE_WAIT;
-			break;
+        /*
+         * In SYN_RECEIVED and ESTABLISHED STATES
+         * enter the CLOSE_WAIT state.
+         */
+        case TCPS_SYN_RECEIVED:
+        case TCPS_ESTABLISHED:
+            tp->t_state = TCPS_CLOSE_WAIT;
+            break;
 
-	 	/*
-		 * If still in FIN_WAIT_1 STATE FIN has not been acked so
-		 * enter the CLOSING state.
-		 */
-		case TCPS_FIN_WAIT_1:
-			tp->t_state = TCPS_CLOSING;
-			break;
+        /*
+         * If still in FIN_WAIT_1 STATE FIN has not been acked so
+         * enter the CLOSING state.
+         */
+        case TCPS_FIN_WAIT_1:
+            tp->t_state = TCPS_CLOSING;
+            break;
 
-	 	/*
-		 * In FIN_WAIT_2 state enter the TIME_WAIT state,
-		 * starting the time-wait timer, turning off the other 
-		 * standard timers.
-		 */
-		case TCPS_FIN_WAIT_2:
-			tp->t_state = TCPS_TIME_WAIT;
-			tcp_canceltimers(tp);
-			tp->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
-			soisdisconnected(so);
-			break;
+        /*
+         * In FIN_WAIT_2 state enter the TIME_WAIT state,
+         * starting the time-wait timer, turning off the other 
+         * standard timers.
+         */
+        case TCPS_FIN_WAIT_2:
+            tp->t_state = TCPS_TIME_WAIT;
+            tcp_canceltimers(tp);
+            tp->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
+            soisdisconnected(so);
+            break;
 
-		/*
-		 * In TIME_WAIT state restart the 2 MSL time_wait timer.
-		 */
-		case TCPS_TIME_WAIT:
-			tp->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
-			break;
-		}
-	}
-	if (so->so_options & US_SO_DEBUG){
+        /*
+         * In TIME_WAIT state restart the 2 MSL time_wait timer.
+         */
+        case TCPS_TIME_WAIT:
+            tp->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
+            break;
+        }
+    }
+    if (so->so_options & US_SO_DEBUG){
         tcp_trace(ctx,TA_INPUT, ostate, tp, &ctx->tcp_saveti, 0);
     }
 
-	/*
-	 * Return any desired output.
-	 */
-	if (needoutput || (tp->t_flags & TF_ACKNOW))
-		(void) tcp_output(ctx,tp);
-	return 0;
+    /*
+     * Return any desired output.
+     */
+    if (needoutput || (tp->t_flags & TF_ACKNOW))
+        (void) tcp_output(ctx,tp);
+    return 0;
 
 dropafterack:
-	/*
-	 * Generate an ACK dropping incoming segment if it occupies
-	 * sequence space, where the ACK reflects our state.
-	 */
-	if (tiflags & TH_RST)
-		goto drop;
+    /*
+     * Generate an ACK dropping incoming segment if it occupies
+     * sequence space, where the ACK reflects our state.
+     */
+    if (tiflags & TH_RST)
+        goto drop;
     rte_pktmbuf_free(m);
-	tp->t_flags |= TF_ACKNOW;
-	(void) tcp_output(ctx,tp);
-	return 0;
+    tp->t_flags |= TF_ACKNOW;
+    (void) tcp_output(ctx,tp);
+    return 0;
 
 dropwithreset:
-	/*
-	 * Generate a RST, dropping incoming segment.
-	 * Make ACK acceptable to originator of segment.
-	 * Don't bother to respond if destination was broadcast/multicast.
-	 */
-	if ((tiflags & TH_RST) )
-		goto drop;
+    /*
+     * Generate a RST, dropping incoming segment.
+     * Make ACK acceptable to originator of segment.
+     * Don't bother to respond if destination was broadcast/multicast.
+     */
+    if ((tiflags & TH_RST) )
+        goto drop;
 
     /* want to use 64B mbuf for response and free big MBUF */
     rte_pktmbuf_free(m);
 
-	if (tiflags & TH_ACK){
+    if (tiflags & TH_ACK){
         tcp_respond(ctx,tp,   (tcp_seq)0, ti->ti_ack, TH_RST);
     }else {
-		if (tiflags & TH_SYN){
+        if (tiflags & TH_SYN){
             ti->ti_len++;
         }
-		tcp_respond(ctx,tp,  ti->ti_seq+ti->ti_len, (tcp_seq)0,
-		    TH_RST|TH_ACK);
-	}
-	/* destroy temporarily created socket */
-	if (dropsocket)
-		(void) soabort(so);
-	return 0;
+        tcp_respond(ctx,tp,  ti->ti_seq+ti->ti_len, (tcp_seq)0,
+            TH_RST|TH_ACK);
+    }
+    /* destroy temporarily created socket */
+    if (dropsocket)
+        (void) soabort(so);
+    return 0;
 
 drop:
-	/*
-	 * Drop space held by incoming segment and return.
-	 */
-	if (tp && (so->so_options & US_SO_DEBUG)){
+    /*
+     * Drop space held by incoming segment and return.
+     */
+    if (tp && (so->so_options & US_SO_DEBUG)){
         tcp_trace(ctx,TA_DROP, ostate, tp, &ctx->tcp_saveti, 0);
     }
-	rte_pktmbuf_free(m);
-	/* destroy temporarily created socket */
-	if (dropsocket){
+    rte_pktmbuf_free(m);
+    /* destroy temporarily created socket */
+    if (dropsocket){
         (void)soabort(so);
     }
 
@@ -1390,69 +1412,69 @@ findpcb:
 void tcp_xmit_timer(CTcpPerThreadCtx * ctx,
                     struct tcpcb *tp,
                     int16_t rtt){
-	short delta;
+    short delta;
 
-	INC_STAT(ctx,tcps_rttupdated);
-	if (tp->t_srtt != 0) {
-		/*
-		 * srtt is stored as fixed point with 3 bits after the
-		 * binary point (i.e., scaled by 8).  The following magic
-		 * is equivalent to the smoothing algorithm in rfc793 with
-		 * an alpha of .875 (srtt = rtt/8 + srtt*7/8 in fixed
-		 * point).  Adjust rtt to origin 0.
-		 */
-		delta = rtt - 1 - (tp->t_srtt >> TCP_RTT_SHIFT);
-		if ((tp->t_srtt += delta) <= 0)
-			tp->t_srtt = 1;
-		/*
-		 * We accumulate a smoothed rtt variance (actually, a
-		 * smoothed mean difference), then set the retransmit
-		 * timer to smoothed rtt + 4 times the smoothed variance.
-		 * rttvar is stored as fixed point with 2 bits after the
-		 * binary point (scaled by 4).  The following is
-		 * equivalent to rfc793 smoothing with an alpha of .75
-		 * (rttvar = rttvar*3/4 + |delta| / 4).  This replaces
-		 * rfc793's wired-in beta.
-		 */
-		if (delta < 0)
-			delta = -delta;
-		delta -= (tp->t_rttvar >> TCP_RTTVAR_SHIFT);
-		if ((tp->t_rttvar += delta) <= 0)
-			tp->t_rttvar = 1;
-	} else {
-		/* 
-		 * No rtt measurement yet - use the unsmoothed rtt.
-		 * Set the variance to half the rtt (so our first
-		 * retransmit happens at 3*rtt).
-		 */
-		tp->t_srtt = rtt << TCP_RTT_SHIFT;
-		tp->t_rttvar = rtt << (TCP_RTTVAR_SHIFT - 1);
-	}
-	tp->t_rtt = 0;
-	tp->t_rxtshift = 0;
+    INC_STAT(ctx,tcps_rttupdated);
+    if (tp->t_srtt != 0) {
+        /*
+         * srtt is stored as fixed point with 3 bits after the
+         * binary point (i.e., scaled by 8).  The following magic
+         * is equivalent to the smoothing algorithm in rfc793 with
+         * an alpha of .875 (srtt = rtt/8 + srtt*7/8 in fixed
+         * point).  Adjust rtt to origin 0.
+         */
+        delta = rtt - 1 - (tp->t_srtt >> TCP_RTT_SHIFT);
+        if ((tp->t_srtt += delta) <= 0)
+            tp->t_srtt = 1;
+        /*
+         * We accumulate a smoothed rtt variance (actually, a
+         * smoothed mean difference), then set the retransmit
+         * timer to smoothed rtt + 4 times the smoothed variance.
+         * rttvar is stored as fixed point with 2 bits after the
+         * binary point (scaled by 4).  The following is
+         * equivalent to rfc793 smoothing with an alpha of .75
+         * (rttvar = rttvar*3/4 + |delta| / 4).  This replaces
+         * rfc793's wired-in beta.
+         */
+        if (delta < 0)
+            delta = -delta;
+        delta -= (tp->t_rttvar >> TCP_RTTVAR_SHIFT);
+        if ((tp->t_rttvar += delta) <= 0)
+            tp->t_rttvar = 1;
+    } else {
+        /* 
+         * No rtt measurement yet - use the unsmoothed rtt.
+         * Set the variance to half the rtt (so our first
+         * retransmit happens at 3*rtt).
+         */
+        tp->t_srtt = rtt << TCP_RTT_SHIFT;
+        tp->t_rttvar = rtt << (TCP_RTTVAR_SHIFT - 1);
+    }
+    tp->t_rtt = 0;
+    tp->t_rxtshift = 0;
 
-	/*
-	 * the retransmit should happen at rtt + 4 * rttvar.
-	 * Because of the way we do the smoothing, srtt and rttvar
-	 * will each average +1/2 tick of bias.  When we compute
-	 * the retransmit timer, we want 1/2 tick of rounding and
-	 * 1 extra tick because of +-1/2 tick uncertainty in the
-	 * firing of the timer.  The bias will give us exactly the
-	 * 1.5 tick we need.  But, because the bias is
-	 * statistical, we have to test that we don't drop below
-	 * the minimum feasible timer (which is 2 ticks).
-	 */
-	TCPT_RANGESET(tp->t_rxtcur, TCP_REXMTVAL(tp),
-	    tp->t_rttmin, TCPTV_REXMTMAX);
-	
-	/*
-	 * We received an ack for a packet that wasn't retransmitted;
-	 * it is probably safe to discard any error indications we've
-	 * received recently.  This isn't quite right, but close enough
-	 * for now (a route might have failed after we sent a segment,
-	 * and the return path might not be symmetrical).
-	 */
-	tp->t_softerror = 0;
+    /*
+     * the retransmit should happen at rtt + 4 * rttvar.
+     * Because of the way we do the smoothing, srtt and rttvar
+     * will each average +1/2 tick of bias.  When we compute
+     * the retransmit timer, we want 1/2 tick of rounding and
+     * 1 extra tick because of +-1/2 tick uncertainty in the
+     * firing of the timer.  The bias will give us exactly the
+     * 1.5 tick we need.  But, because the bias is
+     * statistical, we have to test that we don't drop below
+     * the minimum feasible timer (which is 2 ticks).
+     */
+    TCPT_RANGESET(tp->t_rxtcur, TCP_REXMTVAL(tp),
+        tp->t_rttmin, TCPTV_REXMTMAX);
+    
+    /*
+     * We received an ack for a packet that wasn't retransmitted;
+     * it is probably safe to discard any error indications we've
+     * received recently.  This isn't quite right, but close enough
+     * for now (a route might have failed after we sent a segment,
+     * and the return path might not be symmetrical).
+     */
+    tp->t_softerror = 0;
 }
 
 /*
@@ -1474,7 +1496,7 @@ int tcp_mss(CTcpPerThreadCtx * ctx,
         struct tcpcb *tp, 
         u_int offer){
 
-	return (ctx->tcp_mssdflt);
+    return (ctx->tcp_mssdflt);
 }
 
 

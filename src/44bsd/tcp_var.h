@@ -119,6 +119,8 @@ struct CTcpPkt {
 
 };
 
+#define PACKET_TEMPLATE_SIZE (128)
+
 
 struct tcpcb {
 
@@ -220,7 +222,7 @@ struct tcpcb {
     uint8_t is_ipv6;
     uint8_t m_pad;
 
-    uint8_t template_pkt[64];   /* template packet */
+    uint8_t template_pkt[PACKET_TEMPLATE_SIZE];   /* template packet */
 
 public:
 
@@ -373,6 +375,22 @@ public:
     void Create(CTcpPerThreadCtx *ctx);
     void Delete();
 
+public:
+    void set_tuple(uint32_t src,
+                   uint32_t dst,
+                   uint16_t src_port,
+                   uint16_t dst_port,
+                   bool is_ipv6){
+
+        m_tcp.src_ipv4 = src;
+        m_tcp.dst_ipv4 = dst;
+        m_tcp.src_port = src_port;
+        m_tcp.dst_port = dst_port;
+        m_tcp.is_ipv6  = is_ipv6;
+    }
+    void init();
+public:
+
     void on_slow_tick();
 
     void on_fast_tick();
@@ -396,6 +414,16 @@ public:
 
 
 
+
+
+class CTcpCtxCb {
+public:
+    virtual int on_tx(CTcpPerThreadCtx *ctx,
+                      struct tcpcb * flow,
+                      rte_mbuf_t *m)=0;
+
+};
+
 class CTcpPerThreadCtx {
 public:
     bool Create(void);
@@ -409,6 +437,10 @@ public:
     }
 
     void timer_w_on_tick();
+
+    void set_cb(CTcpCtxCb    * cb){
+        m_cb=cb;
+    }
 
 public:
 
@@ -438,6 +470,7 @@ public:
     uint8_t     m_tick;
 
     CHTimerWheel  m_timer_w; /* TBD-FIXME*/
+    CTcpCtxCb    * m_cb;
     struct  tcpiphdr tcp_saveti;
 
 };
@@ -471,6 +504,9 @@ public:
               struct tcpiphdr *ti, 
               struct rte_mbuf *m);
 
+ int tcp_reass_no_data(CTcpPerThreadCtx * ctx,
+                         struct tcpcb *tp);
+
  int tcp_reass(CTcpPerThreadCtx * ctx,
                           struct tcpcb *tp, 
                           struct tcpiphdr *ti, 
@@ -499,6 +535,8 @@ private:
 void tcp_fasttimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp);
 void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp);
 
+int tcp_listen(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+
 int tcp_connect(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 int  tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
 int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcp_socket *so,  int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
@@ -506,6 +544,14 @@ struct tcpcb *  tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *tp, tcp_seq ack, tcp_seq seq, int flags);
 int  tcp_mss(CTcpPerThreadCtx * ctx,struct tcpcb *tp, u_int offer);
+
+int tcp_flow_input(CTcpPerThreadCtx * ctx,
+                   struct tcpcb *tp, 
+                   struct rte_mbuf *m,
+                   TCPHeader *tcp,
+                   int offset_l7,
+                   int total_l7_len);
+
 
 void tcp_trace(CTcpPerThreadCtx * ctx,short act, short ostate, struct tcpcb * tp, struct tcpiphdr * ti, int req);
 
@@ -537,7 +583,7 @@ struct tcpcb * tcp_drop_now(CTcpPerThreadCtx * ctx,
 
 
 inline bool tcp_reass_is_exists(struct tcpcb *tp){
-    return (tp->m_tpc_reass == ((CTcpReass *)0));
+    return (tp->m_tpc_reass != ((CTcpReass *)0));
 }
 
 inline void tcp_reass_alloc(CTcpPerThreadCtx * ctx,

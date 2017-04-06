@@ -679,6 +679,7 @@ TEST_F(gt_tcp, tst17) {
     }
 
 
+    m_ctx.m_tcpstat.Dump(stdout);
 
 
     m_flow.Delete();
@@ -720,7 +721,136 @@ TEST_F(gt_tcp, tst18) {
     tcp_connect(&m_ctx,&m_flow.m_tcp);
     int i;
     for (i=0; i<1000; i++) {
-        printf(" tick %lu \n",(ulong)i);
+        //printf(" tick %lu \n",(ulong)i);
+        m_ctx.timer_w_on_tick();
+    }
+
+
+    m_ctx.m_tcpstat.Dump(stdout);
+
+    m_flow.Delete();
+    m_ctx.Delete();
+
+    //app.m_write_buf.Delete();
+
+}
+
+
+typedef std::vector<rte_mbuf_t *> vec_queue_t;
+
+class CTcpCtxDebug : public CTcpCtxCb {
+public:
+
+   int on_tx(CTcpPerThreadCtx *ctx,
+             struct tcpcb * flow,
+             rte_mbuf_t *m);
+public:
+
+   vec_queue_t  m_queue[2];
+
+};
+
+
+int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
+                        struct tcpcb * flow,
+                        rte_mbuf_t *m){
+    int dir=0;
+    if (flow->src_port==80) {
+        dir=1;
+    }
+    m_queue[dir].push_back(m);
+    utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now/2)) ;
+    return(0);
+}
+
+bool test_handle_queue(vec_queue_t * lpq,
+                       CTcpPerThreadCtx *ctx,
+                       struct tcpcb * flow){
+
+    bool do_work=false;
+    rte_mbuf_t *m;
+    while (lpq->size()) {
+        do_work=true;
+        m=(*lpq)[0];
+        lpq->erase(lpq->begin());
+
+        char *p=rte_pktmbuf_mtod(m,char *);
+        TCPHeader * tcp=(TCPHeader *)(p+14+20);
+        IPHeader   *ipv4=(IPHeader *)(p+14);
+
+
+        assert(tcp_flow_input(ctx,
+                       flow,
+                       m,
+                       tcp,
+                       14+20+tcp->getHeaderLength(),
+                       ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
+                       )==0);
+
+    }
+    return (do_work);
+}
+
+/* tcp_output simulation .. */
+TEST_F(gt_tcp, tst19) {
+
+    CTcpPerThreadCtx        m_ctx;
+    CTcpFlow                m_flow;
+    CTcpFlow                m_flow_server;
+    CTcpCtxDebug            m_io_debug;
+
+    m_ctx.Create();
+    m_ctx.set_cb(&m_io_debug);
+    m_flow.Create(&m_ctx);
+    m_flow.set_tuple(0x10000001,0x30000001,1025,80,false);
+    m_flow.init();
+
+
+    m_flow_server.Create(&m_ctx);
+    m_flow_server.set_tuple(0x30000001,0x10000001,80,1025,false);
+    m_flow_server.init();
+    
+
+
+#if 1
+
+    CTcpApp app;
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,64000);
+    app.m_write_buf.Dump(stdout);
+
+    CMbufBuffer * lpbuf=&app.m_write_buf;
+    CTcpSockBuf *lptxs=&m_flow.m_tcp.m_socket.so_snd;
+    /* hack the code for now */
+    lptxs->m_app=&app;
+
+    /* simulate buf adding */
+    lptxs->sb_start_new_buffer();
+
+    /* add maximum of the buffer */
+    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
+#endif
+
+
+    tcp_connect(&m_ctx,&m_flow.m_tcp);
+    tcp_listen(&m_ctx,&m_flow_server.m_tcp);
+
+    int i;
+    for (i=0; i<1000; i++) {
+
+        bool do_work=true;
+        while (true) {
+
+            do_work=test_handle_queue(&m_io_debug.m_queue[0],
+                                      &m_ctx,
+                                      &m_flow_server.m_tcp);
+
+            do_work|=test_handle_queue(&m_io_debug.m_queue[1],
+                                      &m_ctx,
+                                      &m_flow.m_tcp);
+
+        }
+
+        //printf(" tick %lu \n",(ulong)i);
         m_ctx.timer_w_on_tick();
     }
 
@@ -732,6 +862,5 @@ TEST_F(gt_tcp, tst18) {
     //app.m_write_buf.Delete();
 
 }
-
 
 
