@@ -539,7 +539,6 @@ int tcp_listen(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 
 int tcp_connect(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 int  tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
-int  tcp_usrreq(CTcpPerThreadCtx * ctx, struct tcp_socket *so,  int req, struct rte_mbuf *m, struct rte_mbuf *nam, struct rte_mbuf *control);
 struct tcpcb *  tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_respond(CTcpPerThreadCtx * ctx,struct tcpcb *tp, tcp_seq ack, tcp_seq seq, int flags);

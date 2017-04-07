@@ -46,10 +46,6 @@
 struct  sockbuf {
     uint32_t    sb_cc;      /* actual chars in buffer */
     uint32_t    sb_hiwat;   /* max actual char count */
-    uint32_t    sb_mbcnt;   /* chars of mbufs used */
-    uint32_t    sb_mbmax;   /* max chars of mbufs to use */
-    //int64_t       sb_lowat;   /* low water mark */
-    //struct    rte_mbuf *sb_mb;    /* the mbuf chain */
     short   sb_flags;   /* flags, see below */
     //short sb_timeo;   /* timeout for read/write */
 };
@@ -107,8 +103,11 @@ void    soisdisconnecting(struct tcp_socket *so);
 
 
 void sbflush (struct sockbuf *sb);
-void    sbappend(struct sockbuf *sb, struct rte_mbuf *m);
-void    sbappend_bytes(struct sockbuf *sb, uint64_t bytes);
+//void    sbappend(struct sockbuf *sb, struct rte_mbuf *m);
+
+void    sbappend(struct sockbuf *sb, struct rte_mbuf *m,uint32_t len);
+
+void    sbappend_bytes(struct sockbuf *sb, uint32_t len);
 
 #ifdef FIXME
 #define sorwakeup(so)   { sowakeup((so), &(so)->so_rcv); \

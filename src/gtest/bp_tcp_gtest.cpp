@@ -759,7 +759,7 @@ int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
         dir=1;
     }
     m_queue[dir].push_back(m);
-    //utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now/2)) ;
+    utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now)) ;
     return(0);
 }
 
@@ -794,6 +794,7 @@ bool test_handle_queue(vec_queue_t * lpq,
 /* tcp_output simulation .. */
 TEST_F(gt_tcp, tst19) {
 
+
     CTcpPerThreadCtx        m_ctx;
     CTcpFlow                m_flow;
     CTcpFlow                m_flow_server;
@@ -810,14 +811,14 @@ TEST_F(gt_tcp, tst19) {
     m_flow_server.set_tuple(0x30000001,0x10000001,80,1025,false);
     m_flow_server.init();
 
-    m_flow_server.m_tcp.m_socket.so_options |=US_SO_DEBUG;
-    m_flow.m_tcp.m_socket.so_options |=US_SO_DEBUG;
+    //m_flow_server.m_tcp.m_socket.so_options |=US_SO_DEBUG;
+    //m_flow.m_tcp.m_socket.so_options |=US_SO_DEBUG;
 
 
 #if 1
 
     CTcpApp app;
-    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,1024);
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,4024);
     app.m_write_buf.Dump(stdout);
 
     CMbufBuffer * lpbuf=&app.m_write_buf;
@@ -839,7 +840,7 @@ TEST_F(gt_tcp, tst19) {
     int i;
     for (i=0; i<1000; i++) {
 
-        bool do_work=true;
+        bool do_work=false;
         while (true) {
 
             do_work=test_handle_queue(&m_io_debug.m_queue[0],
@@ -849,10 +850,12 @@ TEST_F(gt_tcp, tst19) {
             do_work|=test_handle_queue(&m_io_debug.m_queue[1],
                                       &m_ctx,
                                       &m_flow.m_tcp);
-
+            if (do_work==false) {
+                  break;
+            }
         }
 
-        //printf(" tick %lu \n",(ulong)i);
+        //printf("*");
         m_ctx.timer_w_on_tick();
     }
 
@@ -865,4 +868,88 @@ TEST_F(gt_tcp, tst19) {
 
 }
 
+
+
+/* 
+
+copy from m + offset -> end into  p 
+*/
+struct rte_mbuf * utl_mbuf_cpy(char *p,
+             struct rte_mbuf *mi,
+             uint16_t cp_size, 
+             uint16_t & off){
+
+    while (cp_size) {
+        char *md=rte_pktmbuf_mtod(mi, char *);
+        uint16_t msz=mi->data_len-off;
+        uint16_t sz=min(msz,cp_size);
+        memcpy(p,md+off,sz);
+        p+=sz;
+        cp_size-=sz;
+
+        if (sz == msz) {
+            mi=mi->next;
+            off=0;
+        }else{
+            off+=sz;
+        }
+    }
+    return(mi);
+}
+
+
+/**
+ * Creates a "clone" of the given packet mbuf - allocate new mbuf in size of block_size and chain them 
+ *
+ */
+struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mbuf *mi,
+                                           struct rte_mempool *mp){
+	struct rte_mbuf *mc, *m;
+	uint32_t pktlen;
+	uint8_t nseg;
+
+    mc = rte_pktmbuf_alloc(mp);
+    if ( mc== NULL){
+        return NULL;
+    }
+
+    uint16_t nsegsize = mp->elt_size;
+
+    m = mc; /* root */
+	pktlen = mi->pkt_len;
+    m->pkt_len = pktlen;
+    uint16_t off;
+
+	nseg = 0;
+
+    while (true) {
+
+        uint16_t cp_size=min(nsegsize,pktlen);
+
+        char *p=rte_pktmbuf_append(mc, cp_size);
+
+        mi=utl_mbuf_cpy(p,mi,cp_size,off);
+
+        nseg++; /* new */
+
+        pktlen-=cp_size;
+
+        if (pktlen>0){
+            struct rte_mbuf * mt = rte_pktmbuf_alloc(mp);
+            if (mt == NULL) {
+                goto err;
+            }
+          mc->next=mt;
+          mc=mt;
+        }
+    }
+    m->nb_segs = nseg;
+
+	return m;
+err:
+   rte_pktmbuf_free(m);
+   return (NULL); 
+}
+
+/* add test of buffer with 100 bytes-> 100byte .. deepcopy to 1024 byte buffer */
 

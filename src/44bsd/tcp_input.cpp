@@ -295,7 +295,7 @@ inline void TCP_REASS(CTcpPerThreadCtx * ctx,
         tiflags = ti->ti_flags & TH_FIN; 
         INC_STAT(ctx,tcps_rcvpack);
         INC_STAT_CNT(ctx,tcps_rcvbyte,ti->ti_len);
-        sbappend(&so->so_rcv, m); 
+        sbappend(&so->so_rcv, m,ti->ti_len); 
         sorwakeup(so); 
     } else { 
         tiflags = tcp_reass(ctx,tp, ti, m); 
@@ -436,9 +436,9 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     int todrop, acked, ourfinisacked, needoutput = 0;
     int off;
 
-    if ((tp->src_ipv4==0x30000001) && ((tp->snd_nxt-tp->iss)==1 )) {
+/*    if ((tp->src_ipv4==0x30000001) && ((tp->snd_nxt-tp->iss)==1 )) {
         printf(" ****\n");
-    }
+    }*/
 
     uint8_t *optp;  // TCP option is exist  
 
@@ -581,9 +581,9 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                     (void) tcp_output(ctx,tp);
                 return 0;
             }
-        } else if (ti->ti_ack == tp->snd_una &&
-            /*tp->seg_next == (struct tcpiphdr *)tp &&*/
-            ti->ti_len <= sbspace(&so->so_rcv)) {
+        } else if ( (ti->ti_ack == tp->snd_una) &&
+                    (tcp_reass_is_exists(tp)==false) &&
+                    (ti->ti_len <= sbspace(&so->so_rcv))  ) {
             /*
              * this is a pure, in-sequence data packet
              * with nothing on the reassembly queue and
@@ -598,7 +598,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
              * to socket buffer.
              */
             rte_pktmbuf_adj(m, off);
-            sbappend(&so->so_rcv, m);
+            sbappend(&so->so_rcv, m,ti->ti_len);
             sorwakeup(so);
             tp->t_flags |= TF_DELACK;
             return 0;
@@ -1500,6 +1500,8 @@ void tcp_xmit_timer(CTcpPerThreadCtx * ctx,
 int tcp_mss(CTcpPerThreadCtx * ctx,
         struct tcpcb *tp, 
         u_int offer){
+
+    tp->snd_cwnd = ctx->tcp_mssdflt;
 
     return (ctx->tcp_mssdflt);
 }

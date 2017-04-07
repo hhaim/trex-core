@@ -203,7 +203,7 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
 	//printf("\tsnd_(wl1,wl2,wnd) (%lu,%lu,%lu)\n",
 	   //ff(snd_wl1), ff(snd_wl2), ff(snd_wnd));
 
-    printf("\tsnd_(wnd) (%lu)\n", ff(snd_wnd));
+    printf("\tsnd_(wnd,cwnd) (%lu,%lu)\n", ff(snd_wnd),ff(snd_cwnd));
 }
 
 #else

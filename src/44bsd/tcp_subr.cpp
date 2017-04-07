@@ -621,9 +621,6 @@ void tcp_quench(struct tcpcb *tp){
 }
 
 
-struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus){
-    return ((struct tcp_socket *)0);
-}
 
 long sbspace(struct sockbuf *sb){
     return(sb->sb_hiwat -sb->sb_cc);
@@ -634,50 +631,55 @@ void    sbdrop(struct sockbuf *sb, int len){
 }
 
 void sowwakeup(struct tcp_socket *so){
+    //printf(" EVENT ..sowwakeup\n");
 }
 
 void sorwakeup(struct tcp_socket *so){
+    //printf(" EVENT ..sorwakeup\n");
 }
 
 void    soisdisconnecting(struct tcp_socket *so){
+    //printf(" EVENT ..soisdisconnecting\n");
 }
 
 void    soisdisconnected(struct tcp_socket *so){
+    //printf(" EVENT ..soisdisconnected\n");
 }
 
 void sbflush (struct sockbuf *sb){
+    sb->sb_cc=0;
     assert(0);
 }
 
-void    sbappend(struct sockbuf *sb, struct rte_mbuf *m){
+void    sbappend(struct sockbuf *sb, 
+                 struct rte_mbuf *m,
+                 uint32_t len){
+    sb->sb_cc+=len;
 }
 
-void    sbappend_bytes(struct sockbuf *sb, uint64_t bytes){
+
+void    sbappend_bytes(struct sockbuf *sb, 
+                       uint32_t len){
+    sb->sb_cc+=len;
 }
 
 
 void    soisconnecting(struct tcp_socket *so){
-
+      //     printf(" EVENT ..soisconnecting \n");
 }
 
 void    soisconnected(struct tcp_socket *so){
+    //printf(" EVENT ..soisconnected \n");
 }
 void    socantrcvmore(struct tcp_socket *so){
-}
-
-int  tcp_usrreq(CTcpPerThreadCtx * ctx, 
-                struct tcp_socket *so,  
-                int req, 
-                struct rte_mbuf *m, 
-                struct rte_mbuf *nam, 
-                struct rte_mbuf *control){
-    return (0);
+    //printf(" EVENT ..socantrcvmore\n");
 }
 
 
 /* delete a socket */
 int soabort(struct tcp_socket *so)
 {
+    //printf(" EVENT ..soabort\n");
     return(0);
 }
 
