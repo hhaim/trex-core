@@ -875,12 +875,13 @@ TEST_F(gt_tcp, tst19) {
 copy from m + offset -> end into  p 
 */
 struct rte_mbuf * utl_mbuf_cpy(char *p,
-             struct rte_mbuf *mi,
-             uint16_t cp_size, 
-             uint16_t & off){
+                               struct rte_mbuf *mi,
+                               uint16_t cp_size, 
+                               uint16_t & off){
 
     while (cp_size) {
         char *md=rte_pktmbuf_mtod(mi, char *);
+        assert(mi->data_len > off);
         uint16_t msz=mi->data_len-off;
         uint16_t sz=min(msz,cp_size);
         memcpy(p,md+off,sz);
@@ -889,6 +890,10 @@ struct rte_mbuf * utl_mbuf_cpy(char *p,
 
         if (sz == msz) {
             mi=mi->next;
+            if (mi==NULL) {
+                /* error */
+                return(mi);
+            }
             off=0;
         }else{
             off+=sz;
@@ -900,13 +905,15 @@ struct rte_mbuf * utl_mbuf_cpy(char *p,
 
 /**
  * Creates a "clone" of the given packet mbuf - allocate new mbuf in size of block_size and chain them 
+ * this is to simulate Tx->Rx packet convertion 
  *
  */
-struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mbuf *mi,
-                                           struct rte_mempool *mp){
-	struct rte_mbuf *mc, *m;
-	uint32_t pktlen;
-	uint8_t nseg;
+struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mempool *mp,
+                                           struct rte_mbuf *mi){
+    struct rte_mbuf *mc, *m;
+    uint32_t pktlen;
+    uint32_t origin_pktlen;
+    uint8_t nseg;
 
     mc = rte_pktmbuf_alloc(mp);
     if ( mc== NULL){
@@ -916,11 +923,14 @@ struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mbuf *mi,
     uint16_t nsegsize = mp->elt_size;
 
     m = mc; /* root */
-	pktlen = mi->pkt_len;
-    m->pkt_len = pktlen;
+    pktlen = mi->pkt_len;
+    origin_pktlen = mi->pkt_len;
+    
     uint16_t off;
 
-	nseg = 0;
+        
+    nseg = 0;
+        
 
     while (true) {
 
@@ -928,13 +938,18 @@ struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mbuf *mi,
 
         char *p=rte_pktmbuf_append(mc, cp_size);
 
+        if (mi == NULL) {
+            goto err;
+        }
         mi=utl_mbuf_cpy(p,mi,cp_size,off);
 
         nseg++; /* new */
 
         pktlen-=cp_size;
 
-        if (pktlen>0){
+        if (pktlen==0) {
+            break;  /* finish */
+        }else{
             struct rte_mbuf * mt = rte_pktmbuf_alloc(mp);
             if (mt == NULL) {
                 goto err;
@@ -944,12 +959,152 @@ struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mbuf *mi,
         }
     }
     m->nb_segs = nseg;
+    m->pkt_len = origin_pktlen;
+    
 
-	return m;
+    return m;
 err:
    rte_pktmbuf_free(m);
    return (NULL); 
 }
 
+char * utl_rte_pktmbuf_to_mem(struct rte_mbuf *m){
+    char * p=(char *)malloc(m->pkt_len);
+    char * op=p;
+    uint32_t pkt_len=m->pkt_len;
+
+    while (m) {
+        uint16_t seg_len=m->data_len;
+        memcpy(p,rte_pktmbuf_mtod(m,char *),seg_len);
+        p+=seg_len;
+        assert(pkt_len>=seg_len);
+        pkt_len-=seg_len;
+        m = m->next;
+        if (pkt_len==0) {
+            assert(m==0);
+        }
+    }
+    return(op);
+}
+
+
+/* return 0   equal
+          -1  not equal 
+
+*/          
+int utl_rte_pktmbuf_deepcmp(struct rte_mbuf *ma,
+                            struct rte_mbuf *mb){
+
+    if (ma->pkt_len != mb->pkt_len) {
+        return(-1);
+    }
+    int res;
+    char *pa;
+    char *pb;
+    pa=utl_rte_pktmbuf_to_mem(ma);
+    pb=utl_rte_pktmbuf_to_mem(mb);
+    res=memcmp(pa,pb,ma->pkt_len);
+    free(pa);
+    free(pb);
+    return(res);
+}
+
+
 /* add test of buffer with 100 bytes-> 100byte .. deepcopy to 1024 byte buffer */
+
+
+void  test_fill_mbuf(rte_mbuf_t   * m,
+                     uint16_t      b_size,
+                     uint8_t  &     start_cnt){
+
+    char *p=rte_pktmbuf_append(m, b_size);
+    int i;
+    for (i=0; i<(int)b_size; i++) {
+        *p=start_cnt++;
+        p++;
+    }
+}
+
+rte_mbuf_t   * test_build_packet_size(int pkt_len,
+                                      int chunk_size){
+
+    rte_mbuf_t   * m;
+    rte_mbuf_t   * prev_m=NULL;;
+    rte_mbuf_t   * mhead=NULL;
+    uint8_t seg=0;
+    uint32_t save_pkt_len=pkt_len;
+
+    uint8_t cnt=1;
+    while (pkt_len>0) {
+        m=tcp_pktmbuf_alloc(0,chunk_size);
+        seg++;
+
+        assert(m);
+        if (prev_m) {
+            prev_m->next=m;
+        }
+        prev_m=m;
+        if (mhead==NULL) {
+            mhead=m;
+        }
+
+        uint16_t   csize=min(chunk_size,pkt_len);
+        test_fill_mbuf(m,
+                       csize,
+                       cnt);
+        pkt_len-=csize;
+    }
+    mhead->pkt_len = save_pkt_len;
+    mhead->nb_segs = seg;
+    return(mhead);
+}
+
+
+TEST_F(gt_tcp, tst20) {
+    uint16_t off=0;
+    char buf[2048];
+    char *p =buf;
+
+    rte_mbuf_t   * m;
+    m=test_build_packet_size(1024,
+                             60);
+    //rte_pktmbuf_dump(m, 1024);
+
+    off=8;
+    m=utl_mbuf_cpy(p,m,512,off);
+    utl_DumpBuffer(stdout,p,512,0);
+}
+
+/* create comperator for mbuf and check the deep copy function .. */
+
+
+int test_mbuf_deepcpy(int pkt_size,int chunk_size){
+
+        /* alloc 1024 mbuf that has small mbuf */
+    rte_mbuf_t   * m;
+    rte_mbuf_t   * mc;
+
+    m=test_build_packet_size(pkt_size,chunk_size);
+    rte_pktmbuf_dump(m, 1024);
+
+    rte_mempool_t * mpool = tcp_pktmbuf_get_pool(0,2047);
+
+    mc =utl_rte_pktmbuf_deepcopy(mpool,m);
+    assert(mc);
+
+    rte_pktmbuf_dump(mc, 1024);
+    //return (utl_rte_pktmbuf_deepcmp(m,mc));
+    return(0);
+
+}
+
+TEST_F(gt_tcp, tst21) {
+   // EXPECT_EQ(test_mbuf_deepcpy(128,60),0);
+   // EXPECT_EQ(test_mbuf_deepcpy(1024,60),0);
+   // EXPECT_EQ(test_mbuf_deepcpy(1025,60),0);
+   // EXPECT_EQ(test_mbuf_deepcpy(1026,67),0);
+
+    EXPECT_EQ(test_mbuf_deepcpy(4025,129),0);
+}
+
 

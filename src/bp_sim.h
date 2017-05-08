@@ -1194,6 +1194,29 @@ public:
         assert(0);
     }
 
+    inline rte_mempool_t * pktmbuf_get_pool(uint16_t size){
+
+        rte_mempool_t * p;
+
+        if ( size < _128_MBUF_SIZE) {
+            p = m_mbuf_pool_128;
+        }else if ( size < _256_MBUF_SIZE) {
+            p = m_mbuf_pool_256;
+        }else if (size < _512_MBUF_SIZE) {
+            p = m_mbuf_pool_512;
+        }else if (size < _1024_MBUF_SIZE) {
+            p = m_mbuf_pool_1024;
+        }else if (size < _2048_MBUF_SIZE) {
+            p = m_mbuf_pool_2048;
+        }else if (size < _4096_MBUF_SIZE) {
+            p = m_mbuf_pool_4096;
+        }else{
+            assert(size<MAX_PKT_ALIGN_BUF_9K);
+            p = m_mbuf_pool_9k;
+        }
+        return (p);
+    }
+
     inline rte_mbuf_t   * pktmbuf_alloc(uint16_t size){
 
         rte_mbuf_t        * m;
@@ -1261,6 +1284,10 @@ public:
 
     static inline rte_mbuf_t * pktmbuf_alloc_small_by_port(uint8_t port_id) {
         return ( m_mem_pool[m_socket.port_to_socket(port_id)].pktmbuf_alloc_small() );
+    }
+
+    static inline rte_mempool_t * pktmbuf_get_pool(socket_id_t socket,uint16_t size){
+        return (m_mem_pool[socket].pktmbuf_get_pool(size));
     }
 
     /**
