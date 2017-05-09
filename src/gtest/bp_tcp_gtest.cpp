@@ -36,6 +36,9 @@ limitations under the License.
 #include "44bsd/tcp_dpdk.h"
 #include "mbuf.h"
 #include <stdlib.h>
+#include <common/c_common.h>
+#include <common/captureFile.h>
+
 
 
 class gt_tcp  : public testing::Test {
@@ -738,138 +741,6 @@ TEST_F(gt_tcp, tst18) {
 }
 
 
-typedef std::vector<rte_mbuf_t *> vec_queue_t;
-
-class CTcpCtxDebug : public CTcpCtxCb {
-public:
-
-   int on_tx(CTcpPerThreadCtx *ctx,
-             struct tcpcb * flow,
-             rte_mbuf_t *m);
-public:
-
-   vec_queue_t  m_queue[2];
-
-};
-
-
-int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
-                        struct tcpcb * flow,
-                        rte_mbuf_t *m){
-    int dir=0;
-    if (flow->src_port==80) {
-        dir=1;
-    }
-    m_queue[dir].push_back(m);
-    utl_k12_pkt_format(stdout,rte_pktmbuf_mtod(m,char *),  m->pkt_len,(ctx->tcp_now)) ;
-    return(0);
-}
-
-bool test_handle_queue(vec_queue_t * lpq,
-                       CTcpPerThreadCtx *ctx,
-                       struct tcpcb * flow){
-
-    bool do_work=false;
-    rte_mbuf_t *m;
-    while (lpq->size()) {
-        do_work=true;
-        m=(*lpq)[0];
-        lpq->erase(lpq->begin());
-
-        char *p=rte_pktmbuf_mtod(m,char *);
-        TCPHeader * tcp=(TCPHeader *)(p+14+20);
-        IPHeader   *ipv4=(IPHeader *)(p+14);
-
-
-        assert(tcp_flow_input(ctx,
-                       flow,
-                       m,
-                       tcp,
-                       14+20+tcp->getHeaderLength(),
-                       ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
-                       )==0);
-
-    }
-    return (do_work);
-}
-
-/* tcp_output simulation .. */
-TEST_F(gt_tcp, tst19) {
-
-
-    CTcpPerThreadCtx        m_ctx;
-    CTcpFlow                m_flow;
-    CTcpFlow                m_flow_server;
-    CTcpCtxDebug            m_io_debug;
-
-    m_ctx.Create();
-    m_ctx.set_cb(&m_io_debug);
-    m_flow.Create(&m_ctx);
-    m_flow.set_tuple(0x10000001,0x30000001,1025,80,false);
-    m_flow.init();
-
-
-    m_flow_server.Create(&m_ctx);
-    m_flow_server.set_tuple(0x30000001,0x10000001,80,1025,false);
-    m_flow_server.init();
-
-    //m_flow_server.m_tcp.m_socket.so_options |=US_SO_DEBUG;
-    //m_flow.m_tcp.m_socket.so_options |=US_SO_DEBUG;
-
-
-#if 1
-
-    CTcpApp app;
-    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,4024);
-    app.m_write_buf.Dump(stdout);
-
-    CMbufBuffer * lpbuf=&app.m_write_buf;
-    CTcpSockBuf *lptxs=&m_flow.m_tcp.m_socket.so_snd;
-    /* hack the code for now */
-    lptxs->m_app=&app;
-
-    /* simulate buf adding */
-    lptxs->sb_start_new_buffer();
-
-    /* add maximum of the buffer */
-    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
-#endif
-
-
-    tcp_connect(&m_ctx,&m_flow.m_tcp);
-    tcp_listen(&m_ctx,&m_flow_server.m_tcp);
-
-    int i;
-    for (i=0; i<1000; i++) {
-
-        bool do_work=false;
-        while (true) {
-
-            do_work=test_handle_queue(&m_io_debug.m_queue[0],
-                                      &m_ctx,
-                                      &m_flow_server.m_tcp);
-
-            do_work|=test_handle_queue(&m_io_debug.m_queue[1],
-                                      &m_ctx,
-                                      &m_flow.m_tcp);
-            if (do_work==false) {
-                  break;
-            }
-        }
-
-        //printf("*");
-        m_ctx.timer_w_on_tick();
-    }
-
-
-
-    m_flow.Delete();
-    m_ctx.Delete();
-
-    //app.m_write_buf.Delete();
-
-}
-
 
 
 /* 
@@ -1111,6 +982,287 @@ TEST_F(gt_tcp, tst21) {
    EXPECT_EQ(test_mbuf_deepcpy(1025,60),0);
    EXPECT_EQ(test_mbuf_deepcpy(1026,67),0);
    EXPECT_EQ(test_mbuf_deepcpy(4025,129),0);
+}
+
+
+
+
+
+typedef std::vector<rte_mbuf_t *> vec_queue_t;
+
+class CTcpCtxDebug : public CTcpCtxCb {
+public:
+    CTcpCtxDebug();
+    ~CTcpCtxDebug();
+
+   int on_tx(CTcpPerThreadCtx *ctx,
+             struct tcpcb * flow,
+             rte_mbuf_t *m);
+
+   bool  open_pcap_file(std::string pcap);
+   void  write_pcap_mbuf(rte_mbuf_t *m,
+                         uint32_t     time_sec,
+                         uint32_t     time_nsec);
+
+   void  close_pcap_file();
+
+
+public:
+
+   CFileWriterBase         * m_writer;
+   CCapPktRaw              * m_raw;
+
+   vec_queue_t  m_queue[2];
+
+};
+
+rte_mbuf_t * utl_rte_convert_tx_rx_mbuf(rte_mbuf_t *m){
+
+    rte_mbuf_t * mc;
+    rte_mempool_t * mpool = tcp_pktmbuf_get_pool(0,2047);
+    mc =utl_rte_pktmbuf_deepcopy(mpool,m);
+    assert(mc);
+    rte_pktmbuf_free(m); /* free original */
+    return (mc);
+}
+
+void utl_rte_pktmbuf_k12_format(FILE* fp,
+                                rte_mbuf_t *m,
+                                int time_sec) {
+
+    char *p;
+    uint32_t pktlen=m->pkt_len;
+    p=utl_rte_pktmbuf_to_mem(m);
+    utl_k12_pkt_format(stdout,p, pktlen, time_sec) ;    
+    free(p);
+}
+
+void  CTcpCtxDebug::write_pcap_mbuf(rte_mbuf_t *m,
+                                    uint32_t     time_sec,
+                                    uint32_t     time_nsec){
+
+    char *p;
+    uint32_t pktlen=m->pkt_len;
+    if (pktlen>MAX_PKT_SIZE) {
+        printf("ERROR packet size is bigger than 9K \n");
+    }
+
+    p=utl_rte_pktmbuf_to_mem(m);
+    memcpy(m_raw->raw,p,pktlen);
+    m_raw->pkt_cnt++;
+    m_raw->pkt_len =pktlen;
+    m_raw->time_sec=time_sec;
+    m_raw->time_nsec=time_nsec;
+
+    assert(m_writer);
+    bool res=m_writer->write_packet(m_raw);
+    if (res != true) {
+        fprintf(stderr,"ERROR can't write to cap file");
+    }
+    free(p);
+}
+
+
+bool  CTcpCtxDebug::open_pcap_file(std::string pcap){
+
+    m_writer = CCapWriterFactory::CreateWriter(LIBPCAP,(char *)pcap.c_str());
+    if (m_writer == NULL) {
+        fprintf(stderr,"ERROR can't create cap file %s ",(char *)pcap.c_str());
+        return (false);
+    }
+    m_raw = new CCapPktRaw();
+    return(true);
+}
+
+void  CTcpCtxDebug::close_pcap_file(){
+    if (m_raw){
+        delete m_raw;
+        m_raw = NULL;
+    }
+    if (m_writer) {
+        delete m_writer;
+        m_writer = NULL;
+    }
+}
+
+
+CTcpCtxDebug::CTcpCtxDebug(){
+    m_writer=NULL;
+    m_raw=NULL;
+}
+
+CTcpCtxDebug::~CTcpCtxDebug(){
+    close_pcap_file();
+}
+
+
+
+int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
+                        struct tcpcb * flow,
+                        rte_mbuf_t *m){
+    int dir=0;
+    if (flow->src_port==80) {
+        dir=1;
+    }
+    rte_mbuf_t *m_rx= utl_rte_convert_tx_rx_mbuf(m);
+    m_queue[dir].push_back(m_rx);
+    write_pcap_mbuf(m_rx,(ctx->tcp_now),0);
+    return(0);
+}
+
+bool test_handle_queue(vec_queue_t * lpq,
+                       CTcpPerThreadCtx *ctx,
+                       struct tcpcb * flow){
+
+    bool do_work=false;
+    rte_mbuf_t *m;
+    while (lpq->size()) {
+        do_work=true;
+        m=(*lpq)[0];
+        lpq->erase(lpq->begin());
+
+        char *p=rte_pktmbuf_mtod(m,char *);
+        TCPHeader * tcp=(TCPHeader *)(p+14+20);
+        IPHeader   *ipv4=(IPHeader *)(p+14);
+
+
+        assert(tcp_flow_input(ctx,
+                       flow,
+                       m,
+                       tcp,
+                       14+20+tcp->getHeaderLength(),
+                       ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
+                       )==0);
+
+    }
+    return (do_work);
+}
+
+class CClientServerTcp {
+public:
+    bool Create(std::string pcap_file);
+    void Delete();
+
+    int test1();
+
+public:
+    CTcpPerThreadCtx        m_c_ctx;
+    CTcpPerThreadCtx        m_s_ctx;
+
+    CTcpFlow                m_c_flow;
+    CTcpFlow                m_s_flow;
+
+    CTcpCtxDebug            m_io_debug;
+};
+
+
+bool CClientServerTcp::Create(std::string pcap_file){
+
+    m_io_debug.open_pcap_file(pcap_file);
+
+    m_c_ctx.Create();
+    m_c_ctx.set_cb(&m_io_debug);
+
+    m_s_ctx.Create();
+    m_s_ctx.set_cb(&m_io_debug);
+
+    m_c_flow.Create(&m_c_ctx);
+    m_c_flow.set_tuple(0x10000001,0x30000001,1025,80,false);
+    m_c_flow.init();
+
+    m_s_flow.Create(&m_s_ctx);
+    m_s_flow.set_tuple(0x30000001,0x10000001,80,1025,false);
+    m_s_flow.init();
+
+    return(true);
+}
+
+void CClientServerTcp::Delete(){
+    m_c_flow.Delete();
+    m_s_flow.Delete();
+    m_c_ctx.Delete();
+    m_s_ctx.Delete();
+}
+
+
+int CClientServerTcp::test1(){
+
+    CTcpApp app;
+    utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,4024);
+
+    CMbufBuffer * lpbuf=&app.m_write_buf;
+    CTcpSockBuf * lptxs=&m_c_flow.m_tcp.m_socket.so_snd;
+    /* hack the code for now */
+    lptxs->m_app=&app;
+
+    /* simulate buf adding */
+    lptxs->sb_start_new_buffer();
+
+    /* add maximum of the buffer */
+    lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
+
+
+    tcp_connect(&m_c_ctx,&m_c_flow.m_tcp);
+    tcp_listen(&m_s_ctx,&m_s_flow.m_tcp);
+
+    int i;
+    for (i=0; i<1000; i++) {
+
+        bool do_work=false;
+        while (true) {
+
+            do_work=test_handle_queue(&m_io_debug.m_queue[0],
+                                      &m_s_ctx,
+                                      &m_s_flow.m_tcp);
+
+            do_work|=test_handle_queue(&m_io_debug.m_queue[1],
+                                      &m_c_ctx,
+                                      &m_c_flow.m_tcp);
+            if (do_work==false) {
+                  break;
+            }
+        }
+
+        m_c_ctx.timer_w_on_tick();
+        m_s_ctx.timer_w_on_tick();
+    }
+
+    app.m_write_buf.Delete();
+
+    printf (" rx %d \n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
+    return(0);
+
+}
+
+
+
+CClientServerTcp tcp_test1;
+
+/* tcp_output simulation .. */
+TEST_F(gt_tcp, tst19) {
+
+
+#if 0
+    tcp_test1.Create("tcp1.pcap");
+
+    tcp_test1.test1();
+
+    tcp_test1.Delete();
+
+#else
+
+    CClientServerTcp *lpt1=new CClientServerTcp;
+
+    lpt1->Create("tcp1.pcap");
+
+    lpt1->test1();
+
+    lpt1->Delete();
+
+    delete lpt1;
+
+#endif
+
 }
 
 

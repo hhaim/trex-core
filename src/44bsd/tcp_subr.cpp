@@ -246,7 +246,7 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
     m_tick=0;
     m_timer.reset();
     
-        /* TCP_OPTIM  */
+    /* TCP_OPTIM  */
     tcpcb *tp=&m_tcp;
     memset((char *) tp, 0,sizeof(struct tcpcb));
 
@@ -654,6 +654,11 @@ void sbflush (struct sockbuf *sb){
 void    sbappend(struct sockbuf *sb, 
                  struct rte_mbuf *m,
                  uint32_t len){
+    /* pkt_len should be L7 size */
+    assert(len==m->pkt_len);
+
+    rte_pktmbuf_free(m);
+
     sb->sb_cc+=len;
 }
 

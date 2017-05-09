@@ -436,10 +436,6 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     int todrop, acked, ourfinisacked, needoutput = 0;
     int off;
 
-/*    if ((tp->src_ipv4==0x30000001) && ((tp->snd_nxt-tp->iss)==1 )) {
-        printf(" ****\n");
-    }*/
-
     uint8_t *optp;  // TCP option is exist  
 
     if ( tcp->getHeaderLength()==TCP_HEADER_LEN ){
@@ -875,7 +871,7 @@ trimthenstep6:
             INC_STAT_CNT(ctx,tcps_rcvbyteafterwin, todrop);
         }
         /* TBD_MBUF_LINKL -- need to hadle the case of trim of full size */
-        rte_pktmbuf_trim(m, todrop);
+        assert(rte_pktmbuf_trim(m, todrop)==0);
         ti->ti_len -= todrop;
         tiflags &= ~(TH_PUSH|TH_FIN);
     }
@@ -1457,6 +1453,7 @@ void tcp_xmit_timer(CTcpPerThreadCtx * ctx,
     }
     tp->t_rtt = 0;
     tp->t_rxtshift = 0;
+
 
     /*
      * the retransmit should happen at rtt + 4 * rttvar.
