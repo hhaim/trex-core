@@ -35,6 +35,7 @@ limitations under the License.
 #include "44bsd/tcpip.h"
 #include "44bsd/tcp_dpdk.h"
 #include "mbuf.h"
+#include <stdlib.h>
 
 
 class gt_tcp  : public testing::Test {
@@ -691,7 +692,7 @@ TEST_F(gt_tcp, tst17) {
 
 /* tcp_output simulation .. */
 TEST_F(gt_tcp, tst18) {
-
+#if 0
     CTcpPerThreadCtx        m_ctx;
     CTcpFlow                m_flow;
 
@@ -731,6 +732,7 @@ TEST_F(gt_tcp, tst18) {
     m_flow.Delete();
     m_ctx.Delete();
 
+#endif
     //app.m_write_buf.Delete();
 
 }
@@ -920,17 +922,15 @@ struct rte_mbuf * utl_rte_pktmbuf_deepcopy(struct rte_mempool *mp,
         return NULL;
     }
 
-    uint16_t nsegsize = mp->elt_size;
+    uint16_t nsegsize = rte_pktmbuf_tailroom(mc);
 
     m = mc; /* root */
     pktlen = mi->pkt_len;
     origin_pktlen = mi->pkt_len;
     
-    uint16_t off;
-
+    uint16_t off=0;
         
     nseg = 0;
-        
 
     while (true) {
 
@@ -1015,18 +1015,24 @@ int utl_rte_pktmbuf_deepcmp(struct rte_mbuf *ma,
 
 void  test_fill_mbuf(rte_mbuf_t   * m,
                      uint16_t      b_size,
-                     uint8_t  &     start_cnt){
+                     uint8_t  &     start_cnt,
+                     int to_rand){
 
     char *p=rte_pktmbuf_append(m, b_size);
     int i;
     for (i=0; i<(int)b_size; i++) {
-        *p=start_cnt++;
+        if (to_rand) {
+            *p=(uint8_t)(rand()&0xff);
+        }else{
+            *p=start_cnt++;
+        }
         p++;
     }
 }
 
 rte_mbuf_t   * test_build_packet_size(int pkt_len,
-                                      int chunk_size){
+                                      int chunk_size,
+                                      int rand){
 
     rte_mbuf_t   * m;
     rte_mbuf_t   * prev_m=NULL;;
@@ -1051,7 +1057,8 @@ rte_mbuf_t   * test_build_packet_size(int pkt_len,
         uint16_t   csize=min(chunk_size,pkt_len);
         test_fill_mbuf(m,
                        csize,
-                       cnt);
+                       cnt,
+                       rand);
         pkt_len-=csize;
     }
     mhead->pkt_len = save_pkt_len;
@@ -1067,44 +1074,43 @@ TEST_F(gt_tcp, tst20) {
 
     rte_mbuf_t   * m;
     m=test_build_packet_size(1024,
-                             60);
+                             60,
+                             0);
     //rte_pktmbuf_dump(m, 1024);
 
     off=8;
     m=utl_mbuf_cpy(p,m,512,off);
-    utl_DumpBuffer(stdout,p,512,0);
+//    utl_DumpBuffer(stdout,p,512,0);
 }
 
-/* create comperator for mbuf and check the deep copy function .. */
-
-
+/* deep copy of mbufs from tx to rx */
 int test_mbuf_deepcpy(int pkt_size,int chunk_size){
 
-        /* alloc 1024 mbuf that has small mbuf */
     rte_mbuf_t   * m;
     rte_mbuf_t   * mc;
 
-    m=test_build_packet_size(pkt_size,chunk_size);
-    rte_pktmbuf_dump(m, 1024);
+    m=test_build_packet_size(pkt_size,chunk_size,1);
+    //rte_pktmbuf_dump(m, pkt_size);
 
     rte_mempool_t * mpool = tcp_pktmbuf_get_pool(0,2047);
 
     mc =utl_rte_pktmbuf_deepcopy(mpool,m);
     assert(mc);
+    //rte_pktmbuf_dump(mc, pkt_size);
 
-    rte_pktmbuf_dump(mc, 1024);
-    //return (utl_rte_pktmbuf_deepcmp(m,mc));
-    return(0);
+    int res=utl_rte_pktmbuf_deepcmp(m,mc);
 
+    rte_pktmbuf_free(m);
+    rte_pktmbuf_free(mc);
+    return(res);
 }
 
 TEST_F(gt_tcp, tst21) {
-   // EXPECT_EQ(test_mbuf_deepcpy(128,60),0);
-   // EXPECT_EQ(test_mbuf_deepcpy(1024,60),0);
-   // EXPECT_EQ(test_mbuf_deepcpy(1025,60),0);
-   // EXPECT_EQ(test_mbuf_deepcpy(1026,67),0);
-
-    EXPECT_EQ(test_mbuf_deepcpy(4025,129),0);
+   EXPECT_EQ(test_mbuf_deepcpy(128,60),0);
+   EXPECT_EQ(test_mbuf_deepcpy(1024,60),0);
+   EXPECT_EQ(test_mbuf_deepcpy(1025,60),0);
+   EXPECT_EQ(test_mbuf_deepcpy(1026,67),0);
+   EXPECT_EQ(test_mbuf_deepcpy(4025,129),0);
 }
 
 

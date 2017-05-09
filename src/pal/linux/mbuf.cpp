@@ -43,6 +43,7 @@ rte_mempool_t * utl_rte_mempool_create_non_pkt(const char  *name,
     assert(p);
     p->elt_size =elt_size;
     p->size=n;
+    p->priv_size=0;
     p->magic=MAGIC0;
     p->magic2=MAGIC2;
     return p;
@@ -60,6 +61,7 @@ rte_mempool_t * utl_rte_mempool_create(const char  *name,
     assert(p);
     p->size=n;
     p->elt_size =elt_size;
+    p->priv_size=sizeof(rte_mbuf_t); /* each pool has less memory */
     p->magic=MAGIC0;
     p->magic2=MAGIC2;
     return p;
@@ -112,7 +114,7 @@ rte_mbuf_t *rte_pktmbuf_alloc(rte_mempool_t *mp){
 
     buf_len = mp->elt_size ;
 
-    rte_mbuf_t *m =(rte_mbuf_t *)malloc(buf_len );
+    rte_mbuf_t *m =(rte_mbuf_t *)malloc(buf_len);
     assert(m);
 
     m->magic  = MAGIC0;
@@ -120,7 +122,7 @@ rte_mbuf_t *rte_pktmbuf_alloc(rte_mempool_t *mp){
     m->pool   = mp;
     m->refcnt_reserved = 1;
 
-    m->buf_len    = buf_len;
+    m->buf_len    = buf_len-(sizeof(rte_mbuf_t)+RTE_PKTMBUF_HEADROOM);
     m->buf_addr   =(char *)((char *)m+sizeof(rte_mbuf_t)+RTE_PKTMBUF_HEADROOM) ;
 
     rte_pktmbuf_reset(m);
@@ -172,16 +174,7 @@ static inline struct rte_mbuf *rte_pktmbuf_lastseg(struct rte_mbuf *m)
     return m2;
 }
 
-static inline uint16_t rte_pktmbuf_headroom(const struct rte_mbuf *m)
-{
-    return m->data_off;
-}
 
-static inline uint16_t rte_pktmbuf_tailroom(const struct rte_mbuf *m)
-{
-    return (uint16_t)(m->buf_len - rte_pktmbuf_headroom(m) -
-              m->data_len);
-}
 
 
 char *rte_pktmbuf_append(struct rte_mbuf *m, uint16_t len)
