@@ -1174,6 +1174,8 @@ bool CClientServerTcp::Create(std::string pcap_file){
     m_s_flow.set_tuple(0x30000001,0x10000001,80,1025,false);
     m_s_flow.init();
 
+    
+
     return(true);
 }
 
@@ -1228,8 +1230,8 @@ int CClientServerTcp::test1(){
     }
 
     app.m_write_buf.Delete();
-
     printf (" rx %d \n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
+    assert( m_s_flow.m_tcp.m_socket.so_rcv.sb_cc == 4024);
     return(0);
 
 }
@@ -1241,16 +1243,6 @@ CClientServerTcp tcp_test1;
 /* tcp_output simulation .. */
 TEST_F(gt_tcp, tst19) {
 
-
-#if 0
-    tcp_test1.Create("tcp1.pcap");
-
-    tcp_test1.test1();
-
-    tcp_test1.Delete();
-
-#else
-
     CClientServerTcp *lpt1=new CClientServerTcp;
 
     lpt1->Create("tcp1.pcap");
@@ -1260,9 +1252,6 @@ TEST_F(gt_tcp, tst19) {
     lpt1->Delete();
 
     delete lpt1;
-
-#endif
-
 }
 
 

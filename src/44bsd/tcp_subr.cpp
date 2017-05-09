@@ -242,17 +242,17 @@ void CTcpFlow::init(){
 
 
 void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
-    m_ctx=ctx;
     m_tick=0;
-    m_timer.reset();
-    
+
     /* TCP_OPTIM  */
     tcpcb *tp=&m_tcp;
     memset((char *) tp, 0,sizeof(struct tcpcb));
 
+    m_ctx=ctx;
+    m_timer.reset();
+
     tp->m_socket.so_snd.Create(ctx->tcp_tx_socket_bsize);
     tp->m_socket.so_rcv.sb_hiwat = ctx->tcp_rx_socket_bsize;
-
 
     tp->t_maxseg = ctx->tcp_mssdflt;
 
@@ -325,6 +325,7 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 
 
 bool CTcpPerThreadCtx::Create(void){
+
     tcp_tx_socket_bsize=32*1024;
     tcp_rx_socket_bsize=32*1024 ;
     sb_max = SB_MAX;        /* patchable */
@@ -332,7 +333,6 @@ bool CTcpPerThreadCtx::Create(void){
     tcp_mssdflt = TCP_MSS;
     tcp_rttdflt = TCPTV_SRTTDFLT / PR_SLOWHZ;
     tcp_do_rfc1323 = 1;
-    m_tick=0;
     tcp_keepidle = TCPTV_KEEP_IDLE;
     tcp_keepintvl = TCPTV_KEEPINTVL;
     tcp_keepcnt = TCPTV_KEEPCNT;        /* max idle probes */
@@ -341,6 +341,10 @@ bool CTcpPerThreadCtx::Create(void){
     tcp_ttl=0;
     tcp_iss = rand();   /* wrong, but better than a constant */
     m_tcpstat.Clear();
+    m_tick=0;
+    tcp_now=0;
+    m_cb = NULL;
+    memset(&tcp_saveti,0,sizeof(tcp_saveti));
 
     RC_HTW_t tw_res;
     tw_res = m_timer_w.Create(512,1);
