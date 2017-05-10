@@ -338,7 +338,7 @@ void tcp_dooptions(CTcpPerThreadCtx * ctx,
             if (!(ti->ti_flags & TH_SYN))
                 continue;
             memcpy((char *) &mss,(char *) cp + 2, sizeof(mss));
-            mss=ntohs(mss);
+            mss=bsd_ntohs(mss);
             (void) tcp_mss(ctx,tp, mss);    /* sets t_maxseg */
             break;
 
@@ -356,9 +356,9 @@ void tcp_dooptions(CTcpPerThreadCtx * ctx,
                 continue;
             *ts_present = 1;
             memcpy((char *) ts_val,(char *)cp + 2, sizeof(*ts_val));
-            *ts_val=ntohl(*ts_val);
+            *ts_val=bsd_ntohl(*ts_val);
             memcpy((char *) ts_ecr,(char *)cp + 6, sizeof(*ts_ecr));
-            *ts_ecr=ntohl(*ts_ecr);
+            *ts_ecr=bsd_ntohl(*ts_ecr);
 
             /* 
              * A timestamp received in a SYN makes
@@ -593,7 +593,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
              * Drop TCP, IP headers and TCP options then add data
              * to socket buffer.
              */
-            rte_pktmbuf_adj(m, off);
+            assert(rte_pktmbuf_adj(m, off)!=NULL);
             sbappend(&so->so_rcv, m,ti->ti_len);
             sorwakeup(so);
             tp->t_flags |= TF_DELACK;
@@ -604,7 +604,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     /*
      * Drop TCP, IP headers and TCP options. go to L7 
      */
-    rte_pktmbuf_adj(m, off);
+    assert(rte_pktmbuf_adj(m, off)!=NULL);
 
         /*
      * Calculate amount of space in receive window,
@@ -721,7 +721,7 @@ trimthenstep6:
         if (ti->ti_len > tp->rcv_wnd) {
             todrop = ti->ti_len - tp->rcv_wnd;
             /* TBD_MBUF_LINKL */
-            rte_pktmbuf_trim(m, todrop);
+            assert(rte_pktmbuf_trim(m, todrop)==0);
             ti->ti_len = tp->rcv_wnd;
             tiflags &= ~TH_FIN;
             INC_STAT(ctx,tcps_rcvpackafterwin);
@@ -812,7 +812,7 @@ trimthenstep6:
         /* after this operation, it could be a mbuf with len==0 in  case of mbuf_len==todrop
            still need to free it */
         /* TBD_MBUF_LINKL */
-        rte_pktmbuf_adj(m, todrop); 
+        assert(rte_pktmbuf_adj(m, todrop)!=NULL);
         ti->ti_seq += todrop;
         ti->ti_len -= todrop;
         if (ti->ti_urp > todrop)

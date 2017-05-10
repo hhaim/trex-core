@@ -9,7 +9,7 @@
 #include "tcp_debug.h"
 #include <vector>
 #include "tcp_dpdk.h"
-
+#include "tcp_bsd_utl.h"
 /*
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
  *  The Regents of the University of California.  All rights reserved.
@@ -53,53 +53,7 @@
  * Tcp control block, one per tcp; fields:
  */
 
-#include "pal_utl.h"
 
-/*TBD - move to diffrent file */                    
-static inline uint32_t ntohl(uint32_t a){
-    return (PAL_NTOHL(a));
-}
-
-static inline uint32_t htonl(uint32_t a){
-    return (PAL_NTOHL(a));
-}
-
-static inline uint16_t ntohs(uint16_t a){
-    return (PAL_NTOHS(a));
-}
-
-static inline uint16_t htons(uint16_t a){
-    return (PAL_NTOHS(a));
-}
-
-inline uint16_t in_cksum(struct rte_mbuf * m, int len ){
-    return (0);
-}
-
-static __inline int imax(int a, int b)
-{
-    return (a > b ? a : b);
-}
-static __inline int imin(int a, int b)
-{
-    return (a < b ? a : b);
-}
-static __inline long lmax(long a, long b)
-{
-    return (a > b ? a : b);
-}
-static __inline long lmin(long a, long b)
-{
-    return (a < b ? a : b);
-}
-static __inline u_int max(u_int a, u_int b)
-{
-    return (a > b ? a : b);
-}
-static __inline u_int min(u_int a, u_int b)
-{
-    return (a < b ? a : b);
-}
 
 
 class CTcpReass;

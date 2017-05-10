@@ -508,14 +508,14 @@ send:
 
             opt[0] = TCPOPT_MAXSEG;
             opt[1] = 4;
-            mss = htons((u_short) tcp_mss(ctx,tp, 0));
+            mss = bsd_htons((u_short) tcp_mss(ctx,tp, 0));
             *(uint16_t*)(opt + 2)=mss;
             optlen = 4;
      
             if ((tp->t_flags & TF_REQ_SCALE) &&
                 ((flags & TH_ACK) == 0 ||
                 (tp->t_flags & TF_RCVD_SCALE))) {
-                *((u_long *) (opt + optlen)) = htonl(
+                *((u_long *) (opt + optlen)) = bsd_htonl(
                     TCPOPT_NOP << 24 |
                     TCPOPT_WINDOW << 16 |
                     TCPOLEN_WINDOW << 8 |
@@ -537,9 +537,9 @@ send:
         u_long *lp = (u_long *)(opt + optlen);
  
         /* Form timestamp option as shown in appendix A of RFC 1323. */
-        *lp++ = htonl(TCPOPT_TSTAMP_HDR);
-        *lp++ = htonl(ctx->tcp_now);
-        *lp   = htonl(tp->ts_recent);
+        *lp++ = bsd_htonl(TCPOPT_TSTAMP_HDR);
+        *lp++ = bsd_htonl(ctx->tcp_now);
+        *lp   = bsd_htonl(tp->ts_recent);
         optlen += TCPOLEN_TSTAMP_APPA;
     }
 
@@ -655,7 +655,7 @@ send:
     ti->setWindowSize( (u_short) (win>>tp->rcv_scale));
     if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
         /* not support this for now - hhaim*/
-        //ti->ti_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
+        //ti->ti_urp = bsd_htons((u_short)(tp->snd_up - tp->snd_nxt));
         //ti->ti_flags |= TH_URG;
     } else{
         /*
