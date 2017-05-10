@@ -1243,6 +1243,8 @@ CClientServerTcp tcp_test1;
 /* tcp_output simulation .. */
 TEST_F(gt_tcp, tst19) {
 
+    printf(" %d \n",(int)(sizeof(struct tcpcb)-128));
+
     CClientServerTcp *lpt1=new CClientServerTcp;
 
     lpt1->Create("tcp1.pcap");

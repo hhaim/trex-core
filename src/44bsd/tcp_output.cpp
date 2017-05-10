@@ -515,7 +515,7 @@ send:
             if ((tp->t_flags & TF_REQ_SCALE) &&
                 ((flags & TH_ACK) == 0 ||
                 (tp->t_flags & TF_RCVD_SCALE))) {
-                *((u_long *) (opt + optlen)) = bsd_htonl(
+                *((uint32_t *) (opt + optlen)) = bsd_htonl(
                     TCPOPT_NOP << 24 |
                     TCPOPT_WINDOW << 16 |
                     TCPOLEN_WINDOW << 8 |
@@ -534,7 +534,7 @@ send:
          (flags & TH_RST) == 0 &&
         ((flags & (TH_SYN|TH_ACK)) == TH_SYN ||
          (tp->t_flags & TF_RCVD_TSTMP))) {
-        u_long *lp = (u_long *)(opt + optlen);
+        uint32_t *lp = (uint32_t *)(opt + optlen);
  
         /* Form timestamp option as shown in appendix A of RFC 1323. */
         *lp++ = bsd_htonl(TCPOPT_TSTAMP_HDR);

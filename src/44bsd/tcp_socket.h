@@ -46,7 +46,7 @@
 struct  sockbuf {
     uint32_t    sb_cc;      /* actual chars in buffer */
     uint32_t    sb_hiwat;   /* max actual char count */
-    short   sb_flags;   /* flags, see below */
+    short       sb_flags;   /* flags, see below */
     //short sb_timeo;   /* timeout for read/write */
 };
 

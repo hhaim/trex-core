@@ -74,7 +74,7 @@ tcp_usrreq(CTcpPerThreadCtx * ctx,
     int ostate;
 
     if (req == PRU_CONTROL)
-        return (in_control(so, (u_long)m, (caddr_t)nam,
+        return (in_control(so, (uint32_t)m, (caddr_t)nam,
             (struct ifnet *)control));
     if (control && control->m_len) {
         m_freem(control);
@@ -416,8 +416,8 @@ tcp_ctloutput(op, so, level, optname, mp)
     return (error);
 }
 
-u_long  tcp_sendspace = 1024*8;
-u_long  tcp_recvspace = 1024*8;
+uint32_t  tcp_sendspace = 1024*8;
+uint32_t  tcp_recvspace = 1024*8;
 
 /*
  * Attach TCP protocol to socket, allocating

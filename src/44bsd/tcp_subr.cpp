@@ -493,7 +493,7 @@ tcp_close(CTcpPerThreadCtx * ctx,
     if (SEQ_LT(tp->iss + so->so_snd.sb_hiwat * 16, tp->snd_max) &&
         (rt = inp->inp_route.ro_rt) &&
         ((struct sockaddr_in *)rt_key(rt))->sin_addr.s_addr != INADDR_ANY) {
-        register u_long i;
+        uint32_t  i;
 
         if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
             i = tp->t_srtt *
@@ -536,7 +536,7 @@ tcp_close(CTcpPerThreadCtx * ctx,
             i = (i + tp->t_maxseg / 2) / tp->t_maxseg;
             if (i < 2)
                 i = 2;
-            i *= (u_long)(tp->t_maxseg + sizeof (struct tcpiphdr));
+            i *= (uint32_t)(tp->t_maxseg + sizeof (struct tcpiphdr));
             if (rt->rt_rmx.rmx_ssthresh)
                 rt->rt_rmx.rmx_ssthresh =
                     (rt->rt_rmx.rmx_ssthresh + i) / 2;

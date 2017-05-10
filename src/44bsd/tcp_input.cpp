@@ -311,8 +311,8 @@ void tcp_dooptions(CTcpPerThreadCtx * ctx,
               int cnt, 
               struct tcpiphdr *ti, 
               int *ts_present,
-              u_long *ts_val, 
-              u_long * ts_ecr){
+              uint32_t *ts_val, 
+              uint32_t * ts_ecr){
     u_short mss;
     int opt, optlen;
 
@@ -428,7 +428,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
     ti=&pheader;
     int tiflags;
     int iss = 0;
-    u_long tiwin, ts_val, ts_ecr;
+    uint32_t tiwin, ts_val, ts_ecr;
     int ts_present = 0;
     int dropsocket = 0;
     short ostate=0;
@@ -1088,8 +1088,8 @@ trimthenstep6:
          * (maxseg * (maxseg / cwnd) per packet).
          */
         {
-        u_long cw = tp->snd_cwnd;
-        u_long incr = tp->t_maxseg;
+        uint32_t cw = tp->snd_cwnd;
+        uint32_t incr = tp->t_maxseg;
 
         if (cw > tp->snd_ssthresh)
             incr = incr * incr / cw;

@@ -80,12 +80,16 @@ struct tcpcb {
 
     tcp_socket m_socket; 
 
-    CTcpReass * m_tpc_reass; /* tcp reassembley object, allocated only when needed */
+    /* ====== size 8 bytes  */
 
     uint8_t t_timer[TCPT_NTIMERS];  /* tcp timers */
     char    t_force;        /* 1 if forcing out a byte */
     uint8_t mbuf_socket;    /* mbuf socket */
     uint8_t t_dupacks;      /* consecutive dup acks recd */
+    uint8_t m_pad1;
+    /*====== end =============*/
+
+    /* ======= size 12 bytes  */
 
     int16_t t_state;        /* state of this connection */
     int16_t t_rxtshift;     /* log(2) of rexmt exp. backoff */
@@ -103,7 +107,12 @@ struct tcpcb {
 #define TF_RCVD_TSTMP   0x0100      /* a timestamp was received in SYN */
 #define TF_SACK_PERMIT  0x0200      /* other side said I could SACK */
 
-        
+    uint16_t  m_pad2;
+
+    /*====== end =============*/
+
+    /*====== size 15*4 = 60 bytes  */
+
 /*
  * The following fields are used as in the protocol specification.
  * See RFC783, Dec. 1981, page 21.
@@ -115,9 +124,9 @@ struct tcpcb {
     tcp_seq snd_wl1;        /* window update seg seq number */
     tcp_seq snd_wl2;        /* window update seg ack number */
     tcp_seq iss;            /* initial send sequence number */
-    u_long  snd_wnd;        /* send window */
+    uint32_t snd_wnd;        /* send window */
 /* receive sequence variables */
-    u_long  rcv_wnd;        /* receive window */
+    uint32_t  rcv_wnd;        /* receive window */
     tcp_seq rcv_nxt;        /* receive next */
     tcp_seq rcv_up;         /* receive urgent pointer */
     tcp_seq irs;            /* initial receive sequence number */
@@ -131,8 +140,8 @@ struct tcpcb {
                      * used to recognize retransmits
                      */
 /* congestion control (for slow start, source quench, retransmit after loss) */
-    u_long  snd_cwnd;       /* congestion-controlled window */
-    u_long  snd_ssthresh;       /* snd_cwnd size threshhold for
+    uint32_t  snd_cwnd;       /* congestion-controlled window */
+    uint32_t  snd_ssthresh;       /* snd_cwnd size threshhold for
                      * for slow start exponential to
                      * linear switch
                      */
@@ -140,13 +149,18 @@ struct tcpcb {
  * transmit timing stuff.  See below for scale of srtt and rttvar.
  * "Variance" is actually smoothed difference.
  */
+    /*====== end =============*/
+
+    /*====== size 13 *4 = 48 bytes  */
+
     u_short t_idle;         /* inactivity time */
     int16_t t_rtt;          /* round trip time */
-    tcp_seq t_rtseq;        /* sequence number being timed */
     int16_t t_srtt;         /* smoothed round-trip time */
     int16_t t_rttvar;       /* variance in round-trip time */
+
+    tcp_seq t_rtseq;        /* sequence number being timed */
+    uint32_t max_sndwnd;     /* largest window peer has offered */
     u_short t_rttmin;       /* minimum rtt allowed */
-    u_long  max_sndwnd;     /* largest window peer has offered */
 
 /* out-of-band data */
 #if 0
@@ -162,8 +176,8 @@ struct tcpcb {
     u_char  rcv_scale;      /* window scaling for recv window */
     u_char  request_r_scale;    /* pending window scaling */
     u_char  requested_s_scale;
-    u_long  ts_recent;      /* timestamp echo data */
-    u_long  ts_recent_age;      /* when last updated */
+    uint32_t  ts_recent;      /* timestamp echo data */
+    uint32_t  ts_recent_age;      /* when last updated */
     tcp_seq last_ack_sent;
 
     uint32_t  src_ipv4;
@@ -176,7 +190,15 @@ struct tcpcb {
     uint8_t is_ipv6;
     uint8_t m_pad;
 
+    /*====== end =============*/
+
+    /*====== size 128 + 8 = 132 bytes  */
+
+    CTcpReass * m_tpc_reass; /* tcp reassembley object, allocated only when needed */
+
     uint8_t template_pkt[PACKET_TEMPLATE_SIZE];   /* template packet */
+
+    /*====== end =============*/
 
 public:
 
@@ -405,7 +427,7 @@ public:
     uint32_t  tcp_tx_socket_bsize;
     uint32_t  tcp_rx_socket_bsize;
 
-    u_long  sb_max ; /* socket max char */
+    uint32_t  sb_max ; /* socket max char */
     int tcprexmtthresh;
     int tcp_mssdflt;
     int tcp_rttdflt;
@@ -419,7 +441,7 @@ public:
 
     //struct    inpcb tcb;      /* head of queue of active tcpcb's */
     struct      tcpstat m_tcpstat;  /* tcp statistics */
-    u_long      tcp_now;        /* for RFC 1323 timestamps */
+    uint32_t    tcp_now;        /* for RFC 1323 timestamps */
     tcp_seq     tcp_iss;            /* tcp initial send seq # */
     uint8_t     m_tick;
 

@@ -39,7 +39,7 @@
 #include <common/basic_utils.h>
         
              
-typedef u_long  tcp_seq;
+typedef uint32_t  tcp_seq;
 /*
  * TCP header.
  * Per RFC 793, September, 1981.
