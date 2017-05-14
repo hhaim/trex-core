@@ -52,6 +52,19 @@
 #define TSTMP_LT(a,b)   ((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)  ((int)((a)-(b)) >= 0)
 
+int16_t tcp_du32(uint32_t a,
+                 uint32_t b){
+    int32_t d=a-b;
+    if (d>0x7FFF) {
+        d=0x7FFF;
+    }else{
+        if (d<0) {
+            d=0;
+        }
+    }
+    return((int16_t)d);
+}
+
 
 bool CTcpReassBlock::operator==(CTcpReassBlock& rhs)const{
     return  ((m_seq == rhs.m_seq) && (m_flags==rhs.m_flags) && (m_len ==rhs.m_len));
@@ -544,7 +557,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                  */
                 INC_STAT(ctx,tcps_predack)
                 if (ts_present)
-                    tcp_xmit_timer(ctx,tp, (int16_t)(ctx->tcp_now-ts_ecr+1));
+                    tcp_xmit_timer(ctx,tp, tcp_du32(ctx->tcp_now,ts_ecr)+1 );
                 else if (tp->t_rtt &&
                         SEQ_GT(ti->ti_ack, tp->t_rtseq))
                     tcp_xmit_timer(ctx,tp, tp->t_rtt);
@@ -1064,7 +1077,7 @@ trimthenstep6:
          * Recompute the initial retransmit timer.
          */
         if (ts_present){
-            tcp_xmit_timer(ctx,tp, (int16_t)(ctx->tcp_now-ts_ecr+1));
+            tcp_xmit_timer(ctx,tp, tcp_du32(ctx->tcp_now,ts_ecr)+1);
         }else if (tp->t_rtt && SEQ_GT(ti->ti_ack, tp->t_rtseq)){
             tcp_xmit_timer(ctx,tp,tp->t_rtt);
         }

@@ -249,7 +249,7 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
  */
 void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp)
 {
-    register int i;
+    int i;
 
     if (tp->t_state == TCPS_LISTEN)
         return ;

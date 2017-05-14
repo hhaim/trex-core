@@ -38,6 +38,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <common/c_common.h>
 #include <common/captureFile.h>
+#include <common/sim_event_driven.h>
 
 
 
@@ -986,33 +987,146 @@ TEST_F(gt_tcp, tst21) {
 
 
 
+class CTcpSimEventStop : public CSimEventBase {
 
-
-typedef std::vector<rte_mbuf_t *> vec_queue_t;
-
-class CTcpCtxDebug : public CTcpCtxCb {
 public:
-    CTcpCtxDebug();
-    ~CTcpCtxDebug();
+     CTcpSimEventStop(double time){
+         m_time =time;
+     }
+     virtual bool on_event(CSimEventDriven *sched,
+                           bool & reschedule){
+         reschedule=false;
+         return(true);
+     }
+};
 
-   int on_tx(CTcpPerThreadCtx *ctx,
-             struct tcpcb * flow,
-             rte_mbuf_t *m);
 
-   bool  open_pcap_file(std::string pcap);
-   void  write_pcap_mbuf(rte_mbuf_t *m,
-                         uint32_t     time_sec,
-                         uint32_t     time_nsec);
 
-   void  close_pcap_file();
+class CClientServerTcp;
+
+class CTcpSimEventTimers : public CSimEventBase {
+
+public:
+     CTcpSimEventTimers(CClientServerTcp *p,
+                        double dtime){
+         m_p = p;
+         m_time = dtime;
+         m_d_time =dtime;
+     }
+
+     virtual bool on_event(CSimEventDriven *sched,
+                           bool & reschedule);
+
+private:
+    CClientServerTcp * m_p;
+    double m_d_time;
+};
+
+class CTcpSimEventRx : public CSimEventBase {
+
+public:
+    CTcpSimEventRx(CClientServerTcp *p,
+                   rte_mbuf_t *m,
+                   int dir,
+                   double time){
+        m_p = p;
+        m_pkt = m;
+        m_dir = dir;
+        m_time = time;
+    }
+
+    virtual bool on_event(CSimEventDriven *sched,
+                          bool & reschedule);
+
+private:
+    CClientServerTcp * m_p;
+    int                m_dir;
+    rte_mbuf_t *       m_pkt;
+};
+
+
+class CTcpCtxPcapWrt  {
+public:
+    CTcpCtxPcapWrt(){
+        m_writer=NULL;
+        m_raw=NULL;
+    }
+    ~CTcpCtxPcapWrt(){
+        close_pcap_file();
+    }
+
+    bool  open_pcap_file(std::string pcap);
+    void  write_pcap_mbuf(rte_mbuf_t *m,double time);
+
+    void  close_pcap_file();
 
 
 public:
 
    CFileWriterBase         * m_writer;
    CCapPktRaw              * m_raw;
+};
 
-   vec_queue_t  m_queue[2];
+
+void  CTcpCtxPcapWrt::write_pcap_mbuf(rte_mbuf_t *m,
+                                      double time){
+
+    char *p;
+    uint32_t pktlen=m->pkt_len;
+    if (pktlen>MAX_PKT_SIZE) {
+        printf("ERROR packet size is bigger than 9K \n");
+    }
+
+    p=utl_rte_pktmbuf_to_mem(m);
+    memcpy(m_raw->raw,p,pktlen);
+    m_raw->pkt_cnt++;
+    m_raw->pkt_len =pktlen;
+    m_raw->set_new_time(time);
+
+    assert(m_writer);
+    bool res=m_writer->write_packet(m_raw);
+    if (res != true) {
+        fprintf(stderr,"ERROR can't write to cap file");
+    }
+    free(p);
+}
+
+
+bool  CTcpCtxPcapWrt::open_pcap_file(std::string pcap){
+
+    m_writer = CCapWriterFactory::CreateWriter(LIBPCAP,(char *)pcap.c_str());
+    if (m_writer == NULL) {
+        fprintf(stderr,"ERROR can't create cap file %s ",(char *)pcap.c_str());
+        return (false);
+    }
+    m_raw = new CCapPktRaw();
+    return(true);
+}
+
+void  CTcpCtxPcapWrt::close_pcap_file(){
+    if (m_raw){
+        delete m_raw;
+        m_raw = NULL;
+    }
+    if (m_writer) {
+        delete m_writer;
+        m_writer = NULL;
+    }
+}
+
+
+
+//typedef std::vector<rte_mbuf_t *> vec_queue_t;
+
+class CTcpCtxDebug : public CTcpCtxCb {
+public:
+
+   int on_tx(CTcpPerThreadCtx *ctx,
+             struct tcpcb * flow,
+             rte_mbuf_t *m);
+
+public:
+    CClientServerTcp  * m_p ;
 
 };
 
@@ -1037,79 +1151,9 @@ void utl_rte_pktmbuf_k12_format(FILE* fp,
     free(p);
 }
 
-void  CTcpCtxDebug::write_pcap_mbuf(rte_mbuf_t *m,
-                                    uint32_t     time_sec,
-                                    uint32_t     time_nsec){
-
-    char *p;
-    uint32_t pktlen=m->pkt_len;
-    if (pktlen>MAX_PKT_SIZE) {
-        printf("ERROR packet size is bigger than 9K \n");
-    }
-
-    p=utl_rte_pktmbuf_to_mem(m);
-    memcpy(m_raw->raw,p,pktlen);
-    m_raw->pkt_cnt++;
-    m_raw->pkt_len =pktlen;
-    m_raw->time_sec=time_sec;
-    m_raw->time_nsec=time_nsec;
-
-    assert(m_writer);
-    bool res=m_writer->write_packet(m_raw);
-    if (res != true) {
-        fprintf(stderr,"ERROR can't write to cap file");
-    }
-    free(p);
-}
 
 
-bool  CTcpCtxDebug::open_pcap_file(std::string pcap){
-
-    m_writer = CCapWriterFactory::CreateWriter(LIBPCAP,(char *)pcap.c_str());
-    if (m_writer == NULL) {
-        fprintf(stderr,"ERROR can't create cap file %s ",(char *)pcap.c_str());
-        return (false);
-    }
-    m_raw = new CCapPktRaw();
-    return(true);
-}
-
-void  CTcpCtxDebug::close_pcap_file(){
-    if (m_raw){
-        delete m_raw;
-        m_raw = NULL;
-    }
-    if (m_writer) {
-        delete m_writer;
-        m_writer = NULL;
-    }
-}
-
-
-CTcpCtxDebug::CTcpCtxDebug(){
-    m_writer=NULL;
-    m_raw=NULL;
-}
-
-CTcpCtxDebug::~CTcpCtxDebug(){
-    close_pcap_file();
-}
-
-
-
-int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
-                        struct tcpcb * flow,
-                        rte_mbuf_t *m){
-    int dir=0;
-    if (flow->src_port==80) {
-        dir=1;
-    }
-    rte_mbuf_t *m_rx= utl_rte_convert_tx_rx_mbuf(m);
-    m_queue[dir].push_back(m_rx);
-    write_pcap_mbuf(m_rx,(ctx->tcp_now),0);
-    return(0);
-}
-
+#if 0
 bool test_handle_queue(vec_queue_t * lpq,
                        CTcpPerThreadCtx *ctx,
                        struct tcpcb * flow){
@@ -1137,28 +1181,61 @@ bool test_handle_queue(vec_queue_t * lpq,
     }
     return (do_work);
 }
+#endif
+
+
 
 class CClientServerTcp {
 public:
     bool Create(std::string pcap_file);
     void Delete();
 
+
+    /* dir ==0 , C->S 
+       dir ==1   S->C */
+    void on_tx(int dir,rte_mbuf_t *m);
+    void on_rx(int dir,rte_mbuf_t *m);
+
+public:
     int test1();
 
 public:
-    CTcpPerThreadCtx        m_c_ctx;
+    CTcpPerThreadCtx        m_c_ctx;  /* context */
     CTcpPerThreadCtx        m_s_ctx;
 
-    CTcpFlow                m_c_flow;
+    CTcpFlow                m_c_flow; /* flow */
     CTcpFlow                m_s_flow;
 
+    CTcpCtxPcapWrt          m_c_pcap; /* capture to file */
+    CTcpCtxPcapWrt          m_s_pcap;
+
     CTcpCtxDebug            m_io_debug;
+
+    CSimEventDriven         m_sim;
 };
+
+
+int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
+                        struct tcpcb * flow,
+                        rte_mbuf_t *m){
+    int dir=0;
+    if (flow->src_port==80) {
+        dir=1;
+    }
+    rte_mbuf_t *m_rx= utl_rte_convert_tx_rx_mbuf(m);
+
+    m_p->on_tx(dir,m_rx);
+    return(0);
+}
 
 
 bool CClientServerTcp::Create(std::string pcap_file){
 
-    m_io_debug.open_pcap_file(pcap_file);
+    m_io_debug.m_p = this;
+
+    m_c_pcap.open_pcap_file(pcap_file+"_c.pcap");
+
+    m_s_pcap.open_pcap_file(pcap_file+"_s.pcap");
 
     m_c_ctx.Create();
     m_c_ctx.set_cb(&m_io_debug);
@@ -1174,10 +1251,81 @@ bool CClientServerTcp::Create(std::string pcap_file){
     m_s_flow.set_tuple(0x30000001,0x10000001,80,1025,false);
     m_s_flow.init();
 
-    
-
     return(true);
 }
+
+void CClientServerTcp::on_tx(int dir,
+                             rte_mbuf_t *m){
+
+    double t=m_sim.get_time();
+
+    /* write TX side */
+    if (dir==0) {
+        m_c_pcap.write_pcap_mbuf(m,t);
+    }else{
+        m_s_pcap.write_pcap_mbuf(m,t);
+    }
+
+    /* simulate drop/reorder/ corruption HERE !! */
+
+
+    /* move the Tx packet to Rx side of server */
+    m_sim.add_event( new CTcpSimEventRx(this,m,dir^1,(t+0.6)) );
+}
+
+bool CTcpSimEventRx::on_event(CSimEventDriven *sched,
+                              bool & reschedule){
+    reschedule=false;
+    m_p->on_rx(m_dir,m_pkt);
+    return(false);
+}
+
+bool CTcpSimEventTimers::on_event(CSimEventDriven *sched,
+                                  bool & reschedule){
+     reschedule=true;
+     m_time +=m_d_time;
+     m_p->m_c_ctx.timer_w_on_tick();
+     m_p->m_s_ctx.timer_w_on_tick();
+     return(false);
+ }
+
+
+void CClientServerTcp::on_rx(int dir,
+                             rte_mbuf_t *m){
+
+    /* write RX side */
+    double t = m_sim.get_time();
+    CTcpPerThreadCtx * ctx;
+    struct tcpcb *tp;
+
+
+    if (dir==1) {
+        ctx =&m_s_ctx,
+        tp  =&m_s_flow.m_tcp;
+        m_s_pcap.write_pcap_mbuf(m,t);
+    }else{
+        ctx =&m_c_ctx;
+        tp  =&m_c_flow.m_tcp;
+        m_c_pcap.write_pcap_mbuf(m,t);
+    }
+
+
+    /* TBD should be fixed */
+    char *p=rte_pktmbuf_mtod(m,char *);
+    TCPHeader * tcp=(TCPHeader *)(p+14+20);
+    IPHeader   *ipv4=(IPHeader *)(p+14);
+
+
+    assert(tcp_flow_input(ctx,
+                   tp,
+                   m,
+                   tcp,
+                   14+20+tcp->getHeaderLength(),
+                   ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
+                   )==0);
+
+}
+
 
 void CClientServerTcp::Delete(){
     m_c_flow.Delete();
@@ -1185,6 +1333,7 @@ void CClientServerTcp::Delete(){
     m_c_ctx.Delete();
     m_s_ctx.Delete();
 }
+
 
 
 int CClientServerTcp::test1(){
@@ -1203,31 +1352,28 @@ int CClientServerTcp::test1(){
     /* add maximum of the buffer */
     lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
 
+    m_sim.add_event( new CTcpSimEventTimers(this, ((double)(TCP_TIMER_W_TICK)/1000.0)));
+    m_sim.add_event( new CTcpSimEventStop(100.0) );
 
     tcp_connect(&m_c_ctx,&m_c_flow.m_tcp);
     tcp_listen(&m_s_ctx,&m_s_flow.m_tcp);
 
-    int i;
-    for (i=0; i<1000; i++) {
+    m_sim.run_sim();
 
-        bool do_work=false;
-        while (true) {
+    printf(" C counters \n");
+    m_c_ctx.m_tcpstat.Dump(stdout);
+    printf(" S counters \n");
+    m_s_ctx.m_tcpstat.Dump(stdout);
 
-            do_work=test_handle_queue(&m_io_debug.m_queue[0],
-                                      &m_s_ctx,
-                                      &m_s_flow.m_tcp);
+    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_sndbyte,4024);
+    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_rcvackbyte,4024);
+    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_connects,1);
 
-            do_work|=test_handle_queue(&m_io_debug.m_queue[1],
-                                      &m_c_ctx,
-                                      &m_c_flow.m_tcp);
-            if (do_work==false) {
-                  break;
-            }
-        }
 
-        m_c_ctx.timer_w_on_tick();
-        m_s_ctx.timer_w_on_tick();
-    }
+    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_rcvbyte,4024);
+    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_accepts,1);
+    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_preddat,m_s_ctx.m_tcpstat.m_sts.tcps_rcvpack-1);
+
 
     app.m_write_buf.Delete();
     printf (" rx %d \n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
@@ -1240,20 +1386,26 @@ int CClientServerTcp::test1(){
 
 CClientServerTcp tcp_test1;
 
+
 /* tcp_output simulation .. */
 TEST_F(gt_tcp, tst19) {
-
-    printf(" %d \n",(int)(sizeof(struct tcpcb)-128));
-
     CClientServerTcp *lpt1=new CClientServerTcp;
 
-    lpt1->Create("tcp1.pcap");
+    lpt1->Create("tcp1");
 
     lpt1->test1();
 
     lpt1->Delete();
 
     delete lpt1;
+}
+
+
+
+
+
+TEST_F(gt_tcp, tst30) {
+    //event_driven_sim_test();
 }
 
 

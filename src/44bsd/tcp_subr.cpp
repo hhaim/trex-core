@@ -306,10 +306,11 @@ static void tcp_timer(void *userdata,
     tcp_ctx->timer_w_start(tcp_flow);
 }
 
+/* tick every 50msec TCP_TIMER_W_TICK */
 void CTcpPerThreadCtx::timer_w_on_tick(){
     m_timer_w.on_tick((void*)this,tcp_timer);
 
-    if ( m_tick==TCP_SLOW_RATIO_TICK ) {
+    if ( m_tick==TCP_SLOW_RATIO_MASTER ) {
         tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
         if (tcp_maxidle > UINT8_MAX) {
             tcp_maxidle = UINT8_MAX;

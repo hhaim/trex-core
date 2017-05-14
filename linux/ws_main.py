@@ -156,7 +156,8 @@ cmn_src = SrcGroup(dir='src/common',
         'captureFile.cpp',
         'erf.cpp',
         'pcap.cpp',
-        'base64.cpp'
+        'base64.cpp',
+        'sim_event_driven.cpp'
         ]);
 
          

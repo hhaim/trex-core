@@ -341,6 +341,7 @@ public:
 
 #define TCP_FAST_TICK (TCP_TIMER_TICK_BASE_MS/TCP_TIMER_W_TICK)
 #define TCP_SLOW_RATIO_TICK 1
+#define TCP_SLOW_RATIO_MASTER (500/TCP_TIMER_W_TICK)
 
 #include "h_timer.h"
 
