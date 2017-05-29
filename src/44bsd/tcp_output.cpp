@@ -193,7 +193,7 @@ static inline int tcp_build_dpkt_(CTcpPerThreadCtx * ctx,
     while (dlen>0) {
         /* get blocks from socket buffer */
         CBufMbufRef  rb;
-        lptxs->get_by_offset(ctx,offset,rb);
+        lptxs->get_by_offset(&tp->m_socket,offset,rb);
 
         rte_mbuf_t   * mn=rb.m_mbuf;
         if (rb.m_type==MO_CONST) {

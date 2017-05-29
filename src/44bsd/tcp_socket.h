@@ -91,7 +91,7 @@ struct  sockbuf {
 struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus);
 
 long    sbspace(struct sockbuf *sb); 
-void    sbdrop(struct sockbuf *sb, int len);
+//void    sbdrop(struct sockbuf *sb, int len);
 
 int soabort(struct tcp_socket *so);
 void sowwakeup(struct tcp_socket *so);
@@ -105,9 +105,14 @@ void    soisdisconnecting(struct tcp_socket *so);
 void sbflush (struct sockbuf *sb);
 //void    sbappend(struct sockbuf *sb, struct rte_mbuf *m);
 
-void    sbappend(struct sockbuf *sb, struct rte_mbuf *m,uint32_t len);
+void    sbappend(struct tcp_socket *so,
+                 struct sockbuf *sb, 
+                 struct rte_mbuf *m,
+                 uint32_t len);
 
-void    sbappend_bytes(struct sockbuf *sb, uint32_t len);
+void    sbappend_bytes(struct tcp_socket *so,
+                       struct sockbuf *sb, 
+                       uint32_t len);
 
 #ifdef FIXME
 #define sorwakeup(so)   { sowakeup((so), &(so)->so_rcv); \
@@ -228,20 +233,293 @@ public:
 };
 
 
-class CTcpApp {
-public:
+typedef enum { taTX_ACK            =17,   /* tx acked  */
+               taRX_BYTES          =19,   /* Rx byte */
 
-    CMbufBuffer m_write_buf;
+} tcp_app_event_bh_enum_t;
+
+typedef uint8_t tcp_app_event_bh_t;
+
+
+typedef enum { tcTX_BUFFER             =1,   /* send buffer of   CMbufBuffer */
+               tcDELAY                 =2,   /* delay some time */
+               tcRX_BUFFER             =3,   /* enable/disable Rx counters */
+               tcRESET                 =4    /* explicit reset */
+} tcp_app_cmd_enum_t;
+
+typedef uint8_t tcp_app_cmd_t;
+
+
+
+/* CMD == tcTX_BUFFER*/
+struct CTcpAppCmdTxBuffer {
+    CMbufBuffer *   m_buf;
 };
 
+/* CMD == tcRX_BUFFER */
+struct CTcpAppCmdRxBuffer {
+
+    enum {
+            rxcmd_NONE      = 0,
+            rxcmd_CLEAR     = 1,
+            rxcmd_WAIT      = 2,
+            rxcmd_DISABLE_RX   =4
+
+    };
+
+    uint32_t        m_flags;
+    uint32_t        m_rx_bytes_wm;
+};
+
+struct CTcpAppCmdDelay {
+    uint64_t     m_usec_delay;
+};
+
+
+/* Commands read-only  */
+struct CTcpAppCmd {
+
+    tcp_app_cmd_t     m_cmd;
+
+    union {
+        CTcpAppCmdTxBuffer  m_tx_cmd;
+        CTcpAppCmdRxBuffer  m_rx_cmd;
+        CTcpAppCmdDelay     m_delay_cmd;
+    } u;
+public:
+    void Dump(FILE *fd);
+};
+
+typedef std::vector<CTcpAppCmd> tcp_app_cmd_list_t;
+
+
+class CTcpFlow;
 class CTcpPerThreadCtx;
+
+/* Api from application to TCP */
+class CTcpAppApi {
+public:
+
+    /* get maximum tx queue space */
+    virtual uint32_t get_tx_max_space(CTcpFlow * flow)=0;
+
+    /* get space in bytes in the tx queue */
+    virtual uint32_t get_tx_sbspace(CTcpFlow * flow)=0;
+
+    /* add bytes to tx queue */
+    virtual void tx_sbappend(CTcpFlow * flow,uint32_t bytes)=0;
+
+    virtual uint32_t rx_drain(CTcpFlow * flow)=0;
+
+    virtual void tx_tcp_output(CTcpPerThreadCtx * ctx,
+                               CTcpFlow *         flow)=0;
+
+    virtual void delay(uint64_t usec)=0;
+
+};
+
+/* read-only program, many flows point to this program */
+class  CTcpAppProgram {
+
+public:
+    void add_cmd(CTcpAppCmd & cmd);
+
+    void Dump(FILE *fd);
+
+    int get_size(){
+        return (m_cmds.size());
+    }
+
+    CTcpAppCmd * get_index(uint32_t index){
+        return (&m_cmds[index]);
+    }
+
+private:
+    tcp_app_cmd_list_t     m_cmds; 
+};
+
+
+
+typedef enum { te_SOISCONNECTING  =17,   
+               te_SOISCONNECTED,      
+               te_SOCANTRCVMORE,      
+               te_SOABORT     ,       
+               te_SOWWAKEUP   ,
+               te_SORWAKEUP   ,
+               te_SOISDISCONNECTING,
+               te_SOISDISCONNECTED 
+} tcp_app_events_enum_t;
+
+typedef uint8_t tcp_app_events_t;
+
+std::string get_tcp_app_events_name(tcp_app_events_t event);
+
+
+typedef enum { te_NONE     =0,
+               te_SEND     =17,   
+               te_WAIT_RX  =18,      
+               te_DELAY    =19,      
+} tcp_app_state_enum_t;
+
+typedef uint8_t tcp_app_state_t;
+
+
+class CTcpApp  {
+public:
+
+    /* flags */
+    enum {
+            taINTERRUPT   = 1,
+            taRX_DISABLED = 2
+    };
+
+
+
+    CTcpApp() {
+        m_flow = (CTcpFlow *)0;
+        m_ctx =(CTcpPerThreadCtx *)0;
+        m_api=(CTcpAppApi *)0;
+        m_tx_active =0;
+        m_program =(CTcpAppProgram *)0;
+        m_flags=0;
+        m_state =te_NONE;
+        m_debug_id=0;
+        m_pad=0;
+        m_cmd_index=0;
+        m_tx_offset=0;
+        m_tx_residue =0;
+        m_cmd_rx_bytes=0;
+        m_cmd_rx_bytes_wm=0;
+    }
+
+    virtual ~CTcpApp(){
+    }
+
+public:
+    /* inside the Rx */
+    void set_interrupt(bool enable){
+        if (enable){
+            m_flags|=taINTERRUPT;
+        }else{
+            m_flags&=(~taINTERRUPT);
+        }
+    }
+
+    bool get_interrupt(){
+        return ((m_flags &taINTERRUPT)?true:false);
+    }
+
+    void set_rx_disabled(bool disabled){
+        if (disabled){
+            m_flags|=taRX_DISABLED;
+        }else{
+            m_flags&=(~taRX_DISABLED);
+        }
+    }
+
+    bool get_rx_enabled(){
+        return ((m_flags &taRX_DISABLED)?false:true);
+    }
+
+    bool get_rx_disabled(){
+        return ((m_flags &taRX_DISABLED)?true:false);
+    }
+
+    
+
+public:
+
+    void set_debug_id(uint8_t id){
+        m_debug_id = id;
+    }
+
+    uint8_t get_debug_id(){
+        return(m_debug_id);
+    }
+
+    void set_bh_api(CTcpAppApi * api){
+        m_api =api;
+    }
+
+    void set_program(CTcpAppProgram * prog){
+        m_program = prog;
+    }
+
+    void set_flow_ctx(CTcpPerThreadCtx *  ctx,
+                      CTcpFlow *          flow){
+        m_ctx = ctx;
+        m_flow = flow;
+    }
+
+public:
+
+
+    void start(bool interrupt);
+
+    void next();
+
+public:
+
+    void get_by_offset(uint32_t offset,CBufMbufRef & res){
+        assert(m_tx_active);
+        m_tx_active->get_by_offset(m_tx_offset+offset,res);
+    }
+
+    /* application events */
+public:
+
+
+    /* events from TCP stack */
+
+    /* tx queues number of bytes acked */
+    virtual int on_bh_tx_acked(uint32_t tx_bytes);
+
+    /* rx bytes */
+    virtual int on_bh_rx_bytes(uint32_t rx_bytes,
+                               struct rte_mbuf * m_mbuf);
+
+    virtual void on_bh_event(tcp_app_events_t event);
+
+private:
+
+    void process_cmd(CTcpAppCmd * cmd);
+
+    inline void check_rx_condition(){
+        if (m_cmd_rx_bytes>= m_cmd_rx_bytes_wm) {
+            next();
+        }
+    }
+
+private:
+    CTcpFlow *             m_flow;
+    CTcpPerThreadCtx *     m_ctx;
+    CTcpAppApi *           m_api; 
+    CMbufBuffer *          m_tx_active;
+    CTcpAppProgram       * m_program;
+    uint8_t                m_flags;
+    tcp_app_state_t        m_state;
+    uint8_t                m_debug_id;
+    uint8_t                m_pad;
+
+    uint32_t               m_cmd_index; /* the index of current command */
+    uint32_t               m_tx_offset; /* in case of TX tcTX_BUFFER command, offset into the buffer */
+    uint32_t               m_tx_residue; /* how many bytes we can add to the socket queue */
+
+    uint32_t               m_cmd_rx_bytes;
+    uint32_t               m_cmd_rx_bytes_wm; /* water mark to check */
+
+};
+
+
+
+class CTcpPerThreadCtx;
+
 
 class   CTcpSockBuf {
 
 public:
     void Create(uint32_t max_size){
         sb_hiwat=max_size;
-        m_head_offset=0;
         sb_cc=0;
         sb_flags=0;
     }
@@ -256,40 +534,26 @@ public:
         return (sb_hiwat-sb_cc);
     }
 
-    void sb_start_new_buffer(){
-        m_head_offset=0;
-    }
-
     void sbappend(uint32_t bytes){
         sb_cc+=bytes;
     }
 
-    void sbdrop_all(){
-        sbdrop(sb_cc);
+    void sbdrop_all(struct tcp_socket *so){
+        sbdrop(so,sb_cc);
     }
 
     /* drop x bytes from tail */
-    void sbdrop(int len){
-        assert(sb_cc>=len);
-        m_head_offset+=len;
-        sb_cc-=len;
-        sb_flags |=SB_DROPCALL;
-    }
+    inline void sbdrop(struct tcp_socket *so,
+                       int len);
 
-    void get_by_offset(CTcpPerThreadCtx *ctx,uint32_t offset,CBufMbufRef & res){
-        m_app->m_write_buf.get_by_offset(m_head_offset+offset,res);
-        //callback ctx->
-        //get_offset( m_head_offset+offset,CBufMbufRef & res);
-    }
+    inline void get_by_offset(struct tcp_socket *so,uint32_t offset,
+                              CBufMbufRef & res);
 
 public:
 
     uint32_t    sb_cc;      /* actual chars in buffer */
     uint32_t    sb_hiwat;   /* max actual char count */
     uint32_t    sb_flags;   /* flags, see below */
-    uint32_t    m_head_offset; /* offset to head*/
-
-    CTcpApp  *  m_app;
 };
 
 
@@ -309,7 +573,24 @@ struct tcp_socket {
     struct  sockbuf so_rcv;
     CTcpSockBuf     so_snd;
 
+    CTcpApp  *      m_app; /* call back pointer */
 };
+
+
+inline void CTcpSockBuf::sbdrop(struct tcp_socket *so,
+            int len){
+    assert(sb_cc>=len);
+    sb_cc-=len;
+    sb_flags |=SB_DROPCALL;
+    if (len) {
+        so->m_app->on_bh_tx_acked((uint32_t)len);
+    }
+}
+
+inline void CTcpSockBuf::get_by_offset(struct tcp_socket *so,uint32_t offset,
+                          CBufMbufRef & res){
+    so->m_app->get_by_offset(offset,res);
+}
 
 
 

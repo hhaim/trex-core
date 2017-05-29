@@ -515,6 +515,11 @@ void tcp_slowtimo(CTcpPerThreadCtx * ctx, struct tcpcb *tp);
 int tcp_listen(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 
 int tcp_connect(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+struct tcpcb * tcp_usrclosed(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+struct tcpcb * tcp_disconnect(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
+
+
+
 int  tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb * tp);
 struct tcpcb *  tcp_close(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
 void  tcp_setpersist(CTcpPerThreadCtx * ctx,struct tcpcb *tp);
@@ -628,5 +633,44 @@ int  tcp_usrreq __P((struct socket *,
         int, struct mbuf *, struct mbuf *, struct mbuf *));
 void     tcp_xmit_timer __P((struct tcpcb *, int));
 #endif
+
+
+class CTcpAppApiImpl : public CTcpAppApi {
+public:
+
+    /* get maximum tx queue space */
+    virtual uint32_t get_tx_max_space(CTcpFlow * flow){
+        return (flow->m_tcp.m_socket.so_snd.sb_hiwat);
+    }
+
+    /* get space in bytes in the tx queue */
+    virtual uint32_t get_tx_sbspace(CTcpFlow * flow){
+        return (flow->m_tcp.m_socket.so_snd.get_sbspace());
+    }
+
+    /* add bytes to tx queue */
+    virtual void tx_sbappend(CTcpFlow * flow,uint32_t bytes){
+        flow->m_tcp.m_socket.so_snd.sbappend(bytes);
+    }
+
+    virtual uint32_t  rx_drain(CTcpFlow * flow){
+        /* drain bytes from the rx queue */
+        uint32_t res=flow->m_tcp.m_socket.so_rcv.sb_cc;
+        flow->m_tcp.m_socket.so_rcv.sb_cc=0;
+        return(res);
+    }
+
+
+    virtual void tx_tcp_output(CTcpPerThreadCtx * ctx,CTcpFlow *         flow){
+        tcp_output(ctx,&flow->m_tcp);
+    }
+
+    virtual void delay(uint64_t usec){
+        assert(0);
+        printf("TBD \n");
+    }
+};
+
+
 
 #endif

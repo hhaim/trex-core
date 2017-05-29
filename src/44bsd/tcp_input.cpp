@@ -120,7 +120,9 @@ int CTcpReass::tcp_reass_no_data(CTcpPerThreadCtx * ctx,
 
     flags = (m_blocks[0].m_flags==1) ? TH_FIN :0;
 
-    sbappend_bytes(&tp->m_socket.so_rcv ,m_blocks[0].m_len);
+    sbappend_bytes(&tp->m_socket,
+                   &tp->m_socket.so_rcv ,
+                   m_blocks[0].m_len);
 
     /* remove the first block */
     int i;
@@ -308,7 +310,8 @@ inline void TCP_REASS(CTcpPerThreadCtx * ctx,
         tiflags = ti->ti_flags & TH_FIN; 
         INC_STAT(ctx,tcps_rcvpack);
         INC_STAT_CNT(ctx,tcps_rcvbyte,ti->ti_len);
-        sbappend(&so->so_rcv, m,ti->ti_len); 
+        sbappend(so,
+                 &so->so_rcv, m,ti->ti_len); 
         sorwakeup(so); 
     } else { 
         tiflags = tcp_reass(ctx,tp, ti, m); 
@@ -564,7 +567,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
                 acked = ti->ti_ack - tp->snd_una;
                 INC_STAT(ctx,tcps_rcvackpack);
                 INC_STAT_CNT(ctx,tcps_rcvackbyte,acked);
-                so->so_snd.sbdrop(acked);
+                so->so_snd.sbdrop(so,acked);
 
                 tp->snd_una = ti->ti_ack;
                 rte_pktmbuf_free(m);
@@ -607,7 +610,8 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
              * to socket buffer.
              */
             assert(rte_pktmbuf_adj(m, off)!=NULL);
-            sbappend(&so->so_rcv, m,ti->ti_len);
+            sbappend(so,
+                     &so->so_rcv, m,ti->ti_len);
             sorwakeup(so);
             tp->t_flags |= TF_DELACK;
             return 0;
@@ -1110,10 +1114,10 @@ trimthenstep6:
         }
         if (acked > so->so_snd.sb_cc) {
             tp->snd_wnd -= so->so_snd.sb_cc;
-            so->so_snd.sbdrop_all();
+            so->so_snd.sbdrop_all(so);
             ourfinisacked = 1;
         } else {
-            so->so_snd.sbdrop(acked);
+            so->so_snd.sbdrop(so,acked);
             tp->snd_wnd -= acked;
             ourfinisacked = 0;
         }
