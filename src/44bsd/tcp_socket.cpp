@@ -228,6 +228,15 @@ void CMbufBuffer::Add_mbuf(CMbufObject & obj){
     m_vec.push_back(obj);
 }
 
+void CTcpApp::tcp_close(){
+
+    tcp_usrclosed(m_ctx,&m_flow->m_tcp);
+    if (get_interrupt()==false) {
+        m_api->tx_tcp_output(m_ctx,m_flow);
+    }
+
+}
+
 
 void CTcpApp::process_cmd(CTcpAppCmd * cmd){
 
@@ -282,6 +291,7 @@ void CTcpApp::next(){
     if ( m_cmd_index == m_program->get_size() ) {
         /* nothing to do */
         /* TBD */
+        tcp_close();
         printf(" END .. %d \n",(int)m_debug_id);
         return;
     }
@@ -322,7 +332,7 @@ int CTcpApp::on_bh_tx_acked(uint32_t tx_bytes){
 
 
 void CTcpApp::on_bh_event(tcp_app_events_t event){
-    //printf(" event %d %s \n",(int)m_debug_id,get_tcp_app_events_name(event).c_str());
+    printf(" event %d %s \n",(int)m_debug_id,get_tcp_app_events_name(event).c_str());
 }
 
 /* rx bytes */

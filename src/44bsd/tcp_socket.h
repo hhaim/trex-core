@@ -490,6 +490,9 @@ private:
         }
     }
 
+    void tcp_close();
+
+
 private:
     CTcpFlow *             m_flow;
     CTcpPerThreadCtx *     m_ctx;

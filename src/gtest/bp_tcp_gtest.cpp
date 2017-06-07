@@ -1604,3 +1604,127 @@ TEST_F(gt_tcp, tst31) {
     delete buf;
 }
 
+
+
+#include <common/dlist.h>
+#include <common/closehash.h>
+
+
+class CHashObjectVal {
+public:
+    uint32_t m_id;
+};
+
+class CHashUint64 {
+public:
+	static uint32_t Hash(uint64_t x){
+		return ( (x >>40) ^ (x & 0xffffffff));
+	}
+};
+
+
+typedef CHashEntry<uint64_t,CHashObjectVal> test_hash_ent_t;
+typedef CCloseHash<uint64_t,CHashObjectVal,CHashUint64> test_hash_t;
+
+
+#if 0
+class CRxCheckFlowTableHash   {
+public:
+    bool Create(int max_size){
+		return ( m_hash.Create(max_size,0,false,false,true) );
+	}
+    void Delete(){
+		m_hash.Delete();
+	}
+    bool remove(uint64_t fid ) {
+		return(m_hash.Remove(fid)==hsOK?true:false);
+	}
+    CRxCheckFlow * lookup(uint64_t fid ){
+		rx_c_hash_ent_t *lp=m_hash.Find(fid);
+		if (lp) {
+			return (&lp->value);
+		}else{
+			return ((CRxCheckFlow *)NULL);
+		}
+	}
+    CRxCheckFlow * add(uint64_t fid ){
+		rx_c_hash_ent_t *lp;
+		assert(m_hash.Insert(fid,lp)==hsOK);
+		return (&lp->value);
+	}
+
+    void remove_all(void){
+		
+	}
+    void dump_all(FILE *fd){
+		m_hash.Dump(fd);
+	}
+    uint64_t count(void){
+		return ( m_hash.GetSize());
+
+	}
+public:
+
+	rx_c_hash_t                  m_hash;
+};
+
+#endif
+
+
+
+
+struct CMyNode {
+    TCDListNode m_node;
+    uint32_t    m_id;
+};
+      
+
+TEST_F(gt_tcp, tst32) {
+    TCGenDList list;
+    printf(" dlist tests  \n");
+    list.Create();
+#if 1
+    int i;
+    for (i=0; i<10; i++) {
+        CMyNode * lp=new CMyNode();
+        lp->m_id=i;
+        lp->m_node.reset();
+        list.insert_head(&lp->m_node);
+    }
+#endif
+    TCGenDListIterator it(list);
+
+    CMyNode * lp=0;
+    for ( ;(lp=(CMyNode *)it.node()); it++){
+        printf(" id: %lu \n",(ulong)lp->m_id);
+    }
+
+    while (!list.is_empty()) {
+        delete list.remove_head();
+    }
+}
+
+TEST_F(gt_tcp, tst33) {
+
+    test_hash_t   hash;
+    test_hash_ent_t * lp;
+
+    hash.Create(32);
+
+    lp=hash.find(1);
+    assert(lp==0);
+
+    EXPECT_EQ(hash.insert(1,lp),hsOK);
+    lp->value.m_id=17;
+
+    EXPECT_EQ(hash.insert(1,lp),hsERR_INSERT_DUPLICATE);
+
+    lp=hash.find(1);
+    EXPECT_EQ(lp->value.m_id,17);
+
+    hash.remove(lp);
+
+    hash.Delete();
+}
+
+

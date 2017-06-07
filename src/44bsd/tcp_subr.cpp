@@ -312,8 +312,8 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 
     if ( m_tick==TCP_SLOW_RATIO_MASTER ) {
         tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
-        if (tcp_maxidle > UINT8_MAX) {
-            tcp_maxidle = UINT8_MAX;
+        if (tcp_maxidle > (2 * TCPTV_MSL)) {
+            tcp_maxidle = (2 * TCPTV_MSL);
         }
 
         tcp_iss += TCP_ISSINCR/PR_SLOWHZ;       /* increment iss */
@@ -548,6 +548,8 @@ tcp_close(CTcpPerThreadCtx * ctx,
 #endif /* RTV_RTT */
     /* free the reassembly queue, if any */
 
+    /* mark it as close and return zero */
+    tp->t_state = TCPS_CLOSED;
     /* TBD -- back pointer to flow and delete it */
     INC_STAT(ctx,tcps_closed);
     return((struct tcpcb *)0);
