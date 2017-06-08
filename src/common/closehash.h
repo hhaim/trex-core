@@ -26,6 +26,7 @@ limitations under the License.
 #include "dlist.h"
 #include <string.h>
 #include <stdio.h>
+#include <string>
 
 struct CCloseHashRec {
   TCGenDList m_list;

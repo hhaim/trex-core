@@ -1,5 +1,5 @@
-#ifndef FLOW_TABLE_
-#define FLOW_TABLE_
+#ifndef __FLOW_TABLE_
+#define __FLOW_TABLE_
 
 /*
  Hanoh Haim
@@ -27,12 +27,12 @@ limitations under the License.
 
 typedef uint64_t flow_key_t; 
 
-static inline uint32_t hash_rot(uint32_t v,uint16_t r ){
+static inline uint32_t ft_hash_rot(uint32_t v,uint16_t r ){
     return ( (v<<r) | ( v>>(32-(r))) );
 }
 
 
-static inline uint32_t hash1(uint64_t u ){
+static inline uint32_t ft_hash1(uint64_t u ){
   uint64_t v = u * 3935559000370003845 + 2691343689449507681;
 
   v ^= v >> 21;
@@ -48,7 +48,7 @@ static inline uint32_t hash1(uint64_t u ){
   return (uint32_t)v;
 }
 
-static inline uint32_t hash2(uint64_t in){
+static inline uint32_t ft_hash2(uint64_t in){
     uint64_t in1=in*2654435761;
     /* convert to 32bit */
     uint32_t x= (in1>>32) ^ (in1 & 0xffffffff);
@@ -100,12 +100,12 @@ public:
 
     uint32_t get_hash_worse(){
         uint16_t p = get_port();
-        uint32_t res = hash_rot(get_ip(),((p %16)+1)) ^ (p + get_proto()) ;
+        uint32_t res = ft_hash_rot(get_ip(),((p %16)+1)) ^ (p + get_proto()) ;
         return (res);
     }
 
     uint32_t get_hash(){
-        return ( hash2(get_as_uint64()) );
+        return ( ft_hash2(get_as_uint64()) );
     }
 
     void dump(FILE *fd);
@@ -122,6 +122,45 @@ private:
     } u;
 
 };
+
+/* full tuple -- for directional flow */
+
+class CFlowKeyFullTuple {
+public:
+    uint8_t  m_proto;
+    uint8_t  m_l3_offset;
+    uint8_t  m_l4_offset;
+    uint8_t  m_l5_offset;
+    uint16_t m_total_l7;
+    bool     m_ipv4;
+};
+
+
+
+typedef CHashEntry<flow_key_t> flow_hash_ent_t;
+typedef CCloseHash<flow_key_t> flow_hash_t;
+
+
+class CFlowTable {
+public:
+    bool Create(uint32_t size,
+                bool client_side);
+    void Delete();
+
+public:
+      bool parse_packet(struct rte_mbuf *   mbuf,
+                        CSimplePacketParser & parser,
+                        CFlowKeyTuple      & tuple,
+                        CFlowKeyFullTuple  & ftuple);
+
+      bool rx_handle_packet(CTcpPerThreadCtx * ctx,
+                            struct rte_mbuf * mbuf);
+
+private:
+    bool            m_client_side;
+    flow_hash_t     m_ft;
+};
+
 
 
 

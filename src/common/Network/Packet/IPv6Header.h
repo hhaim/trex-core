@@ -77,6 +77,9 @@ public:
     inline uint8_t  getHopLimit();
     inline void     setHopLimit(uint8_t);
     inline void     getSourceIpv6(uint16_t *);
+    inline uint32_t getSourceIpv6LSB();
+    inline uint32_t getDestIpv6LSB();
+
     inline void     setSourceIpv6(uint16_t *);
     inline void     getDestIpv6(uint16_t *);
     inline void     setDestIpv6(uint16_t *);
@@ -213,6 +216,15 @@ inline  void IPv6Header::getSourceIpv6(uint16_t *argSourceAddress)
         argSourceAddress[i] = PKT_NTOHS(mySource[i]);
     }
 }
+
+inline uint32_t IPv6Header::getSourceIpv6LSB(){
+    return (PKT_NTOHL(*((uint32_t*)&mySource[6])));
+}
+
+inline uint32_t IPv6Header::getDestIpv6LSB(){
+    return (PKT_NTOHL(*((uint32_t*)&myDestination[6])));
+}
+
 
 inline void IPv6Header::setSourceIpv6(uint16_t *argSourceAddress)
 {

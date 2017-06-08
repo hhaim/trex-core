@@ -325,7 +325,8 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
 }
 
 
-bool CTcpPerThreadCtx::Create(void){
+bool CTcpPerThreadCtx::Create(uint32_t size,
+                              bool is_client){
 
     tcp_tx_socket_bsize=32*1024;
     tcp_rx_socket_bsize=32*1024 ;
@@ -355,6 +356,11 @@ bool CTcpPerThreadCtx::Create(void){
         printf("ERROR  %-30s  - %s \n",err.get_str(),err.get_help_str());
         return(false);
     }
+
+    if (!m_ft.Create(size,is_client)){
+        printf("ERROR  can't create flow table \n");
+        return(false);
+    }
     return(true);
 }
 
@@ -362,6 +368,7 @@ bool CTcpPerThreadCtx::Create(void){
 
 void CTcpPerThreadCtx::Delete(){
     m_timer_w.Delete();
+    m_ft.Delete();
 }
 
 /*

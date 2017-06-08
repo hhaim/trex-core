@@ -1,6 +1,5 @@
-#ifndef FLOW_TABLE_
-#define FLOW_TABLE_
-
+#include "flow_table.h"
+#include "tcp_var.h"
 /*
  Hanoh Haim
  Cisco Systems, Inc.
@@ -22,109 +21,141 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include <common/closehash.h>
 
+#include "flow_stat_parser.h"
 
-typedef uint64_t flow_key_t; 
-
-static inline uint32_t hash_rot(uint32_t v,uint16_t r ){
-    return ( (v<<r) | ( v>>(32-(r))) );
+void CFlowKeyTuple::dump(FILE *fd){
+    fprintf(fd,"m_ip       : %lu \n",(ulong)get_ip());
+    fprintf(fd,"m_port     : %lu \n",(ulong)get_port());
+    fprintf(fd,"m_proto    : %lu \n",(ulong)get_proto());
+    fprintf(fd,"m_ipv4     : %lu \n",(ulong)get_is_ipv4());
+    fprintf(fd,"hash       : %u \n",get_hash());
 }
 
 
-static inline uint32_t hash1(uint64_t u ){
-  uint64_t v = u * 3935559000370003845 + 2691343689449507681;
+bool CFlowTable::Create(uint32_t size,
+                        bool client_side){
 
-  v ^= v >> 21;
-  v ^= v << 37;
-  v ^= v >>  4;
-
-  v *= 4768777513237032717;
-
-  v ^= v << 20;
-  v ^= v >> 41;
-  v ^= v <<  5;
-
-  return (uint32_t)v;
+    m_client_side = client_side;
+    if (!m_ft.Create(size) ){
+        printf("ERROR can't allocate flow-table \n");
+        return(false);
+    }
+    return(true);
 }
 
-static inline uint32_t hash2(uint64_t in){
-    uint64_t in1=in*2654435761;
-    /* convert to 32bit */
-    uint32_t x= (in1>>32) ^ (in1 & 0xffffffff);
-    return (x);
+void CFlowTable::Delete(){
+    m_ft.Delete();
 }
 
 
-class CFlowKeyTuple {
-public:
-    CFlowKeyTuple(){
-        u.m_raw=0;
+bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
+                              CSimplePacketParser & parser,
+                              CFlowKeyTuple & tuple,
+                              CFlowKeyFullTuple & ftuple){
+
+    if (!parser.Parse()){
+        return(false);
     }
 
-    void set_ip(uint32_t ip){
-        u.m_bf.m_ip = ip;
+    /* TBD fix, should support UDP/IPv6 */
+
+    if ( parser.m_protocol != IPHeader::Protocol::TCP ){
+        return(false);
+    }
+    /* it is TCP, only supported right now */
+
+    uint8_t *p=rte_pktmbuf_mtod(mbuf, uint8_t*);
+    /* check packet length and checksum in case of TCP */
+
+    CFlowKeyFullTuple *lpf= &ftuple;
+
+    if (parser.m_ipv4) {
+        /* IPv4 */
+        lpf->m_ipv4      =true;
+        lpf->m_l3_offset = (uintptr_t)parser.m_ipv4 - (uintptr_t)p;
+        IPHeader *   ipv4= parser.m_ipv4;
+        TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
+        if ( m_client_side ) {
+            tuple.set_ip(ipv4->getDestIp());
+            tuple.set_port(lpTcp->getDestPort());
+        }else{
+            tuple.set_ip(ipv4->getSourceIp());
+            tuple.set_port(lpTcp->getSourcePort());
+        }
+
+
+    }else{
+        lpf->m_ipv4      =false;
+        lpf->m_l3_offset = (uintptr_t)parser.m_ipv6 - (uintptr_t)p;
+
+        IPv6Header *   ipv6= parser.m_ipv6;
+        TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
+
+        if ( m_client_side ) {
+            tuple.set_ip(ipv6->getDestIpv6LSB());
+            tuple.set_port(lpTcp->getDestPort());
+        }else{
+            tuple.set_ip(ipv6->getSourceIpv6LSB());
+            tuple.set_port(lpTcp->getSourcePort());
+        }
     }
 
-    void set_port(uint16_t port){
-        u.m_bf.m_port = port;
+    lpf->m_proto     =   parser.m_protocol;
+    lpf->m_l4_offset = (uintptr_t)parser.m_l4 - (uintptr_t)p;
+
+    lpf->m_l5_offset = lpf->m_l4_offset + tcp->getHeaderLength();
+    lpf->m_total_l7  =
+
+    tuple.set_proto(lpf->m_proto);
+    tuple.set_ipv4(lpf->m_ipv4);
+    return(true);
+}
+
+bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
+                                  struct rte_mbuf * mbuf){
+
+    CFlowKeyTuple tuple;
+    CFlowKeyFullTuple ftuple;
+
+    CSimplePacketParser parser(mbuf);
+
+
+    if ( !parse_packet(mbuf,
+                      tuple,
+                      ftuple) ) {
+        /* free memory */
+        rte_pktmbuf_free(mbuf);
     }
 
-    void set_proto(uint8_t proto){
-        u.m_bf.m_proto = proto;
+    flow_key_t key=tuple.get_as_uint64();
+    uint32_t  hash=tuple.get_hash();
+
+    flow_hash_ent_t * lpflow;
+    lpflow = m_ft.find(key,hash);
+    CTcpFlow * lptflow;
+
+
+    if ( lpflow ) {
+        lptflow = CTcpFlow::cast_from_hash_obj(lpflow);
+
+        TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
+        tcp_flow_input(ctx,
+                       &lptflow->m_tcp,
+                       mbuf,
+                       lpTcp,
+                       ftuple.m_l5_offset,
+                       ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
+                       )
+
+
+
     }
 
-    void set_ipv4(bool ipv4){
-        u.m_bf.m_ipv4 = ipv4?1:0;
-    }
-
-    uint32_t get_ip(){
-        return(u.m_bf.m_ip);
-    }
-
-    uint32_t get_port(){
-        return(u.m_bf.m_port);
-    }
-
-    uint8_t get_proto(){
-        return(u.m_bf.m_proto);
-    }
-
-    bool get_is_ipv4(){
-        return(u.m_bf.m_ipv4?true:false);
-    }
-
-    uint64_t get_as_uint64(){
-        return (u.m_raw);
-    }
-
-    uint32_t get_hash_worse(){
-        uint16_t p = get_port();
-        uint32_t res = hash_rot(get_ip(),((p %16)+1)) ^ (p + get_proto()) ;
-        return (res);
-    }
-
-    uint32_t get_hash(){
-        return ( hash2(get_as_uint64()) );
-    }
-
-    void dump(FILE *fd);
-private:
-    union {
-        struct {
-            uint64_t m_ip:32,
-                     m_port:16,
-                     m_proto:8,
-                     m_ipv4:1,
-                     m_spare:7;
-        }        m_bf;
-        uint64_t m_raw;
-    } u;
-
-};
 
 
+    return(true);
+}
 
-#endif
 
 

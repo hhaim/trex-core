@@ -34,6 +34,8 @@ limitations under the License.
 #include "44bsd/tcp_socket.h"
 #include "44bsd/tcpip.h"
 #include "44bsd/tcp_dpdk.h"
+#include "44bsd/flow_table.h"
+
 #include "mbuf.h"
 #include <stdlib.h>
 #include <common/c_common.h>
@@ -64,7 +66,7 @@ TEST_F(gt_tcp, tst2) {
     CTcpFlow   flow;
     flow.Create(&tcp_ctx);
 
-    tcp_ctx.Create();
+    tcp_ctx.Create(100,false);
     tcp_ctx.timer_w_start(&flow);
     int i;
     for (i=0; i<40; i++) {
@@ -124,7 +126,7 @@ public:
 };
 
 bool CTcpReassTest::Create(){
-    m_ctx.Create();
+    m_ctx.Create(100,false);
     m_flow.Create(&m_ctx);
     return(true);
 }
@@ -1255,10 +1257,10 @@ bool CClientServerTcp::Create(std::string pcap_file){
 
     m_s_pcap.open_pcap_file(pcap_file+"_s.pcap");
 
-    m_c_ctx.Create();
+    m_c_ctx.Create(100,true);
     m_c_ctx.set_cb(&m_io_debug);
 
-    m_s_ctx.Create();
+    m_s_ctx.Create(100,false);
     m_s_ctx.set_cb(&m_io_debug);
 
     m_c_flow.Create(&m_c_ctx);
@@ -1692,131 +1694,6 @@ TEST_F(gt_tcp, tst32) {
 #include <common/closehash.h>
 
 
-typedef uint64_t flow_key_t; 
-
-static inline uint32_t hash_rot(uint32_t v,uint16_t r ){
-    return ( (v<<r) | ( v>>(32-(r))) );
-}
-
-
-static inline uint32_t hash1(uint64_t u ){
-  uint64_t v = u * 3935559000370003845 + 2691343689449507681;
-
-  v ^= v >> 21;
-  v ^= v << 37;
-  v ^= v >>  4;
-
-  v *= 4768777513237032717;
-
-  v ^= v << 20;
-  v ^= v >> 41;
-  v ^= v <<  5;
-
-  return (uint32_t)v;
-}
-
-static inline uint32_t hash2(uint64_t in){
-    uint64_t in1=in*2654435761;
-    /* convert to 32bit */
-    uint32_t x= (in1>>32) ^ (in1 & 0xffffffff);
-    return (x);
-}
-
-
-class CFlowKeyTuple {
-public:
-    CFlowKeyTuple(){
-        u.m_raw=0;
-    }
-
-    void set_ip(uint32_t ip){
-        u.m_bf.m_ip = ip;
-    }
-
-    void set_port(uint16_t port){
-        u.m_bf.m_port = port;
-    }
-
-    void set_proto(uint8_t proto){
-        u.m_bf.m_proto = proto;
-    }
-
-    void set_ipv4(bool ipv4){
-        u.m_bf.m_ipv4 = ipv4?1:0;
-    }
-
-    uint32_t get_ip(){
-        return(u.m_bf.m_ip);
-    }
-
-    uint32_t get_port(){
-        return(u.m_bf.m_port);
-    }
-
-    uint8_t get_proto(){
-        return(u.m_bf.m_proto);
-    }
-
-    bool get_is_ipv4(){
-        return(u.m_bf.m_ipv4?true:false);
-    }
-
-    uint64_t get_as_uint64(){
-        return (u.m_raw);
-    }
-
-    uint32_t get_hash_worse(){
-        uint16_t p = get_port();
-        uint32_t res = hash_rot(get_ip(),((p %16)+1)) ^ (p + get_proto()) ;
-        return (res);
-    }
-
-    uint32_t get_hash(){
-        return ( hash2(get_as_uint64()) );
-    }
-
-    void dump(FILE *fd);
-private:
-    union {
-        struct {
-            uint64_t m_ip:32,
-                     m_port:16,
-                     m_proto:8,
-                     m_ipv4:1,
-                     m_spare:7;
-        }        m_bf;
-        uint64_t m_raw;
-    } u;
-
-};
-
-
-void CFlowKeyTuple::dump(FILE *fd){
-    fprintf(fd,"m_ip       : %lu \n",(ulong)get_ip());
-    fprintf(fd,"m_port     : %lu \n",(ulong)get_port());
-    fprintf(fd,"m_proto    : %lu \n",(ulong)get_proto());
-    fprintf(fd,"m_ipv4     : %lu \n",(ulong)get_is_ipv4());
-    fprintf(fd,"hash       : %u \n",get_hash());
-}
-
-#if 0
-typedef CHashEntry<flow_key_t> flow_hash_ent_t;
-typedef CCloseHash<flow_key_t> flow_hash_t;
-
-class CFlowTable {
-public:
-    bool Create(uint32_t size);
-    void Delete();
-
-public:
-      bool rx_handle_packet(struct rte_mbuf * mbuf);
-      void remove_flow(
-private:
-
-    flow_hash_t     m_ft;
-};
-#endif
-
 TEST_F(gt_tcp, tst33) {
     CFlowKeyTuple key;
     key.dump(stdout);
@@ -2014,4 +1891,39 @@ TEST_F(gt_tcp, tst37) {
     ht.Delete();
 }
 
+class MyTestVirt {
+public:
+    virtual int a1(){
+        return(17);
+    }
+    virtual ~MyTestVirt(){
+    }
+    int a;
+    int b;
+};
+
+struct MyTestVirt2 {
+    int a;
+    int b;
+};
+
+
+TEST_F(gt_tcp, tst38) {
+    MyTestVirt * lp=new MyTestVirt();
+    MyTestVirt2 *lp1=new MyTestVirt2();
+
+    printf(" %p %p\n",lp,&lp->a);
+
+    void *p=&lp->a;
+
+    UNSAFE_CONTAINER_OF_PUSH
+    MyTestVirt * lp2 =(MyTestVirt *)((uint8_t*)p-offsetof (MyTestVirt,a));
+    UNSAFE_CONTAINER_OF_POP
+
+    printf(" %p %p \n",lp2,&lp2->a);
+
+    delete lp;
+    delete lp1;
+
+}
 

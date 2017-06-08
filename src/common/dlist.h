@@ -23,6 +23,7 @@ limitations under the License.
 */
 
 #include <stdint.h>
+#include <assert.h>
 
 
 struct TCDListNode {

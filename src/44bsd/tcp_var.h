@@ -2,6 +2,7 @@
 #define BSD44_BR_TCP_VAR
 
 #include <stdint.h>
+#include <stddef.h>
 #include "tcp.h"
 #include "tcp_timer.h"
 #include "mbuf.h"
@@ -10,6 +11,9 @@
 #include <vector>
 #include "tcp_dpdk.h"
 #include "tcp_bsd_utl.h"
+#include "flow_table.h"
+#include <common/utl_gcc_diag.h>
+
 /*
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
  *  The Regents of the University of California.  All rights reserved.
@@ -346,6 +350,10 @@ public:
 #include "h_timer.h"
 
 class CTcpPerThreadCtx ;
+
+
+
+
 class CTcpFlow {
 
 public:
@@ -368,6 +376,13 @@ public:
     void init();
 public:
 
+    static CTcpFlow * cast_from_hash_obj(flow_hash_ent_t *p){
+        UNSAFE_CONTAINER_OF_PUSH
+        CTcpFlow * lp2 =(CTcpFlow *)((uint8_t*)p-offsetof (CTcpFlow,m_hash));
+        UNSAFE_CONTAINER_OF_POP
+        return (lp2);
+    }
+
     void on_slow_tick();
 
     void on_fast_tick();
@@ -383,9 +398,10 @@ public:
     }
 
 public:
-    uint8_t     m_tick;
-    tcpcb       m_tcp;
-    CHTimerObj  m_timer;
+    flow_hash_ent_t   m_hash; /* object   */
+    tcpcb             m_tcp;
+    CHTimerObj        m_timer;
+    uint8_t           m_tick;
     CTcpPerThreadCtx *m_ctx;
 };
 
@@ -403,7 +419,8 @@ public:
 
 class CTcpPerThreadCtx {
 public:
-    bool Create(void);
+    bool Create(uint32_t size,
+                bool is_client);
     void Delete();
     RC_HTW_t timer_w_start(CTcpFlow * flow){
         return (m_timer_w.timer_start(&flow->m_timer,TCP_FAST_TICK));
@@ -448,8 +465,9 @@ public:
 
     CHTimerWheel  m_timer_w; /* TBD-FIXME*/
     CTcpCtxCb    * m_cb;
-    struct  tcpiphdr tcp_saveti;
 
+    CFlowTable   m_ft;
+    struct  tcpiphdr tcp_saveti;
 };
 
 
