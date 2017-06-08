@@ -39,11 +39,10 @@ enum HASH_STATUS {
 };
 
 
-template <class K, class V>
+template <class K>
 class CHashEntry : public TCDListNode {
 public:
     K key;
-    V value;
 };
 
 
@@ -90,12 +89,12 @@ class HASH_ENV{
 }
 */
 
-template<class KEY, class VAL,class HASH_ENV>
+template<class KEY>
 class CCloseHash {
 
 public:
 
-    typedef CHashEntry<KEY,VAL>  hashEntry_t;
+    typedef CHashEntry<KEY>  hashEntry_t;
 
     CCloseHash();
 
@@ -108,14 +107,16 @@ public:
     void reset();
 public:
     
-    HASH_STATUS insert(const KEY & key,
-                       hashEntry_t * & handle);
+    HASH_STATUS insert(hashEntry_t * entry,uint32_t hash);
+
+    /* insert without check */
+    HASH_STATUS insert_nc(hashEntry_t * entry,uint32_t hash);
     
-    void  remove(hashEntry_t * lp);
+    HASH_STATUS remove(hashEntry_t * entry);
 
-    HASH_STATUS remove(const KEY & key);
+    HASH_STATUS remove_by_key(const KEY & key,uint32_t hash,hashEntry_t * & entry);
 
-    hashEntry_t * find(const KEY & key);
+    hashEntry_t * find(const KEY & key,uint32_t hash);
 
 
     uint32_t get_hash_size(){
@@ -126,13 +127,13 @@ public:
         return m_numEntries;
     }
 
-
 public:
     void Dump(FILE *fd);
 
 private:
     CCloseHashRec *              m_tbl; 
     uint32_t                     m_size;  // size of m_tbl log2
+    uint32_t                     m_mask;
     uint32_t                     m_numEntries; // Number of entries in hash
     uint32_t                     m_maxEntries; // Max number of entries allowed
     COpenHashCounters            m_stats;
@@ -140,22 +141,21 @@ private:
 
 
 
-
-
-template<class KEY, class VAL,class HASH_ENV>
-CCloseHash< KEY, VAL,HASH_ENV>::CCloseHash(){
+template<class KEY>
+CCloseHash<KEY>::CCloseHash(){
     m_size = 0;
+    m_mask=0;
     m_tbl=0; 
     m_numEntries=0;
     m_maxEntries=0;
 }
 
-template<class KEY, class VAL,class HASH_ENV>
-CCloseHash< KEY, VAL,HASH_ENV>::~CCloseHash(){
+template<class KEY>
+CCloseHash< KEY>::~CCloseHash(){
 }
 
 
-inline  uint32_t hash_FindPower2(uint32_t number){
+inline static uint32_t hash_FindPower2(uint32_t number){
     uint32_t  powerOf2=1;
     while(powerOf2 < number){
         if(powerOf2==0x80000000)
@@ -165,10 +165,11 @@ inline  uint32_t hash_FindPower2(uint32_t number){
     return(powerOf2);
 }
     
-template<class KEY, class VAL,class HASH_ENV>
-bool CCloseHash<KEY,VAL,HASH_ENV>::Create(uint32_t size){
+template<class KEY>
+bool CCloseHash<KEY>::Create(uint32_t size){
 
     m_size = hash_FindPower2(size);
+    m_mask=(m_size-1);
     m_tbl = new CCloseHashRec[m_size];
     if (!m_tbl) {
         return false;
@@ -185,62 +186,68 @@ bool CCloseHash<KEY,VAL,HASH_ENV>::Create(uint32_t size){
     return true;
 }
 
-template<class KEY, class VAL,class HASH_ENV>
-void CCloseHash<KEY,VAL,HASH_ENV>::Delete(){
+template<class KEY>
+void CCloseHash<KEY>::Delete(){
     delete []m_tbl;
     m_tbl=0;
     m_size = 0;
+    m_mask=0;
     m_numEntries=0;
     m_maxEntries=0;
 }
 
 
 
-template<class KEY, class VAL,class HASH_ENV>
-HASH_STATUS CCloseHash<KEY,VAL,HASH_ENV>::insert(const KEY & key,
-                                                 CCloseHash::hashEntry_t* & handle){
+template<class KEY>
+HASH_STATUS CCloseHash<KEY>::insert(hashEntry_t * entry,uint32_t hash){
 
     m_stats.m_cmd_open++;
-    uint32_t place = HASH_ENV::Hash(key) & (m_size-1);
+    uint32_t place = hash & (m_mask);
     CCloseHashRec * lpRec= &m_tbl[place];
     TCGenDListIterator iter(lpRec->m_list);
     hashEntry_t *lp;
     for ( ;(lp=(hashEntry_t *)iter.node()); iter++){
-        if (lp->key==key){
+        if (lp->key==entry->key){
             return(hsERR_INSERT_DUPLICATE);
         }
     }
-    lp = new CCloseHash::hashEntry_t();
-    if (!lp) {
-        handle=0;
-        return(hsERR_INSERT_FULL);
-    }
-    lp->key=key;
-    lpRec->m_list.append(lp);
-    handle=lp;
+    lpRec->m_list.append(entry);
     m_numEntries++;
     return(hsOK);
 }
 
-template<class KEY, class VAL,class HASH_ENV>
-void  CCloseHash<KEY,VAL,HASH_ENV>::remove(CCloseHash::hashEntry_t * lp){
-    m_stats.m_cmd_remove++;
-    lp->detach();
-    delete lp;
-    m_numEntries--;
+template<class KEY>
+HASH_STATUS CCloseHash<KEY>::insert_nc(hashEntry_t * entry,uint32_t hash){
+
+    m_stats.m_cmd_open++;
+    uint32_t place = hash & (m_mask);
+    CCloseHashRec * lpRec= &m_tbl[place];
+    lpRec->m_list.append(entry);
+    m_numEntries++;
+    return(hsOK);
 }
 
-template<class KEY, class VAL,class HASH_ENV>
-HASH_STATUS CCloseHash<KEY,VAL,HASH_ENV>::remove(const KEY & key){
+
+
+template<class KEY>
+HASH_STATUS  CCloseHash<KEY>::remove(hashEntry_t * entry){
     m_stats.m_cmd_remove++;
-    uint32_t place = HASH_ENV::Hash(key) & (m_size-1);
+    entry->detach();
+    m_numEntries--;
+    return(hsOK);
+}
+
+template<class KEY>
+HASH_STATUS CCloseHash<KEY>::remove_by_key(const KEY & key,uint32_t hash,hashEntry_t * & entry){
+    m_stats.m_cmd_remove++;
+    uint32_t place = hash & (m_mask);
     CCloseHashRec * lpRec= &m_tbl[place];
     TCGenDListIterator iter(lpRec->m_list);
     hashEntry_t *lp;
     for ( ;(lp=(hashEntry_t *)iter.node()); iter++){
         if ( lp->key == key ){
             lp->detach();
-            delete lp;
+            entry=lp;
             m_numEntries--;
             return(hsOK);
         }
@@ -249,10 +256,10 @@ HASH_STATUS CCloseHash<KEY,VAL,HASH_ENV>::remove(const KEY & key){
 }
 
 
-template<class KEY, class VAL,class HASH_ENV>
-typename CCloseHash<KEY,VAL,HASH_ENV>::hashEntry_t * CCloseHash<KEY,VAL,HASH_ENV>::find(const KEY & key){
+template<class KEY>
+typename CCloseHash<KEY>::hashEntry_t * CCloseHash<KEY>::find(const KEY & key,uint32_t hash){
     m_stats.m_cmd_find++;
-    uint32_t place = HASH_ENV::Hash(key) & (m_size-1);
+    uint32_t place = hash & (m_mask);
     CCloseHashRec * lpRec= &m_tbl[place];
     TCGenDListIterator iter(lpRec->m_list);
     hashEntry_t *lp;
@@ -269,8 +276,8 @@ typename CCloseHash<KEY,VAL,HASH_ENV>::hashEntry_t * CCloseHash<KEY,VAL,HASH_ENV
 
 
 
-template<class KEY, class VAL,class HASH_ENV>
-void CCloseHash<KEY,VAL,HASH_ENV>::reset(){
+template<class KEY>
+void CCloseHash<KEY>::reset(){
     m_stats.Clear();
     for(int i=0;i<m_size;i++){
         m_tbl[i].m_list.Create();
@@ -281,8 +288,8 @@ void CCloseHash<KEY,VAL,HASH_ENV>::reset(){
 
 
 
-template<class KEY, class VAL,class HASH_ENV>
-void CCloseHash<KEY,VAL,HASH_ENV>::Dump(FILE *fd){
+template<class KEY>
+void CCloseHash<KEY>::Dump(FILE *fd){
 	fprintf(fd," stats \n");
     fprintf(fd," ---------------------- \n");
     m_stats.Dump(fd);

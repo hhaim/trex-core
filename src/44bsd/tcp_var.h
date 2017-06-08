@@ -1,4 +1,4 @@
-#ifndef BSD44_BR_TCP_VAR
+#ifndef BSD44_BR_TCP_V9AR
 #define BSD44_BR_TCP_VAR
 
 #include <stdint.h>

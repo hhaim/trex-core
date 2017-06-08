@@ -1607,24 +1607,8 @@ TEST_F(gt_tcp, tst31) {
 
 
 #include <common/dlist.h>
-#include <common/closehash.h>
 
 
-class CHashObjectVal {
-public:
-    uint32_t m_id;
-};
-
-class CHashUint64 {
-public:
-	static uint32_t Hash(uint64_t x){
-		return ( (x >>40) ^ (x & 0xffffffff));
-	}
-};
-
-
-typedef CHashEntry<uint64_t,CHashObjectVal> test_hash_ent_t;
-typedef CCloseHash<uint64_t,CHashObjectVal,CHashUint64> test_hash_t;
 
 
 #if 0
@@ -1704,27 +1688,286 @@ TEST_F(gt_tcp, tst32) {
     }
 }
 
-TEST_F(gt_tcp, tst33) {
 
-    test_hash_t   hash;
+#include <common/closehash.h>
+
+
+typedef uint64_t flow_key_t; 
+
+static inline uint32_t hash_rot(uint32_t v,uint16_t r ){
+    return ( (v<<r) | ( v>>(32-(r))) );
+}
+
+
+static inline uint32_t hash1(uint64_t u ){
+  uint64_t v = u * 3935559000370003845 + 2691343689449507681;
+
+  v ^= v >> 21;
+  v ^= v << 37;
+  v ^= v >>  4;
+
+  v *= 4768777513237032717;
+
+  v ^= v << 20;
+  v ^= v >> 41;
+  v ^= v <<  5;
+
+  return (uint32_t)v;
+}
+
+static inline uint32_t hash2(uint64_t in){
+    uint64_t in1=in*2654435761;
+    /* convert to 32bit */
+    uint32_t x= (in1>>32) ^ (in1 & 0xffffffff);
+    return (x);
+}
+
+
+class CFlowKeyTuple {
+public:
+    CFlowKeyTuple(){
+        u.m_raw=0;
+    }
+
+    void set_ip(uint32_t ip){
+        u.m_bf.m_ip = ip;
+    }
+
+    void set_port(uint16_t port){
+        u.m_bf.m_port = port;
+    }
+
+    void set_proto(uint8_t proto){
+        u.m_bf.m_proto = proto;
+    }
+
+    void set_ipv4(bool ipv4){
+        u.m_bf.m_ipv4 = ipv4?1:0;
+    }
+
+    uint32_t get_ip(){
+        return(u.m_bf.m_ip);
+    }
+
+    uint32_t get_port(){
+        return(u.m_bf.m_port);
+    }
+
+    uint8_t get_proto(){
+        return(u.m_bf.m_proto);
+    }
+
+    bool get_is_ipv4(){
+        return(u.m_bf.m_ipv4?true:false);
+    }
+
+    uint64_t get_as_uint64(){
+        return (u.m_raw);
+    }
+
+    uint32_t get_hash_worse(){
+        uint16_t p = get_port();
+        uint32_t res = hash_rot(get_ip(),((p %16)+1)) ^ (p + get_proto()) ;
+        return (res);
+    }
+
+    uint32_t get_hash(){
+        return ( hash2(get_as_uint64()) );
+    }
+
+    void dump(FILE *fd);
+private:
+    union {
+        struct {
+            uint64_t m_ip:32,
+                     m_port:16,
+                     m_proto:8,
+                     m_ipv4:1,
+                     m_spare:7;
+        }        m_bf;
+        uint64_t m_raw;
+    } u;
+
+};
+
+
+void CFlowKeyTuple::dump(FILE *fd){
+    fprintf(fd,"m_ip       : %lu \n",(ulong)get_ip());
+    fprintf(fd,"m_port     : %lu \n",(ulong)get_port());
+    fprintf(fd,"m_proto    : %lu \n",(ulong)get_proto());
+    fprintf(fd,"m_ipv4     : %lu \n",(ulong)get_is_ipv4());
+    fprintf(fd,"hash       : %u \n",get_hash());
+}
+
+typedef CHashEntry<flow_key_t> flow_hash_ent_t;
+typedef CCloseHash<flow_key_t> flow_hash_t;
+
+
+class CFlowTable {
+public:
+    bool Create(uint32_t size);
+    void Delete();
+
+public:
+      bool rx_handle_packet(struct rte_mbuf * mbuf);
+      void remove_flow(
+private:
+
+    flow_hash_t     m_ft;
+};
+
+TEST_F(gt_tcp, tst33) {
+    CFlowKeyTuple key;
+    key.dump(stdout);
+    key.set_ip(0x12345678);
+    key.set_port(1025);
+    key.set_proto(06);
+    key.set_ipv4(true);
+    key.dump(stdout);
+    printf(" %lx \n",(ulong)key.get_as_uint64());
+}
+
+#include <algorithm>
+#include <map>
+
+typedef std::map<uint64_t, uint32_t, std::less<uint64_t> > hash_test_map_t;
+typedef hash_test_map_t::iterator hash_test_map_iter_t;
+
+struct chash_result {
+    uint32_t max_lookup;
+    double   table_util;
+    double   lookup_hit;
+};
+
+/* to check hash function */
+int hash_func_test(uint32_t mask,int clients,int ports,chash_result & res){
+    int i;
+    hash_test_map_t map_tbl;
+    int c;
+    int hit=0;
+    int lookup=0;
+    int max_lookup=0;
+
+    for (c=0; c<clients; c++) {
+        for (i=1025; i<(ports+1025); i++) {
+            lookup++;
+
+            CFlowKeyTuple key;
+            key.set_ip(0x16000001+c);
+            key.set_port(i);
+            key.set_proto(06);
+            key.set_ipv4(true);
+            uint32_t mkey = key.get_hash()&mask;
+            uint32_t val=0;
+
+            hash_test_map_iter_t iter;
+            iter = map_tbl.find(mkey);
+            if (iter != map_tbl.end() ) {
+                val=((*iter).second);
+                hit++;
+                (*iter).second=val+1;
+                if (val+1>max_lookup){
+                    max_lookup=val+1;
+                }
+
+            }else{
+                map_tbl.insert(hash_test_map_t::value_type(mkey,1));
+            }
+        }
+    }
+
+    res.max_lookup = max_lookup;
+    res.table_util = (ulong)100.0*(lookup)/(double)mask;
+    res.lookup_hit = ((double)(hit+lookup)/(double)lookup);
+
+
+    printf(" lookup        : %lu \n",(ulong)lookup);
+    printf(" hit           : %lu \n",(ulong)hit);
+    printf(" table size    : %lu \n",(ulong)mask);
+    printf(" max_lookup    : %lu \n",(ulong)max_lookup);
+    printf(" table_util    : %f  \n",res.table_util);
+    printf(" lookup factor %.1f %% \n",res.lookup_hit);
+    return (0);
+}
+
+/* check hash */
+TEST_F(gt_tcp, tst34) {
+
+    uint32_t mask=((1<<20)-1);
+    int i; 
+    chash_result res;
+    for (i=1000;i<6000; i+=100) {
+        hash_func_test(mask,255,i,res);
+    }
+}
+
+TEST_F(gt_tcp, tst35) {
+
+    int c; int i;
+    int p=0;
+
+    uint32_t mask=((1<<20)-1);
+
+    for (c=0; c<1000; c++) {
+        for (i=1025; i<60000; i++) {
+            CFlowKeyTuple key;
+            key.set_ip(0x16000001+c);
+            key.set_port(i);
+            key.set_proto(06);
+            key.set_ipv4(true);
+            uint32_t mkey = key.get_hash()&mask;
+            p+=mkey;
+        }
+    }
+}
+
+
+typedef CHashEntry<flow_key_t> test_hash_ent_t;
+typedef CCloseHash<flow_key_t> test_hash_t;
+
+
+class CMyFlowTest {
+public:
+    test_hash_ent_t m_hash_key;
+    uint32_t        m_id;
+};
+
+
+TEST_F(gt_tcp, tst36) {
+
+    test_hash_t   ht;
     test_hash_ent_t * lp;
 
-    hash.Create(32);
+    CFlowKeyTuple tuple;
 
-    lp=hash.find(1);
+    tuple.set_ip(0x16000001);
+    tuple.set_port(1025);
+    tuple.set_proto(6);
+    tuple.set_ipv4(true);
+
+    ht.Create(32);
+
+    flow_key_t key = tuple.get_as_uint64();
+    uint32_t   hash =tuple.get_hash(); 
+
+    lp=ht.find(key,hash);
     assert(lp==0);
 
-    EXPECT_EQ(hash.insert(1,lp),hsOK);
-    lp->value.m_id=17;
+    CMyFlowTest * lp_flow = new CMyFlowTest();
 
-    EXPECT_EQ(hash.insert(1,lp),hsERR_INSERT_DUPLICATE);
+    lp_flow->m_hash_key.key =key;
+    lp_flow->m_id =17;
 
-    lp=hash.find(1);
-    EXPECT_EQ(lp->value.m_id,17);
+    ht.insert_nc(&lp_flow->m_hash_key,hash);
 
-    hash.remove(lp);
+    lp=ht.find(key,hash);
+    assert(lp==&lp_flow->m_hash_key);
 
-    hash.Delete();
+    ht.remove(&lp_flow->m_hash_key);
+    delete lp_flow;
+
+    ht.Delete();
 }
+
 
 
