@@ -1971,4 +1971,47 @@ TEST_F(gt_tcp, tst36) {
 }
 
 
+void my_close_hash_on_detach_cb(void *userdata,
+                             void  *obj){
+
+    CMyFlowTest * lpobj=(CMyFlowTest *)obj;
+    printf (" free id  %lu \n",(ulong)lpobj->m_id);
+    delete lpobj;
+}
+
+TEST_F(gt_tcp, tst37) {
+
+    test_hash_t   ht;
+    test_hash_ent_t * lp;
+
+    CFlowKeyTuple tuple;
+
+    tuple.set_ip(0x16000001);
+    tuple.set_port(1025);
+    tuple.set_proto(6);
+    tuple.set_ipv4(true);
+
+    ht.Create(32);
+
+    flow_key_t key = tuple.get_as_uint64();
+    uint32_t   hash =tuple.get_hash(); 
+
+    lp=ht.find(key,hash);
+    assert(lp==0);
+
+    CMyFlowTest * lp_flow = new CMyFlowTest();
+
+    lp_flow->m_hash_key.key =key;
+    lp_flow->m_id =17;
+
+    ht.insert_nc(&lp_flow->m_hash_key,hash);
+
+    lp=ht.find(key,hash);
+    assert(lp==&lp_flow->m_hash_key);
+
+    ht.detach_all(0,my_close_hash_on_detach_cb);
+
+    ht.Delete();
+}
+
 

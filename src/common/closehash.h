@@ -89,6 +89,9 @@ class HASH_ENV{
 }
 */
 
+typedef void (*close_hash_on_detach_cb_t)(void *userdata,void  *obh);
+
+
 template<class KEY>
 class CCloseHash {
 
@@ -117,6 +120,9 @@ public:
     HASH_STATUS remove_by_key(const KEY & key,uint32_t hash,hashEntry_t * & entry);
 
     hashEntry_t * find(const KEY & key,uint32_t hash);
+
+     /* iterate all, detach and call the callback */
+    void detach_all(void *userdata,close_hash_on_detach_cb_t cb);
 
 
     uint32_t get_hash_size(){
@@ -272,6 +278,20 @@ typename CCloseHash<KEY>::hashEntry_t * CCloseHash<KEY>::find(const KEY & key,ui
         f_itr++;
     }
     return((hashEntry_t *)0);
+}
+
+
+template<class KEY>
+void CCloseHash<KEY>::detach_all(void *userdata,
+                                 close_hash_on_detach_cb_t cb){
+    for(int i=0;i<m_size;i++){
+        TCGenDList * lp=&m_tbl[i].m_list;
+        while ( !lp->is_empty() ){
+            TCDListNode* obj=lp->remove_head();
+            m_numEntries--;
+            cb(userdata,(void *)obj);
+        }
+    }
 }
 
 
