@@ -1799,9 +1799,9 @@ void CFlowKeyTuple::dump(FILE *fd){
     fprintf(fd,"hash       : %u \n",get_hash());
 }
 
+#if 0
 typedef CHashEntry<flow_key_t> flow_hash_ent_t;
 typedef CCloseHash<flow_key_t> flow_hash_t;
-
 
 class CFlowTable {
 public:
@@ -1815,6 +1815,7 @@ private:
 
     flow_hash_t     m_ft;
 };
+#endif
 
 TEST_F(gt_tcp, tst33) {
     CFlowKeyTuple key;
