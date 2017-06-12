@@ -303,7 +303,7 @@ static void tcp_timer(void *userdata,
     CTcpFlow * tcp_flow=my_unsafe_container_of(tmr,CTcpFlow,m_timer);
     UNSAFE_CONTAINER_OF_POP;
     tcp_flow->on_tick();
-    tcp_ctx->timer_w_start(tcp_flow);
+    tcp_ctx->timer_w_restart(tcp_flow);
 }
 
 /* tick every 50msec TCP_TIMER_W_TICK */
@@ -322,6 +322,25 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
     } else{
         m_tick++;
     }
+}
+
+CTcpFlow * CTcpPerThreadCtx::alloc_flow(uint32_t src,
+                                        uint32_t dst,
+                                        uint16_t src_port,
+                                        uint16_t dst_port,
+                                        bool is_ipv6){
+    CTcpFlow * flow = new (std::nothrow) CTcpFlow();
+    if (flow == 0 ) {
+        return((CTcpFlow *)0);
+    }
+    flow->Create(this);
+    flow->set_tuple(src,dst,src_port,dst_port,is_ipv6);
+    flow->init();
+    return(flow);
+}
+
+void       CTcpPerThreadCtx::free_flow(CTcpFlow * flow){
+    delete flow;
 }
 
 

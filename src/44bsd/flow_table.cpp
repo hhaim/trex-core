@@ -41,11 +41,37 @@ bool CFlowTable::Create(uint32_t size,
         printf("ERROR can't allocate flow-table \n");
         return(false);
     }
+    reset_stats();
+    m_tcp_api=(CTcpAppApi    *)0;
+    m_prog =(CTcpAppProgram *)0;
     return(true);
 }
 
 void CFlowTable::Delete(){
     m_ft.Delete();
+}
+
+
+void CFlowTable::dump(FILE *fd){
+    m_ft.Dump(stdout);
+    fprintf(fd,"stats_err_no_syn                   : %u \n",m_stats_err_no_syn);
+    fprintf(fd,"stats_err_len_err                  : %u \n",m_stats_err_len_err);
+    fprintf(fd,"stats_err_no_tcp                   : %u \n",m_stats_err_no_tcp);
+    fprintf(fd,"stats_err_client_pkt_without_flow  : %u \n",m_stats_err_client_pkt_without_flow);
+    fprintf(fd,"stats_err_no_template              : %u \n",m_stats_err_no_template);
+    fprintf(fd,"stats_err_no_memory                : %u \n",m_stats_err_no_memory);
+    fprintf(fd,"stats_err_duplicate_client_tuple   : %u \n",m_stats_err_duplicate_client_tuple);
+}
+
+
+void CFlowTable::reset_stats(){
+   m_stats_err_no_syn =0;
+   m_stats_err_len_err =0;
+   m_stats_err_no_tcp =0;
+   m_stats_err_client_pkt_without_flow=0;
+   m_stats_err_no_template=0;  
+   m_stats_err_no_memory=0;
+   m_stats_err_duplicate_client_tuple=0;
 }
 
 
@@ -57,10 +83,12 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
     if (!parser.Parse()){
         return(false);
     }
+    uint16_t l3_pkt_len=0;
 
     /* TBD fix, should support UDP/IPv6 */
 
     if ( parser.m_protocol != IPHeader::Protocol::TCP ){
+        m_stats_err_no_tcp++;
         return(false);
     }
     /* it is TCP, only supported right now */
@@ -84,6 +112,7 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
             tuple.set_port(lpTcp->getSourcePort());
         }
 
+        l3_pkt_len = ipv4->getTotalLength() + lpf->m_l3_offset;
 
     }else{
         lpf->m_ipv4      =false;
@@ -99,18 +128,74 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
             tuple.set_ip(ipv6->getSourceIpv6LSB());
             tuple.set_port(lpTcp->getSourcePort());
         }
+        /* TBD need to find the last header here */
+
+        l3_pkt_len = ipv6->getPayloadLen();
     }
 
     lpf->m_proto     =   parser.m_protocol;
     lpf->m_l4_offset = (uintptr_t)parser.m_l4 - (uintptr_t)p;
 
-    lpf->m_l5_offset = lpf->m_l4_offset + tcp->getHeaderLength();
-    lpf->m_total_l7  =
+    TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
+
+    lpf->m_l7_offset = lpf->m_l4_offset + lpTcp->getHeaderLength();
+
+    if (l3_pkt_len < lpf->m_l7_offset ) {
+        m_stats_err_len_err++;
+        return(false);
+    }
+    lpf->m_l7_total_len  =  l3_pkt_len - lpf->m_l7_offset;
+
+    /* TBD need to check TCP header checksum */
 
     tuple.set_proto(lpf->m_proto);
     tuple.set_ipv4(lpf->m_ipv4);
     return(true);
 }
+
+
+
+void CFlowTable::handle_close(CTcpPerThreadCtx * ctx,
+                              CTcpFlow * flow){
+    m_ft.remove(&flow->m_hash);
+    ctx->free_flow(flow);
+}
+
+void CFlowTable::process_tcp_packet(CTcpPerThreadCtx * ctx,
+                                    CTcpFlow *  flow,
+                                    struct rte_mbuf * mbuf,
+                                    TCPHeader    * lpTcp,
+                                    CFlowKeyFullTuple &ftuple){
+
+    tcp_flow_input(ctx,
+                   &flow->m_tcp,
+                   mbuf,
+                   lpTcp,
+                   ftuple.m_l7_offset,
+                   ftuple.m_l7_total_len
+                   );
+
+    if (flow->is_can_close()) {
+        handle_close(ctx,flow);
+    }
+}
+
+bool CFlowTable::insert_new_flow(CTcpFlow *  flow,
+                                 CFlowKeyTuple  & tuple){
+
+    flow_key_t key=tuple.get_as_uint64();
+    uint32_t  hash=tuple.get_hash();
+    flow->m_hash.key =key;
+
+    HASH_STATUS  res=m_ft.insert(&flow->m_hash,hash);
+    if (res!=hsOK) {
+        m_stats_err_duplicate_client_tuple++;
+        /* duplicate */
+        return(false);
+    }
+    return(true);
+}
+
 
 bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
                                   struct rte_mbuf * mbuf){
@@ -122,10 +207,12 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
 
 
     if ( !parse_packet(mbuf,
-                      tuple,
-                      ftuple) ) {
+                       parser,
+                       tuple,
+                       ftuple) ) {
         /* free memory */
         rte_pktmbuf_free(mbuf);
+        return(false);
     }
 
     flow_key_t key=tuple.get_as_uint64();
@@ -135,24 +222,78 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
     lpflow = m_ft.find(key,hash);
     CTcpFlow * lptflow;
 
-
     if ( lpflow ) {
         lptflow = CTcpFlow::cast_from_hash_obj(lpflow);
-
         TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
-        tcp_flow_input(ctx,
-                       &lptflow->m_tcp,
-                       mbuf,
-                       lpTcp,
-                       ftuple.m_l5_offset,
-                       ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
-                       )
-
-
-
+        process_tcp_packet(ctx,lptflow,mbuf,lpTcp,ftuple);
+        return (true);;
     }
 
+    TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
 
+    /* not found in flowtable */
+    if ( m_client_side ){
+        m_stats_err_client_pkt_without_flow++;
+        rte_pktmbuf_free(mbuf);
+        return(false);
+    }
+
+    /* server side */
+    if (  (lpTcp->getFlags() & TCPHeader::Flag::SYN) ==0 ) {
+        /* no syn */
+        /* TBD need to generate RST packet in this case */
+        rte_pktmbuf_free(mbuf);
+        m_stats_err_no_syn++;
+        return(false);
+    }
+
+    /* server with SYN packet, it is OK 
+    we need to build the flow and add it to the table */
+
+    /* TBD template port */
+    if (lpTcp->getDestPort() != 80) {
+        rte_pktmbuf_free(mbuf);
+        m_stats_err_no_template++;
+        return(false);
+    }
+
+    IPHeader *  ipv4 = (IPHeader *)parser.m_ipv4;
+
+
+    lptflow = ctx->alloc_flow(ipv4->getDestIp(),
+                          tuple.get_ip(),
+                          lpTcp->getDestPort(),
+                          tuple.get_port(),
+                          false);
+
+
+
+    if (lptflow == 0 ) {
+        rte_pktmbuf_free(mbuf);
+        m_stats_err_no_memory++;
+        return(false);
+    }
+
+    /* add to flow-table */
+    lptflow->m_hash.key = key;
+
+    /* no need to check, we just checked */
+    m_ft.insert_nc(&lptflow->m_hash,hash);
+
+    CTcpApp * app =&lptflow->m_app;
+
+    app->set_program(m_prog);
+    app->set_bh_api(m_tcp_api);
+    app->set_flow_ctx(ctx,lptflow);
+
+    lptflow->set_app(app);
+
+    app->start(true); /* start the application */
+    /* start listen */
+    tcp_listen(ctx,&lptflow->m_tcp);
+
+    /* process SYN packet */
+    process_tcp_packet(ctx,lptflow,mbuf,lpTcp,ftuple);
 
     return(true);
 }

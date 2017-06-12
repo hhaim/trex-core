@@ -7,6 +7,7 @@
 #include "tcp_timer.h"
 #include "mbuf.h"
 #include "tcp_socket.h"
+#include "tcp_fsm.h"
 #include "tcp_debug.h"
 #include <vector>
 #include "tcp_dpdk.h"
@@ -397,10 +398,19 @@ public:
         }
     }
 
+    bool is_can_close(){
+        return (m_tcp.t_state == TCPS_CLOSED ?true:false);
+    }
+
+    void set_app(CTcpApp  * app){
+        m_tcp.m_socket.m_app = app;
+    }
+
 public:
     flow_hash_ent_t   m_hash; /* object   */
     tcpcb             m_tcp;
     CHTimerObj        m_timer;
+    CTcpApp           m_app;
     uint8_t           m_tick;
     CTcpPerThreadCtx *m_ctx;
 };
@@ -426,6 +436,17 @@ public:
         return (m_timer_w.timer_start(&flow->m_timer,TCP_FAST_TICK));
     }
 
+    RC_HTW_t timer_w_restart(CTcpFlow * flow){
+        if (flow->is_can_close()) {
+            /* free the flow in case it was finished */
+            m_ft.handle_close(this,flow);
+            return(RC_HTW_OK);
+        }else{
+            return (m_timer_w.timer_start(&flow->m_timer,TCP_FAST_TICK));
+        }
+    }
+
+
     RC_HTW_t timer_w_stop(CTcpFlow * flow){
         return (m_timer_w.timer_stop(&flow->m_timer));
     }
@@ -438,6 +459,13 @@ public:
 
 public:
 
+    CTcpFlow * alloc_flow(uint32_t src,
+                          uint32_t dst,
+                          uint16_t src_port,
+                          uint16_t dst_port,
+                          bool is_ipv6);
+
+    void       free_flow(CTcpFlow * flow);            
     
 public:
 

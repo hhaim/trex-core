@@ -23,6 +23,7 @@ limitations under the License.
 */
 
 #include <common/closehash.h>
+#include "flow_stat_parser.h"
 
 
 typedef uint64_t flow_key_t; 
@@ -128,10 +129,10 @@ private:
 class CFlowKeyFullTuple {
 public:
     uint8_t  m_proto;
-    uint8_t  m_l3_offset;
-    uint8_t  m_l4_offset;
-    uint8_t  m_l5_offset;
-    uint16_t m_total_l7;
+    uint8_t  m_l3_offset;  /*IPv4/IPv6*/
+    uint8_t  m_l4_offset; /* TCP/UDP*/
+    uint8_t  m_l7_offset; 
+    uint16_t m_l7_total_len;
     bool     m_ipv4;
 };
 
@@ -141,11 +142,26 @@ typedef CHashEntry<flow_key_t> flow_hash_ent_t;
 typedef CCloseHash<flow_key_t> flow_hash_t;
 
 
+class CTcpPerThreadCtx ;
+class CTcpFlow;
+class CTcpAppApi;
+class CTcpAppProgram;
+
+
 class CFlowTable {
 public:
     bool Create(uint32_t size,
                 bool client_side);
+
     void Delete();
+
+    void set_tcp_api(CTcpAppApi    *   tcp_api){
+         m_tcp_api = tcp_api;
+    }
+
+    void set_tcp_program(CTcpAppProgram *  prog){
+        m_prog = prog;
+    }
 
 public:
       bool parse_packet(struct rte_mbuf *   mbuf,
@@ -156,9 +172,37 @@ public:
       bool rx_handle_packet(CTcpPerThreadCtx * ctx,
                             struct rte_mbuf * mbuf);
 
+      /* insert new flow - usualy client */
+      bool insert_new_flow(CTcpFlow *  flow,
+                           CFlowKeyTuple  & tuple);
+
+      void handle_close(CTcpPerThreadCtx * ctx,
+                        CTcpFlow * flow);
+
+      void process_tcp_packet(CTcpPerThreadCtx * ctx,
+                              CTcpFlow *  flow,
+                              struct rte_mbuf * mbuf,
+                              TCPHeader    * lpTcp,
+                              CFlowKeyFullTuple &ftuple);
+
+      void dump(FILE *fd);
+private: 
+    void reset_stats();
 private:
     bool            m_client_side;
     flow_hash_t     m_ft;
+
+    CTcpAppApi    *   m_tcp_api;
+    CTcpAppProgram *  m_prog; /* we have one program for now */
+
+    uint32_t        m_stats_err_client_pkt_without_flow;
+    uint32_t        m_stats_err_no_syn;
+    uint32_t        m_stats_err_len_err;
+    uint32_t        m_stats_err_no_tcp;  
+    uint32_t        m_stats_err_no_template;  
+    uint32_t        m_stats_err_no_memory; 
+    uint32_t        m_stats_err_duplicate_client_tuple; 
+
 };
 
 

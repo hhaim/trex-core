@@ -1207,7 +1207,6 @@ public:
     void on_rx(int dir,rte_mbuf_t *m);
 
 public:
-    int test1();
     int test2();
 
 
@@ -1215,8 +1214,6 @@ public:
     CTcpPerThreadCtx        m_c_ctx;  /* context */
     CTcpPerThreadCtx        m_s_ctx;
 
-    CTcpFlow                m_c_flow; /* flow */
-    CTcpFlow                m_s_flow;
 
     CTcpAppApiImpl          m_tcp_bh_api_impl_c;
     CTcpAppApiImpl          m_tcp_bh_api_impl_s;
@@ -1263,13 +1260,6 @@ bool CClientServerTcp::Create(std::string pcap_file){
     m_s_ctx.Create(100,false);
     m_s_ctx.set_cb(&m_io_debug);
 
-    m_c_flow.Create(&m_c_ctx);
-    m_c_flow.set_tuple(0x10000001,0x30000001,1025,80,false);
-    m_c_flow.init();
-
-    m_s_flow.Create(&m_s_ctx);
-    m_s_flow.set_tuple(0x30000001,0x10000001,80,1025,false);
-    m_s_flow.init();
 
     return(true);
 }
@@ -1318,103 +1308,24 @@ void CClientServerTcp::on_rx(int dir,
     /* write RX side */
     double t = m_sim.get_time();
     CTcpPerThreadCtx * ctx;
-    struct tcpcb *tp;
-
 
     if (dir==1) {
         ctx =&m_s_ctx,
-        tp  =&m_s_flow.m_tcp;
         m_s_pcap.write_pcap_mbuf(m,t);
     }else{
         ctx =&m_c_ctx;
-        tp  =&m_c_flow.m_tcp;
         m_c_pcap.write_pcap_mbuf(m,t);
     }
 
-
-    /* TBD should be fixed */
-    char *p=rte_pktmbuf_mtod(m,char *);
-    TCPHeader * tcp=(TCPHeader *)(p+14+20);
-    IPHeader   *ipv4=(IPHeader *)(p+14);
-
-
-    assert(tcp_flow_input(ctx,
-                   tp,
-                   m,
-                   tcp,
-                   14+20+tcp->getHeaderLength(),
-                   ipv4->getTotalLength()-(20+tcp->getHeaderLength()) 
-                   )==0);
-
+    ctx->m_ft.rx_handle_packet(ctx,m);
 }
 
 
 void CClientServerTcp::Delete(){
-    m_c_flow.Delete();
-    m_s_flow.Delete();
     m_c_ctx.Delete();
     m_s_ctx.Delete();
 }
 
-
-
-int CClientServerTcp::test1(){
-
-#if 0
-    CTcpApp app;
-    /* TBD */
-    //utl_mbuf_buffer_create_and_fill(&app.m_write_buf,2048,4024);
-    /*TBD */
-    //CMbufBuffer * lpbuf=&app.m_write_buf;
-    //CMbufBuffer * lpbuf = NULL;
-
-    m_rtt_sec = 1.2;
-
-    m_c_flow.m_tcp.m_socket.m_app =&app;
-
-    //m_s_flow.m_tcp.m_socket.m_app =&app;
-
-    //CTcpSockBuf * lptxs=&m_c_flow.m_tcp.m_socket.so_snd;
-    /* hack the code for now */
-    //lptxs->m_app=&app;
-
-    /* simulate buf adding */
-    //lptxs->sb_start_new_buffer();
-
-    /* add maximum of the buffer */
-    //lptxs->sbappend(min(lpbuf->m_t_bytes,lptxs->sb_hiwat));
-
-    m_sim.add_event( new CTcpSimEventTimers(this, ((double)(TCP_TIMER_W_TICK)/1000.0)));
-    m_sim.add_event( new CTcpSimEventStop(100.0) );
-
-    tcp_connect(&m_c_ctx,&m_c_flow.m_tcp);
-    tcp_listen(&m_s_ctx,&m_s_flow.m_tcp);
-
-    m_sim.run_sim();
-
-    printf(" C counters \n");
-    m_c_ctx.m_tcpstat.Dump(stdout);
-    printf(" S counters \n");
-    m_s_ctx.m_tcpstat.Dump(stdout);
-
-    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_sndbyte,4024);
-    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_rcvackbyte,4024);
-    EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_connects,1);
-
-
-    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_rcvbyte,4024);
-    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_accepts,1);
-    EXPECT_EQ(m_s_ctx.m_tcpstat.m_sts.tcps_preddat,m_s_ctx.m_tcpstat.m_sts.tcps_rcvpack-1);
-
-
-    //app.m_write_buf.Delete();
-
-    printf (" rx %d 8\n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
-    assert( m_s_flow.m_tcp.m_socket.so_rcv.sb_cc == 4024);
-#endif
-    return(0);
-
-}
 
 int CClientServerTcp::test2(){
 
@@ -1422,11 +1333,28 @@ int CClientServerTcp::test2(){
     CMbufBuffer * buf;
     CTcpAppProgram * prog_c;
     CTcpAppProgram * prog_s;
+    CTcpFlow          *  c_flow; 
+
     CTcpApp * app_c;
-    CTcpApp * app_s;
+    //CTcpApp * app_s;
     CTcpAppCmd cmd;
 
     uint32_t tx_num_bytes=100*1024;
+
+    c_flow = m_c_ctx.alloc_flow(0x10000001,0x30000001,1025,80,false);
+    CFlowKeyTuple   c_tuple;
+    c_tuple.set_ip(0x10000001);
+    c_tuple.set_port(1025);
+    c_tuple.set_proto(6);
+    c_tuple.set_ipv4(true);
+
+    assert(m_c_ctx.m_ft.insert_new_flow(c_flow,c_tuple)==true);
+
+
+    printf("client  %p \n",c_flow);
+
+    app_c = &c_flow->m_app;
+
 
     /* CONST */
     buf = new CMbufBuffer();
@@ -1436,11 +1364,6 @@ int CClientServerTcp::test2(){
 
 
     /* PER FLOW  */
-
-    app_c = new CTcpApp();
-    app_s = new CTcpApp();
-
-
 
     /* client program */
     cmd.m_cmd =tcTX_BUFFER;
@@ -1460,43 +1383,33 @@ int CClientServerTcp::test2(){
 
     app_c->set_program(prog_c);
     app_c->set_bh_api(&m_tcp_bh_api_impl_c);
-    app_c->set_flow_ctx(&m_c_ctx,&m_c_flow);
+    app_c->set_flow_ctx(&m_c_ctx,c_flow);
     app_c->set_debug_id(1);
+    c_flow->set_app(app_c);
 
 
-
-    app_s->set_program(prog_s);
-    app_s->set_bh_api(&m_tcp_bh_api_impl_s);
-    app_s->set_flow_ctx(&m_s_ctx,&m_s_flow);
-    app_s->set_debug_id(2);
+    m_s_ctx.m_ft.set_tcp_api(&m_tcp_bh_api_impl_s);
+    m_s_ctx.m_ft.set_tcp_program(prog_s);
 
 
     m_rtt_sec = 0.05;
 
-
-    /* HACK !!! need to solve this */
-
-    m_c_flow.m_tcp.m_socket.m_app =app_c;
-    m_s_flow.m_tcp.m_socket.m_app =app_s;
-
-    /* HACK !!! need to solve this */
-
-
     m_sim.add_event( new CTcpSimEventTimers(this, ((double)(TCP_TIMER_W_TICK)/1000.0)));
     m_sim.add_event( new CTcpSimEventStop(1000.0) );
 
+    /* start client */
     app_c->start(true);
-    tcp_connect(&m_c_ctx,&m_c_flow.m_tcp);
-
-    app_s->start(true);
-    tcp_listen(&m_s_ctx,&m_s_flow.m_tcp);
+    tcp_connect(&m_c_ctx,&c_flow->m_tcp);
 
     m_sim.run_sim();
 
     printf(" C counters \n");
     m_c_ctx.m_tcpstat.Dump(stdout);
+    m_c_ctx.m_ft.dump(stdout);
     printf(" S counters \n");
     m_s_ctx.m_tcpstat.Dump(stdout);
+    m_s_ctx.m_ft.dump(stdout);
+
 
     //EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_sndbyte,4024);
     //EXPECT_EQ(m_c_ctx.m_tcpstat.m_sts.tcps_rcvackbyte,4024);
@@ -1509,12 +1422,12 @@ int CClientServerTcp::test2(){
 
 
     //app.m_write_buf.Delete();
-    printf (" rx %d \n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
+    //printf (" rx %d \n",m_s_flow.m_tcp.m_socket.so_rcv.sb_cc);
     //assert( m_s_flow.m_tcp.m_socket.so_rcv.sb_cc == 4024);
 
 
-    delete app_c;
-    delete app_s;
+    //delete app_c;
+    //delete app_s;
 
     delete prog_c;
     delete prog_s;
@@ -1529,21 +1442,6 @@ int CClientServerTcp::test2(){
 
 
 CClientServerTcp tcp_test1;
-
-
-/* tcp_output simulation .. */
-TEST_F(gt_tcp, tst19) {
-    CClientServerTcp *lpt1=new CClientServerTcp;
-
-    lpt1->Create("tcp1");
-
-    lpt1->test1();
-
-    lpt1->Delete();
-
-    delete lpt1;
-}
-
 
 
 

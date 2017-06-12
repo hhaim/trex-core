@@ -332,7 +332,7 @@ int CTcpApp::on_bh_tx_acked(uint32_t tx_bytes){
 
 
 void CTcpApp::on_bh_event(tcp_app_events_t event){
-    printf(" event %d %s \n",(int)m_debug_id,get_tcp_app_events_name(event).c_str());
+    //printf(" event %d %s \n",(int)m_debug_id,get_tcp_app_events_name(event).c_str());
 }
 
 /* rx bytes */
