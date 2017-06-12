@@ -158,7 +158,7 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
 void CFlowTable::handle_close(CTcpPerThreadCtx * ctx,
                               CTcpFlow * flow){
     m_ft.remove(&flow->m_hash);
-    ctx->free_flow(flow);
+    free_flow(flow);
 }
 
 void CFlowTable::process_tcp_packet(CTcpPerThreadCtx * ctx,
@@ -179,6 +179,29 @@ void CFlowTable::process_tcp_packet(CTcpPerThreadCtx * ctx,
         handle_close(ctx,flow);
     }
 }
+
+CTcpFlow * CFlowTable::alloc_flow(CTcpPerThreadCtx * ctx,
+                                  uint32_t src,
+                                  uint32_t dst,
+                                  uint16_t src_port,
+                                  uint16_t dst_port,
+                                  bool is_ipv6){
+    CTcpFlow * flow = new (std::nothrow) CTcpFlow();
+    if (flow == 0 ) {
+        return((CTcpFlow *)0);
+    }
+    flow->Create(ctx);
+    flow->set_tuple(src,dst,src_port,dst_port,is_ipv6);
+    flow->init();
+    return(flow);
+}
+
+void       CFlowTable::free_flow(CTcpFlow * flow){
+    assert(flow);
+    delete flow;
+
+}
+
 
 bool CFlowTable::insert_new_flow(CTcpFlow *  flow,
                                  CFlowKeyTuple  & tuple){
@@ -260,11 +283,12 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
     IPHeader *  ipv4 = (IPHeader *)parser.m_ipv4;
 
 
-    lptflow = ctx->alloc_flow(ipv4->getDestIp(),
-                          tuple.get_ip(),
-                          lpTcp->getDestPort(),
-                          tuple.get_port(),
-                          false);
+    lptflow = ctx->m_ft.alloc_flow(ctx,
+                                   ipv4->getDestIp(),
+                                   tuple.get_ip(),
+                                   lpTcp->getDestPort(),
+                                   tuple.get_port(),
+                                   false);
 
 
 

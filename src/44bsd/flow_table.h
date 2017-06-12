@@ -186,6 +186,18 @@ public:
                               CFlowKeyFullTuple &ftuple);
 
       void dump(FILE *fd);
+
+public:
+
+      CTcpFlow * alloc_flow(CTcpPerThreadCtx * ctx,
+                            uint32_t src,
+                            uint32_t dst,
+                            uint16_t src_port,
+                            uint16_t dst_port,
+                            bool is_ipv6);
+
+      void       free_flow(CTcpFlow * flow);            
+
 private: 
     void reset_stats();
 private:

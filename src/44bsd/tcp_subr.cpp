@@ -324,24 +324,6 @@ void CTcpPerThreadCtx::timer_w_on_tick(){
     }
 }
 
-CTcpFlow * CTcpPerThreadCtx::alloc_flow(uint32_t src,
-                                        uint32_t dst,
-                                        uint16_t src_port,
-                                        uint16_t dst_port,
-                                        bool is_ipv6){
-    CTcpFlow * flow = new (std::nothrow) CTcpFlow();
-    if (flow == 0 ) {
-        return((CTcpFlow *)0);
-    }
-    flow->Create(this);
-    flow->set_tuple(src,dst,src_port,dst_port,is_ipv6);
-    flow->init();
-    return(flow);
-}
-
-void       CTcpPerThreadCtx::free_flow(CTcpFlow * flow){
-    delete flow;
-}
 
 
 bool CTcpPerThreadCtx::Create(uint32_t size,

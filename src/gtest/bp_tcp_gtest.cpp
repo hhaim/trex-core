@@ -1341,7 +1341,7 @@ int CClientServerTcp::test2(){
 
     uint32_t tx_num_bytes=100*1024;
 
-    c_flow = m_c_ctx.alloc_flow(0x10000001,0x30000001,1025,80,false);
+    c_flow = m_c_ctx.m_ft.alloc_flow(&m_c_ctx,0x10000001,0x30000001,1025,80,false);
     CFlowKeyTuple   c_tuple;
     c_tuple.set_ip(0x10000001);
     c_tuple.set_port(1025);
