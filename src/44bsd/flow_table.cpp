@@ -156,8 +156,12 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
 
 
 void CFlowTable::handle_close(CTcpPerThreadCtx * ctx,
-                              CTcpFlow * flow){
-    m_ft.remove(&flow->m_hash);
+                              CTcpFlow * flow,
+                              bool remove_from_ft){
+    ctx->m_cb->on_flow_close(ctx,flow);
+    if ( remove_from_ft ){
+        m_ft.remove(&flow->m_hash);
+    }
     free_flow(flow);
 }
 
@@ -176,7 +180,7 @@ void CFlowTable::process_tcp_packet(CTcpPerThreadCtx * ctx,
                    );
 
     if (flow->is_can_close()) {
-        handle_close(ctx,flow);
+        handle_close(ctx,flow,true);
     }
 }
 
@@ -188,6 +192,7 @@ CTcpFlow * CFlowTable::alloc_flow(CTcpPerThreadCtx * ctx,
                                   bool is_ipv6){
     CTcpFlow * flow = new (std::nothrow) CTcpFlow();
     if (flow == 0 ) {
+        m_stats_err_no_memory++;
         return((CTcpFlow *)0);
     }
     flow->Create(ctx);
@@ -254,7 +259,7 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
 
     TCPHeader    * lpTcp = (TCPHeader *)parser.m_l4;
 
-    /* not found in flowtable */
+    /* not found in flowtable , we are generating the flows*/
     if ( m_client_side ){
         m_stats_err_client_pkt_without_flow++;
         rte_pktmbuf_free(mbuf);
@@ -264,7 +269,7 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
     /* server side */
     if (  (lpTcp->getFlags() & TCPHeader::Flag::SYN) ==0 ) {
         /* no syn */
-        /* TBD need to generate RST packet in this case */
+        /* TBD need to generate RST packet in this case?? need to check what are the conditions in the old code ??? */
         rte_pktmbuf_free(mbuf);
         m_stats_err_no_syn++;
         return(false);
@@ -275,6 +280,7 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
 
     /* TBD template port */
     if (lpTcp->getDestPort() != 80) {
+        /* TBD need to generate RST packet in this case */
         rte_pktmbuf_free(mbuf);
         m_stats_err_no_template++;
         return(false);
@@ -294,9 +300,12 @@ bool CFlowTable::rx_handle_packet(CTcpPerThreadCtx * ctx,
 
     if (lptflow == 0 ) {
         rte_pktmbuf_free(mbuf);
-        m_stats_err_no_memory++;
         return(false);
     }
+
+    uint8_t *pkt = rte_pktmbuf_mtod(mbuf, uint8_t*);
+
+    lptflow->server_update_mac_from_packet(pkt);
 
     /* add to flow-table */
     lptflow->m_hash.key = key;

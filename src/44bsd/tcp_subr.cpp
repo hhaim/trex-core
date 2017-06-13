@@ -248,6 +248,13 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
     tcpcb *tp=&m_tcp;
     memset((char *) tp, 0,sizeof(struct tcpcb));
 
+    m_pad[0]=0;
+    m_pad[1]=0;
+    m_c_idx_enable =0;
+    m_c_idx=0;
+    m_c_pool_idx=0;
+    m_c_template_idx=0;
+
     m_ctx=ctx;
     m_timer.reset();
 
@@ -272,6 +279,13 @@ void CTcpFlow::Create(CTcpPerThreadCtx *ctx){
     tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
     tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 
+}
+
+
+void CTcpFlow::server_update_mac_from_packet(uint8_t *pkt){
+    /* copy thr MAC from the packet in reverse order */
+    memcpy(m_tcp.template_pkt+6,pkt,6);
+    memcpy(m_tcp.template_pkt,pkt+6,6);
 }
 
 

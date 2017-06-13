@@ -210,6 +210,18 @@ def getstatusoutput(cmd):
 
 main_src = SrcGroup(dir='src',
         src_list=[
+            '44bsd/tcp_output.cpp',
+            '44bsd/tcp_timer.cpp',
+            '44bsd/tcp_debug.cpp',
+            '44bsd/tcp_subr.cpp',
+            '44bsd/flow_table.cpp',
+            '44bsd/tcp_input.cpp',
+            '44bsd/tcp_usrreq.cpp',
+            '44bsd/tcp_socket.cpp',
+            '44bsd/tcp_dpdk.cpp',
+            'bp_sim_tcp.cpp',
+
+
              'bp_sim.cpp',
              'utl_term_io.cpp',
              'global_io_mode.cpp',
@@ -360,20 +372,6 @@ version_src = SrcGroup(
     ])
 
 
-tldk_src = SrcGroup(dir='src/tldk/lib',
-                src_list=[
-                 'libtle_timer/timer.c',
-
-                 'libtle_l4p/ctx.c',
-                 'libtle_l4p/event.c',
-                 'libtle_l4p/stream_table.c',
-                 'libtle_l4p/tcp_ofo.c',
-                 'libtle_l4p/tcp_stream.c',
-                 'libtle_l4p/tcp_rxtx.c',
-                 'libtle_l4p/udp_stream.c',
-                 'libtle_l4p/udp_rxtx.c',
-                 'libtle_dring/dring.c'
-            ]);
 
 dpdk_src = SrcGroup(dir='src/dpdk/',
                 src_list=[
@@ -559,9 +557,6 @@ bp_dpdk =SrcGroups([
                 dpdk_src
                 ]);
 
-bp_tldk =SrcGroups([
-                tldk_src
-                ]);
 
 mlx5_dpdk =SrcGroups([
                 mlx5_dpdk_src
@@ -692,21 +687,8 @@ includes_path =''' ../src/pal/linux_dpdk/
 ../src/dpdk/lib/librte_pipeline/
 ../src/dpdk/lib/librte_ring/
 ../src/dpdk/lib/librte_ip_frag/
-
-../src/tldk/lib/libtle_timer/
-../src/tldk/lib/libtle_l4p/
-../src/tldk/lib/libtle_dring/
-
-
               ''';
 
-tldk_includes_path = '''
-
-../src/tldk/lib/libtle_timer/
-../src/tldk/lib/libtle_l4p/
-../src/tldk/lib/libtle_dring/
-
-'''
 
 dpdk_includes_verb_path =''
 
@@ -859,9 +841,6 @@ class build_option:
     def get_dpdk_target (self):
         return self.update_executable_name("dpdk");
 
-    def get_tldk_target (self):
-        return self.update_executable_name("tldk");
-
     def get_mlx5_target (self):
         return self.update_executable_name("mlx5");
 
@@ -952,14 +931,6 @@ def build_prog (bld, build_obj):
       target=build_obj.get_dpdk_target() 
       );
 
-    bld.objects(
-      features='c ',
-      includes = dpdk_includes_path +tldk_includes_path,
-
-      cflags   = (build_obj.get_c_flags()+DPDK_FLAGS ),
-      source   = bp_tldk.file_list(top),
-      target=build_obj.get_tldk_target() 
-      );
 
     if bld.env.NO_MLX == False:
         bld.shlib(
@@ -977,7 +948,7 @@ def build_prog (bld, build_obj):
                 cxxflags =(build_obj.get_cxx_flags()+['-std=gnu++11',]),
                 linkflags = build_obj.get_link_flags() ,
                 lib=['pthread','dl', 'z'],
-                use =[build_obj.get_dpdk_target(),build_obj.get_tldk_target(),'zmq'],
+                use =[build_obj.get_dpdk_target(),'zmq'],
                 source = bp.file_list(top) + debug_file_list,
                 rpath = rpath_linkage,
                 target = build_obj.get_target())

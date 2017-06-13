@@ -563,32 +563,6 @@ TEST_F(gt_tcp, tst15) {
 }
 #endif
 
-int utl_mbuf_buffer_create_and_fill(CMbufBuffer * buf,
-                                    uint32_t blk_size,
-                                    uint32_t size){
-    buf->Create(blk_size);
-    uint8_t cnt=0; 
-    while (size>0) {
-        uint32_t alloc_size=min(blk_size,size);
-        rte_mbuf_t   * m=tcp_pktmbuf_alloc(0,alloc_size);
-        assert(m);
-        char *p=(char *)rte_pktmbuf_append(m, alloc_size);
-        int i;
-        for (i=0;i<alloc_size; i++) {
-            *p=cnt;
-            cnt++;
-            p++;
-        }
-        CMbufObject obj;
-        obj.m_type =MO_CONST;
-        obj.m_mbuf=m;
-        
-        buf->Add_mbuf(obj);
-        size-=alloc_size;
-    }
-
-    return(0);
-}
 
 #if 0
 TEST_F(gt_tcp, tst16) {
@@ -1132,8 +1106,12 @@ class CTcpCtxDebug : public CTcpCtxCb {
 public:
 
    int on_tx(CTcpPerThreadCtx *ctx,
-             struct tcpcb * flow,
+             struct tcpcb * tp,
              rte_mbuf_t *m);
+
+   int on_flow_close(CTcpPerThreadCtx *ctx,
+                     CTcpFlow * flow);
+
 
 public:
     CClientServerTcp  * m_p ;
@@ -1229,11 +1207,20 @@ public:
 };
 
 
+
+int CTcpCtxDebug::on_flow_close(CTcpPerThreadCtx *ctx,
+                                CTcpFlow * flow){
+    /* bothing to do */
+
+    return(0);
+}
+
+
 int CTcpCtxDebug::on_tx(CTcpPerThreadCtx *ctx,
-                        struct tcpcb * flow,
+                        struct tcpcb * tp,
                         rte_mbuf_t *m){
     int dir=0;
-    if (flow->src_port==80) {
+    if (tp->src_port==80) {
         dir=1;
     }
     rte_mbuf_t *m_rx= utl_rte_convert_tx_rx_mbuf(m);

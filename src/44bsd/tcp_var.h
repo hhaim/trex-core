@@ -406,24 +406,56 @@ public:
         m_tcp.m_socket.m_app = app;
     }
 
+    void set_tuple_generator(uint32_t          c_idx,
+                             uint16_t          c_pool_idx,
+                             uint16_t          c_template_idx,
+                             bool enable){
+        m_c_idx_enable = enable;
+        m_c_idx = c_idx;
+        m_c_pool_idx = c_pool_idx;
+        m_c_template_idx = c_template_idx;
+    }
+
+    void get_tuple_generator(uint32_t   &       c_idx,
+                             uint16_t   &       c_pool_idx,
+                             uint16_t   &       c_template_id,
+                             bool & enable){
+        enable =  m_c_idx_enable;
+        c_idx = m_c_idx;
+        c_pool_idx = m_c_pool_idx;
+        c_template_id = m_c_template_idx;
+    }
+
+    /* update MAC addr from the packet in reverse */
+    void server_update_mac_from_packet(uint8_t *pkt);
+
 public:
     flow_hash_ent_t   m_hash; /* object   */
     tcpcb             m_tcp;
     CHTimerObj        m_timer;
     CTcpApp           m_app;
-    uint8_t           m_tick;
     CTcpPerThreadCtx *m_ctx;
+    uint8_t           m_tick;
+    uint8_t           m_c_idx_enable;
+    uint8_t           m_pad[2];
+    uint32_t          m_c_idx;
+    uint16_t          m_c_pool_idx;
+    uint16_t          m_c_template_idx;
 };
-
-
-
 
 
 class CTcpCtxCb {
 public:
+    virtual ~CTcpCtxCb(){
+    }
     virtual int on_tx(CTcpPerThreadCtx *ctx,
-                      struct tcpcb * flow,
+                      struct tcpcb * tp,
                       rte_mbuf_t *m)=0;
+
+    virtual int on_flow_close(CTcpPerThreadCtx *ctx,
+                              CTcpFlow * flow)=0;
+
+
 
 };
 
@@ -439,7 +471,7 @@ public:
     RC_HTW_t timer_w_restart(CTcpFlow * flow){
         if (flow->is_can_close()) {
             /* free the flow in case it was finished */
-            m_ft.handle_close(this,flow);
+            m_ft.handle_close(this,flow,true);
             return(RC_HTW_OK);
         }else{
             return (m_timer_w.timer_start(&flow->m_timer,TCP_FAST_TICK));

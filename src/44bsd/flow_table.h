@@ -163,6 +163,10 @@ public:
         m_prog = prog;
     }
 
+    bool is_client_side(){
+        return (m_client_side);
+    }
+
 public:
       bool parse_packet(struct rte_mbuf *   mbuf,
                         CSimplePacketParser & parser,
@@ -177,7 +181,8 @@ public:
                            CFlowKeyTuple  & tuple);
 
       void handle_close(CTcpPerThreadCtx * ctx,
-                        CTcpFlow * flow);
+                        CTcpFlow * flow,
+                        bool remove_from_ft);
 
       void process_tcp_packet(CTcpPerThreadCtx * ctx,
                               CTcpFlow *  flow,

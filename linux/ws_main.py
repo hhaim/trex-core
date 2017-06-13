@@ -115,6 +115,7 @@ main_src = SrcGroup(dir='src',
              '44bsd/tcp_usrreq.cpp',
              '44bsd/tcp_socket.cpp',
              '44bsd/tcp_dpdk.cpp',
+             'bp_sim_tcp.cpp',
 
              'inet_pton.cpp',
              'bp_sim.cpp',

@@ -320,6 +320,12 @@ public:
     virtual int open_file(std::string file_name)=0;
     virtual int close_file(void)=0;
 
+    /* read packet from the right queue , per direction, client/server */
+    virtual uint16_t rx_burst(pkt_dir_t dir, 
+                              struct rte_mbuf **rx_pkts, 
+                              uint16_t nb_pkts){
+        assert(0);
+    }
     /* send one packet */
     virtual int send_node(CGenNode * node)=0;
     
@@ -327,6 +333,7 @@ public:
     virtual int send_node_service_mode(CGenNode *node) {
         return send_node(node);
     }
+
     
     /* send one packet to a specific dir. flush all packets */
     virtual void send_one_pkt(pkt_dir_t dir, rte_mbuf_t *m) {}
@@ -382,6 +389,7 @@ public:
 #define TW_LEVELS        (CGlobalInfo::m_options.get_tw_levels())
 #define BUCKET_TIME_SEC (CGlobalInfo::m_options.get_tw_bucket_time_in_sec())
 #define BUCKET_TIME_SEC_LEVEL1 (CGlobalInfo::m_options.get_tw_bucket_level1_time_in_sec())
+#define TCP_RX_FLUSH_SEC  (20.0/1000000.0)
 
 
 class CPreviewMode {
@@ -654,6 +662,14 @@ public:
 
     bool get_mlx5_so_mode() {
         return (btGetMaskBit32(m_flags1, 11, 11) ? true : false);
+    }
+
+    void set_tcp_mode(bool enable) {
+        btSetMaskBit32(m_flags1, 12, 12, (enable ? 1 : 0) );
+    }
+
+    bool get_tcp_mode() {
+        return (btGetMaskBit32(m_flags1, 12, 12) ? true : false);
     }
 
 public:
@@ -1379,6 +1395,11 @@ static inline int get_is_stateless(){
     return (CGlobalInfo::m_options.is_stateless() );
 }
 
+static inline int get_is_tcp_mode(){
+    return (CGlobalInfo::m_options.preview.get_tcp_mode() );
+}
+
+
 static inline int get_is_rx_check_mode(){
     return (CGlobalInfo::m_options.preview.get_is_rx_check_enable() ?1:0);
 }
@@ -1532,6 +1553,11 @@ class CCapFileFlowInfo ;
    we are optimizing the allocation dealocation !!!
  */
 
+struct CNodeTcp {
+     rte_mbuf_t * mbuf;
+     uint8_t      dir;
+};
+
 struct CGenNodeBase  {
 public:
 
@@ -1550,6 +1576,9 @@ public:
         TW_SYNC                 =11,
         TW_SYNC1                =12,
 
+        TCP_RX_FLUSH            =13, /* TCP rx flush */
+        TCP_TX_FIF              =14, /* TCP FIF */
+        TCP_TW                  =15  /* TCP TW -- need to consolidate */
     };
 
     /* flags MASKS*/
@@ -2052,6 +2081,15 @@ public:
 private:
     int send_sl_node(CGenNodeStateless * node_sl);
     int send_pcap_node(CGenNodePCAP * pcap_node);
+
+};
+
+
+class CErfIFTcp : public CErfIFStl {
+
+public:
+
+    virtual int send_node(CGenNode * node);
 
 };
 
@@ -3879,6 +3917,12 @@ private:
 
 /////////////////////////////////////////////////////////////////////////////////
 /* per thread info  */
+
+class CTcpPerThreadCtx;
+class CTcpAppProgram;
+class CMbufBuffer;
+class CTcpCtxCb;
+ 
 class CFlowGenListPerThread {
 
 public:
@@ -4118,6 +4162,33 @@ private:
 
     TrexStatelessDpCore              m_stateless_dp_info;
     bool                             m_terminated_by_master;
+
+public:
+    /* TCP stack memory */
+
+    CTcpPerThreadCtx      *         m_c_tcp;
+    CTcpCtxCb             *         m_c_tcp_io;
+    CTcpPerThreadCtx      *         m_s_tcp;
+    CTcpCtxCb             *         m_s_tcp_io;
+
+    CTcpAppProgram        *         m_prog_c; /* program of the client */
+    CTcpAppProgram        *         m_prog_s; /* program of the server */
+
+    CMbufBuffer           *         m_buf; 
+    double                          m_tcp_fif_d_time;
+
+public:
+    double tcp_get_tw_tick_in_sec(){
+        return(50.0/1000.0);
+    }
+    bool Create_tcp();
+    void Delete_tcp();
+
+    void tcp_generate_flows_roundrobin(bool &done);
+
+    void tcp_handle_rx_flush(CGenNode * node,bool on_terminate);
+    void tcp_handle_tx_fif(CGenNode * node,bool on_terminate);
+    void tcp_handle_tw(CGenNode * node,bool on_terminate);
 
 private:
     uint8_t                 m_cacheline_pad[RTE_CACHE_LINE_SIZE][19]; // improve prefech

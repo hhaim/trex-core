@@ -118,8 +118,6 @@ static inline int get_is_rx_thread_enabled() {
     return ((CGlobalInfo::m_options.is_rx_enabled() || CGlobalInfo::m_options.is_stateless()) ?1:0);
 }
 
-void  test_tcp_session();
-
 
 struct port_cfg_t;
 
@@ -708,6 +706,7 @@ enum { OPT_HELP,
        OPT_NO_OFED_CHECK,
        OPT_NO_SCAPY_SERVER,
        OPT_ACTIVE_FLOW,
+       OPT_TCP_MODE, 
        OPT_RT,
        OPT_MLX5_SO 
 };
@@ -771,7 +770,9 @@ static CSimpleOpt::SOption parser_options[] =
         { OPT_ARP_REF_PER,            "--arp-refresh-period", SO_REQ_SEP },
         { OPT_NO_OFED_CHECK,          "--no-ofed-check",   SO_NONE    },
         { OPT_NO_SCAPY_SERVER,        "--no-scapy-server", SO_NONE    },
+        { OPT_TCP_MODE,               "--tcp",SO_NONE},
         { OPT_RT,                     "--rt",              SO_NONE    },
+
         SO_END_OF_OPTIONS
     };
 
@@ -953,6 +954,10 @@ static int parse_options(int argc, char *argv[], CParserOption* po, bool first_t
 
             case OPT_IPV6:
                 po->preview.set_ipv6_mode_enable(true);
+                break;
+
+            case OPT_TCP_MODE:
+                po->preview.set_tcp_mode(true);
                 break;
 
             case OPT_RT:
@@ -2142,6 +2147,17 @@ protected:
     rte_mbuf_t * generate_slow_path_node_pkt(CGenNodeStateless *node_sl);
 };
 
+class CCoreEthIFTcp : public CCoreEthIF {
+public:
+    uint16_t     rx_burst(pkt_dir_t dir, 
+                          struct rte_mbuf **rx_pkts, 
+                          uint16_t nb_pkts);
+
+    virtual int send_node(CGenNode *node);
+};
+
+
+
 bool CCoreEthIF::Create(uint8_t             core_id,
                         uint8_t             tx_client_queue_id,
                         CPhyEthIF  *        tx_client_port,
@@ -2287,7 +2303,6 @@ int CCoreEthIF::send_pkt(CCorePerPort * lp_port,
         len = 0;
     }
     lp_port->m_len = len;
-
     return (0);
 }
 
@@ -2424,6 +2439,24 @@ CCoreEthIFStateless::send_node_packet(CGenNodeStateless      *node_sl,
         return send_pkt(lp_port, m, lp_stats);
     }
 }
+
+uint16_t CCoreEthIFTcp::rx_burst(pkt_dir_t dir, 
+                                 struct rte_mbuf **rx_pkts, 
+                                 uint16_t nb_pkts){
+    uint16_t res = m_ports[dir].m_port->rx_burst_dq(rx_pkts,nb_pkts);
+    return (res);
+}
+
+
+int CCoreEthIFTcp::send_node(CGenNode *node){
+    CNodeTcp * node_tcp = (CNodeTcp *) node;
+    uint8_t dir=node_tcp->dir;
+    CCorePerPort *lp_port = &m_ports[dir];
+    CVirtualIFPerSideStats *lp_stats = &m_stats[dir];
+    send_pkt(lp_port,node_tcp->mbuf,lp_stats);
+    return (0);
+}
+
 
 int CCoreEthIFStateless::send_node(CGenNode *node) {
     return send_node_common<false>(node);
@@ -3325,6 +3358,8 @@ public:
     CPhyEthIF   m_ports[TREX_MAX_PORTS];
     CCoreEthIF          m_cores_vif_sf[BP_MAX_CORES]; /* counted from 1 , 2,3 core zero is reserved - stateful */
     CCoreEthIFStateless m_cores_vif_sl[BP_MAX_CORES]; /* counted from 1 , 2,3 core zero is reserved - stateless*/
+    CCoreEthIFTcp       m_cores_vif_tcp[BP_MAX_CORES];
+
     CCoreEthIF *        m_cores_vif[BP_MAX_CORES];
     CParserOption m_po ;
     CFlowGenList  m_fl;
@@ -3804,9 +3839,17 @@ int  CGlobalTRex::ixgbe_start(void){
 
                 }
             }else{
+                
+
+                uint16_t rx_desc =RTE_TEST_RX_DESC_DEFAULT;
+                /* in case of TCP we will rx packets */
+                if ( get_is_tcp_mode() ) {
+                    rx_desc = RTE_TEST_RX_LATENCY_DESC_DEFAULT;
+                }
+
                  // setup RX drop queue
                 _if->rx_queue_setup(MAIN_DPDK_DATA_Q,
-                                    RTE_TEST_RX_DESC_DEFAULT,
+                                    rx_desc,
                                     socket_id,
                                     &m_port_cfg.m_rx_conf,
                                     CGlobalInfo::m_mem_pool[socket_id].m_mbuf_pool_2048);
@@ -3894,7 +3937,11 @@ int  CGlobalTRex::ixgbe_start(void){
         if ( get_is_stateless() ){
             m_cores_vif[j]=&m_cores_vif_sl[j];
         }else{
-            m_cores_vif[j]=&m_cores_vif_sf[j];
+            if (get_is_tcp_mode()) {
+                m_cores_vif[j]=&m_cores_vif_tcp[j];
+            }else{
+                m_cores_vif[j]=&m_cores_vif_sf[j];
+            }
         }
         m_cores_vif[j]->Create(j,
                                queue_id,
@@ -5801,10 +5848,6 @@ int main_test(int argc , char * argv[]){
     TrexWatchDog::getInstance().init(wd_enable);
 
 
-    /* init TCP */
-    test_tcp_session();
-
-
     g_trex.m_sl_rx_running = false;
     if ( get_is_stateless() ) {
         g_trex.start_master_stateless();
@@ -5866,9 +5909,13 @@ int main_test(int argc , char * argv[]){
 
     // after doing all needed ARP resolution, we need to flush queues, and stop our drop queue
     g_trex.ixgbe_rx_queue_flush();
-    for (int i = 0; i < g_trex.m_max_ports; i++) {
-        CPhyEthIF *_if = &g_trex.m_ports[i];
-        _if->stop_rx_drop_queue();
+
+    if (!get_is_tcp_mode()) {
+        /* in case of TCP we need to get the packet from rx rxq=0 */
+        for (int i = 0; i < g_trex.m_max_ports; i++) {
+            CPhyEthIF *_if = &g_trex.m_ports[i];
+            _if->stop_rx_drop_queue();
+        }
     }
 
     if ( CGlobalInfo::m_options.is_latency_enabled()
@@ -7585,55 +7632,5 @@ void TrexDpdkPlatformApi::mark_for_shutdown() const {
     g_trex.mark_for_shutdown(CGlobalTRex::SHUTDOWN_RPC_REQ);
 }
 
-// POC ////////////////
-//////////////////////////////////////////////////////////////////////////
-#include "tle_ctx.h"
-
-class CTcpPerCore {
-
-public:
-    struct tle_ctx *ctx;
-public:
-
-    bool Create();
-    void Delete();
-
-public:
-};
-
-bool CTcpPerCore::Create(){
-    struct tle_ctx_param ctx_prm;
-    memset(&ctx_prm, 0, sizeof(ctx_prm));
-
-    ctx_prm.socket_id = 0;  /* socket id */
-    ctx_prm.proto = TLE_PROTO_TCP;
-    ctx_prm.max_streams = 10;      
-    ctx_prm.max_stream_rbufs = 100000;
-    ctx_prm.max_stream_sbufs = 100000;
-    ctx_prm.send_bulk_size   = 100000;
-    ctx_prm.lookup4          = NULL;
-    ctx_prm.lookup4_data     = NULL;
-    ctx_prm.lookup6          = NULL;
-    ctx_prm.lookup6_data     = NULL;
-
-    ctx = tle_ctx_create(&ctx_prm);
-
-    return(true);
-}
-
-void CTcpPerCore::Delete(){
-    if (ctx){
-        tle_ctx_destroy(ctx);
-        ctx=NULL;
-    }
-}
-
-
-CTcpPerCore m_tcp_core;
-
-void  test_tcp_session(){
-    m_tcp_core.Create();
-    m_tcp_core.Delete();
-}
 
 
