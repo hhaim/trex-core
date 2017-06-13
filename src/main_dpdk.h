@@ -145,11 +145,14 @@ class CPhyEthIF  {
         return rte_eth_tx_burst(m_port_id, queue_id, tx_pkts, nb_pkts);
     }
     inline uint16_t  rx_burst(uint16_t queue_id, struct rte_mbuf **rx_pkts, uint16_t nb_pkts) {
+        if (queue_id!=1) {
+            printf(" rte_eth_rx_burst %d \n",queue_id);
+        }
         return rte_eth_rx_burst(m_port_id, queue_id, rx_pkts, nb_pkts);
     }
 
     inline uint16_t  rx_burst_dq(struct rte_mbuf **rx_pkts, uint16_t nb_pkts) {
-        return rte_eth_rx_burst(m_port_id, m_rx_queue, rx_pkts, nb_pkts);
+        return rte_eth_rx_burst(m_port_id, 0, rx_pkts, nb_pkts);
     }
 
     inline uint32_t pci_reg_read(uint32_t reg_off) {

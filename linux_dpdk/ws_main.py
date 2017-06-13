@@ -220,7 +220,7 @@ main_src = SrcGroup(dir='src',
             '44bsd/tcp_socket.cpp',
             '44bsd/tcp_dpdk.cpp',
             'bp_sim_tcp.cpp',
-
+            'utl_mbuf.cpp',
 
              'bp_sim.cpp',
              'utl_term_io.cpp',

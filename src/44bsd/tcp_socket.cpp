@@ -292,7 +292,6 @@ void CTcpApp::next(){
         /* nothing to do */
         /* TBD */
         tcp_close();
-        printf(" END .. %d \n",(int)m_debug_id);
         return;
     }
     CTcpAppCmd * lpcmd=m_program->get_index(m_cmd_index);

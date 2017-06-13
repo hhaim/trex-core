@@ -66,7 +66,9 @@ const char *tcptimers[] =
 const char	*tanames[] =
     { "input", "output", "user", "respond", "drop" };
 
+#if 0
 #define TCPDEBUG
+#endif
 
 #ifdef TCPDEBUG
 /* one thread debug */
@@ -213,8 +215,10 @@ void tcp_trace(CTcpPerThreadCtx * ctx,
           short ostate, 
           struct tcpcb * tp, 
           struct tcpiphdr * ti, 
+          TCPHeader * tio,
           int req){
 }
+
 
 
 #endif

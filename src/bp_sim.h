@@ -1999,6 +1999,7 @@ public:
     // stats
     uint64_t                         m_total_bytes;
     uint64_t                         m_total_pkt;
+
     uint64_t                         m_total_open_flows;
     uint64_t                         m_total_close_flows;
     uint64_t                         m_nat_lookup_no_flow_id;
