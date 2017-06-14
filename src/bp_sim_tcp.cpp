@@ -283,7 +283,7 @@ bool CFlowGenListPerThread::Create_tcp(){
     m_s_tcp->Create(10000,false);
     m_s_tcp->set_cb(m_s_tcp_io);
 
-    uint32_t tx_num_bytes=32*1024;
+    uint32_t tx_num_bytes=500*1024;
 
     m_buf = new CMbufBuffer();
     m_prog_c = new CTcpAppProgram();

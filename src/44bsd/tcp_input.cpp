@@ -163,7 +163,7 @@ int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
         /* first one - just add it to the list */
         CTcpReassBlock * lpb=&m_blocks[0];
         lpb->m_seq = ti->ti_seq;
-        lpb->m_len = (uint64_t)ti->ti_len;
+        lpb->m_len = (uint32_t)ti->ti_len;
         lpb->m_flags = (ti->ti_flags & TH_FIN) ?1:0;
         m_active_blocks=1;
         return(0);
@@ -305,7 +305,10 @@ inline void TCP_REASS(CTcpPerThreadCtx * ctx,
     if (ti->ti_seq == tp->rcv_nxt && 
        (tcp_reass_is_exists(tp)==false) && 
         tp->t_state == TCPS_ESTABLISHED) { 
-        tp->t_flags |= TF_DELACK; 
+        if (tiflags & TH_PUSH) 
+            tp->t_flags |= TF_ACKNOW; 
+        else 
+            tp->t_flags |= TF_DELACK; 
         tp->rcv_nxt += ti->ti_len; 
         tiflags = ti->ti_flags & TH_FIN; 
         INC_STAT(ctx,tcps_rcvpack);
@@ -427,7 +430,6 @@ tcp_pulloutofband(struct tcp_socket *so,
 
 #endif
 
-//void tcp_input(m, iphlen)
 
 
 /* assuming we found the flow */
@@ -613,7 +615,19 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
             sbappend(so,
                      &so->so_rcv, m,ti->ti_len);
             sorwakeup(so);
-            tp->t_flags |= TF_DELACK;
+
+            /*
+             * If this is a short packet, then ACK now - with Nagel
+             *  congestion avoidance sender won't send more until
+             *  he gets an ACK.
+             */
+            if (tiflags & TH_PUSH){
+                tp->t_flags |= TF_ACKNOW;
+                tcp_output(ctx,tp);
+            }else{
+                tp->t_flags |= TF_DELACK;
+            }
+
             return 0;
         }
     }
@@ -1356,6 +1370,7 @@ step6:
     if (so->so_options & US_SO_DEBUG){
         tcp_trace(ctx,TA_INPUT, ostate, tp, ti, 0,0);
     }
+
 
     /*
      * Return any desired output.
