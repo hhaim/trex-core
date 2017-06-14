@@ -240,7 +240,7 @@ int CTcpReass::pre_tcp_reass(CTcpPerThreadCtx * ctx,
         INC_STAT(ctx,tcps_rcvoopackdrop);
     }
     
-    m_active_blocks = min(ci,MAX_TCP_REASS_BLOCKS);
+    m_active_blocks = bsd_umin(ci,MAX_TCP_REASS_BLOCKS);
     for (li=0; li<m_active_blocks; li++ ) {
         m_blocks[li]= tblocks[li];
     }
@@ -364,7 +364,7 @@ void tcp_dooptions(CTcpPerThreadCtx * ctx,
             if (!(ti->ti_flags & TH_SYN))
                 continue;
             tp->t_flags |= TF_RCVD_SCALE;
-            tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
+            tp->requested_s_scale = bsd_umin(cp[2], TCP_MAX_WINSHIFT);
             break;
 
         case TCPOPT_TIMESTAMP:
@@ -634,7 +634,7 @@ int tcp_flow_input(CTcpPerThreadCtx * ctx,
         win = sbspace(&so->so_rcv);
         if (win < 0)
           win = 0;
-        tp->rcv_wnd = max(win, (int)(tp->rcv_adv - tp->rcv_nxt));
+        tp->rcv_wnd = bsd_imax(win, (int)(tp->rcv_adv - tp->rcv_nxt));
     }
 
     switch (tp->t_state) {
@@ -1031,7 +1031,7 @@ trimthenstep6:
                 else if (++tp->t_dupacks == ctx->tcprexmtthresh) {
                     tcp_seq onxt = tp->snd_nxt;
                     u_int win =
-                        min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
+                        bsd_umin(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
 
                     if (win < 2)
                         win = 2;
@@ -1110,7 +1110,7 @@ trimthenstep6:
 
         if (cw > tp->snd_ssthresh)
             incr = incr * incr / cw;
-        tp->snd_cwnd = min(cw + incr, TCP_MAXWIN<<tp->snd_scale);
+        tp->snd_cwnd = bsd_umin(cw + incr, TCP_MAXWIN<<tp->snd_scale);
         }
         if (acked > so->so_snd.sb_cc) {
             tp->snd_wnd -= so->so_snd.sb_cc;

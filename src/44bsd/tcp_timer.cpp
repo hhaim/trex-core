@@ -165,7 +165,7 @@ tcp_timers(CTcpPerThreadCtx * ctx,struct tcpcb *tp, int timer){
          * to go below this.)
          */
         {
-        u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
+        u_int win = bsd_umin(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
         if (win < 2)
             win = 2;
         tp->snd_cwnd = tp->t_maxseg;

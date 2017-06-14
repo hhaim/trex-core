@@ -41,6 +41,8 @@ limitations under the License.
 #include <stdlib.h>
 #include <common/c_common.h>
 
+#undef DEBUG_TX_PACKET
+                                          
 class CTcpDpdkCb : public CTcpCtxCb {
 public:
    int on_tx(CTcpPerThreadCtx *ctx,
@@ -89,8 +91,10 @@ int CTcpDpdkCb::on_tx(CTcpPerThreadCtx *ctx,
     node_tcp.dir  = m_dir;
     node_tcp.mbuf = m;
 
-    //fprintf(stdout,"TX---> dir %d \n",m_dir);
-    //utl_rte_pktmbuf_dump_k12(stdout,m);
+#ifdef DEBUG_TX_PACKET
+     fprintf(stdout,"TX---> dir %d \n",m_dir);
+     utl_rte_pktmbuf_dump_k12(stdout,m);
+#endif
     
     m_p->m_node_gen.m_v_if->send_node((CGenNode *) &node_tcp);
     return(0);
@@ -129,9 +133,10 @@ void CFlowGenListPerThread::tcp_handle_rx_flush(CGenNode * node,
             for (i=0; i<(int)cnt;i++) {
                 rte_mbuf_t * m=rx_pkts[i];
 
-                //fprintf(stdout,"RX---> dir %d \n",dir);
-                //utl_rte_pktmbuf_dump_k12(stdout,m);
-
+#ifdef DEBUG_TX_PACKET
+                fprintf(stdout,"RX---> dir %d \n",dir);
+                utl_rte_pktmbuf_dump_k12(stdout,m);
+#endif
                 ctx->m_ft.rx_handle_packet(ctx,m);
             }
         }

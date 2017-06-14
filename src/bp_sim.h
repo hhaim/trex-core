@@ -1214,20 +1214,20 @@ public:
 
         rte_mempool_t * p;
 
-        if ( size < _128_MBUF_SIZE) {
+        if ( size <= _128_MBUF_SIZE) {
             p = m_mbuf_pool_128;
-        }else if ( size < _256_MBUF_SIZE) {
+        }else if ( size <= _256_MBUF_SIZE) {
             p = m_mbuf_pool_256;
-        }else if (size < _512_MBUF_SIZE) {
+        }else if (size <= _512_MBUF_SIZE) {
             p = m_mbuf_pool_512;
-        }else if (size < _1024_MBUF_SIZE) {
+        }else if (size <= _1024_MBUF_SIZE) {
             p = m_mbuf_pool_1024;
-        }else if (size < _2048_MBUF_SIZE) {
+        }else if (size <= _2048_MBUF_SIZE) {
             p = m_mbuf_pool_2048;
-        }else if (size < _4096_MBUF_SIZE) {
+        }else if (size <= _4096_MBUF_SIZE) {
             p = m_mbuf_pool_4096;
         }else{
-            assert(size<MAX_PKT_ALIGN_BUF_9K);
+            assert(size<=MAX_PKT_ALIGN_BUF_9K);
             p = m_mbuf_pool_9k;
         }
         return (p);
@@ -1236,20 +1236,20 @@ public:
     inline rte_mbuf_t   * pktmbuf_alloc(uint16_t size){
 
         rte_mbuf_t        * m;
-        if ( size < _128_MBUF_SIZE) {
+        if ( size <= _128_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_128);
-        }else if ( size < _256_MBUF_SIZE) {
+        }else if ( size <= _256_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_256);
-        }else if (size < _512_MBUF_SIZE) {
+        }else if (size <= _512_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_512);
-        }else if (size < _1024_MBUF_SIZE) {
+        }else if (size <= _1024_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_1024);
-        }else if (size < _2048_MBUF_SIZE) {
+        }else if (size <= _2048_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_2048);
-        }else if (size < _4096_MBUF_SIZE) {
+        }else if (size <=_4096_MBUF_SIZE) {
             m = _rte_pktmbuf_alloc(m_mbuf_pool_4096);
         }else{
-            assert(size<MAX_PKT_ALIGN_BUF_9K);
+            assert(size<=MAX_PKT_ALIGN_BUF_9K);
             m = _rte_pktmbuf_alloc(m_mbuf_pool_9k);
         }
         return (m);

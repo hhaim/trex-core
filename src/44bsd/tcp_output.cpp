@@ -142,7 +142,7 @@ static inline uint16_t update_next_mbuf(rte_mbuf_t   *mi,
                                         rte_mbuf_t * &lastm,
                                         uint16_t dlen){
 
-    uint16_t bsize = min(rb.get_mbuf_size(),dlen);
+    uint16_t bsize = bsd_umin(rb.get_mbuf_size(),dlen);
     uint16_t trim=rb.get_mbuf_size()-bsize;
     if (rb.m_offset) {
         rte_pktmbuf_adj(mi, rb.m_offset);
@@ -267,14 +267,13 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
  * In any case the ack and sequence number of the transmitted
  * segment are as specified by the parameters.
  */
-void
-tcp_respond(CTcpPerThreadCtx * ctx,
+void tcp_respond(CTcpPerThreadCtx * ctx,
             struct tcpcb *tp, 
             tcp_seq ack, 
             tcp_seq seq, 
             int flags){
     assert(tp);
-    uint16_t win = sbspace(&tp->m_socket.so_rcv);
+    uint32_t win = sbspace(&tp->m_socket.so_rcv);
 
     CTcpPkt pkt;
     if (tcp_build_cpkt(ctx,tp,TCP_HEADER_LEN,pkt)!=0){
@@ -285,9 +284,10 @@ tcp_respond(CTcpPerThreadCtx * ctx,
     ti->setSeqNumber(seq);
     ti->setAckFlag(ack);
     ti->setFlag(flags);
-    ti->setWindowSize((u_short) (win >> tp->rcv_scale));
+    ti->setWindowSize((uint16_t) (win >> tp->rcv_scale));
 
     /* TBD repace this */
+    assert(0);
     utl_k12_pkt_format(stdout,pkt.get_header_ptr(),  pkt.get_pkt_size()) ;
     // (void) ip_output(m, NULL, ro, 0, NULL);
 }
@@ -301,8 +301,9 @@ tcp_respond(CTcpPerThreadCtx * ctx,
 int tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb *tp) {
 
     struct tcp_socket *so = &tp->m_socket;
-    long len, win;
-    int off, flags, error=0;
+    int32_t len ;
+    uint32_t win;
+    int32_t off, flags, error=0;
     u_char opt[MAX_TCPOPTLEN];
     unsigned optlen, hdrlen;
     int idle, sendalot;
@@ -325,7 +326,8 @@ int tcp_output(CTcpPerThreadCtx * ctx,struct tcpcb *tp) {
 again:
     sendalot = 0;
     off = tp->snd_nxt - tp->snd_una;
-    win = min(tp->snd_wnd, tp->snd_cwnd);
+    assert(off>=0);
+    win = bsd_umin(tp->snd_wnd, tp->snd_cwnd);
 
     flags = tcp_outflags[tp->t_state];
     /*
@@ -361,7 +363,7 @@ again:
         }
     }
 
-    len = min(so->so_snd.sb_cc, win) - off;
+    len = ((int32_t)bsd_umin(so->so_snd.sb_cc, win)) - off;
 
     if (len < 0) {
         /*
@@ -426,12 +428,12 @@ again:
          * taking into account that we are limited by
          * TCP_MAXWIN << tp->rcv_scale.
          */
-        long adv = min(win, (long)TCP_MAXWIN << tp->rcv_scale) -
+        int32_t adv = bsd_umin(win, (int32_t)TCP_MAXWIN << tp->rcv_scale) -
             (tp->rcv_adv - tp->rcv_nxt);
 
-        if (adv >= (long) (2 * tp->t_maxseg))
+        if (adv >= (int32_t) (2 * tp->t_maxseg))
             goto send;
-        if (2 * adv >= (long) so->so_rcv.sb_hiwat)
+        if ((int32_t)(2 * adv) >= (int32_t) so->so_rcv.sb_hiwat)
             goto send;
     }
 
@@ -646,12 +648,14 @@ send:
      * Calculate receive window.  Don't shrink window,
      * but avoid silly window syndrome.
      */
-    if (win < (long)(so->so_rcv.sb_hiwat / 4) && win < (long)tp->t_maxseg)
+    if ( (win < (so->so_rcv.sb_hiwat / 4)) && (win < (uint32_t)tp->t_maxseg) ){
         win = 0;
-    if (win > (long)TCP_MAXWIN << tp->rcv_scale)
-        win = (long)TCP_MAXWIN << tp->rcv_scale;
-    if (win < (long)(tp->rcv_adv - tp->rcv_nxt))
-        win = (long)(tp->rcv_adv - tp->rcv_nxt);
+    }
+    if (win < (uint32_t)(tp->rcv_adv - tp->rcv_nxt))
+        win = (uint32_t)(tp->rcv_adv - tp->rcv_nxt);
+    if (win > (uint32_t)TCP_MAXWIN << tp->rcv_scale)
+        win = (uint32_t)TCP_MAXWIN << tp->rcv_scale;
+
     ti->setWindowSize( (u_short) (win>>tp->rcv_scale));
     if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
         /* not support this for now - hhaim*/
@@ -729,7 +733,6 @@ send:
     if (so->so_options & US_SO_DEBUG){
         tcp_trace(ctx,TA_OUTPUT, tp->t_state, tp, (struct tcpiphdr *)0, ti,len);
     }
-
 
     error = ctx->m_cb->on_tx(ctx,tp,pkt.m_buf);
 

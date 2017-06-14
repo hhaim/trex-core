@@ -68,28 +68,15 @@ inline uint16_t in_cksum(struct rte_mbuf * m, int len ){
     return (0);
 }
 
-static __inline int imax(int a, int b)
-{
+static inline int32_t bsd_imax(int32_t a, int32_t b){
     return (a > b ? a : b);
 }
-static __inline int imin(int a, int b)
-{
-    return (a < b ? a : b);
-}
-static __inline long lmax(long a, long b)
-{
+
+static inline uint32_t bsd_umax(uint32_t a, uint32_t b){
     return (a > b ? a : b);
 }
-static __inline long lmin(long a, long b)
-{
-    return (a < b ? a : b);
-}
-static __inline u_int max(u_int a, u_int b)
-{
-    return (a > b ? a : b);
-}
-static __inline u_int min(u_int a, u_int b)
-{
+
+static inline uint32_t bsd_umin(uint32_t a, uint32_t b){
     return (a < b ? a : b);
 }
 

@@ -32,8 +32,8 @@ limitations under the License.
 #include "tcp_socket.h"
 
 
-long sbspace(struct sockbuf *sb){
-    return(sb->sb_hiwat -sb->sb_cc);
+uint32_t sbspace(struct sockbuf *sb){
+    return(sb->sb_hiwat - sb->sb_cc);
 }
 
 
@@ -179,6 +179,9 @@ void CMbufBuffer::Delete(){
 }
 
 void CMbufBuffer::get_by_offset(uint32_t offset,CBufMbufRef & res){
+    if (offset>=m_t_bytes) {
+        printf(" ERROR get_by_offset: %lu %lu\n",(ulong)offset,(ulong)m_t_bytes);
+    }
     assert(offset<m_t_bytes);
     /* TBD might  worth to cache the calculation (%/) and save the next offset calculation ..,
        in case of MSS == m_blk_size it would be just ++ */
@@ -246,7 +249,7 @@ void CTcpApp::process_cmd(CTcpAppCmd * cmd){
             m_tx_offset =0;
             m_tx_active = cmd->u.m_tx_cmd.m_buf; /* tx is active */
             assert(m_tx_active);
-            uint32_t add_to_queue = min(m_api->get_tx_max_space(m_flow),m_tx_active->m_t_bytes);
+            uint32_t add_to_queue = bsd_umin(m_api->get_tx_max_space(m_flow),m_tx_active->m_t_bytes);
             m_tx_residue = m_tx_active->m_t_bytes - add_to_queue;
             /* append to tx queue the maximum bytes */
             m_api->tx_sbappend(m_flow,add_to_queue);
@@ -314,7 +317,7 @@ int CTcpApp::on_bh_tx_acked(uint32_t tx_bytes){
     set_interrupt(true);
     m_tx_offset+=tx_bytes;
     if (m_tx_residue){
-        uint32_t add_to_queue = min(tx_bytes,m_tx_residue);
+        uint32_t add_to_queue = bsd_umin(tx_bytes,m_tx_residue);
         m_api->tx_sbappend(m_flow,add_to_queue);
         m_tx_residue-=add_to_queue;
     }else{
@@ -410,7 +413,7 @@ int utl_mbuf_buffer_create_and_fill(CMbufBuffer * buf,
     buf->Create(blk_size);
     uint8_t cnt=0; 
     while (size>0) {
-        uint32_t alloc_size=min(blk_size,size);
+        uint32_t alloc_size=bsd_umin(blk_size,size);
         rte_mbuf_t   * m=tcp_pktmbuf_alloc(0,alloc_size);
         assert(m);
         char *p=(char *)rte_pktmbuf_append(m, alloc_size);

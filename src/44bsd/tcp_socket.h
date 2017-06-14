@@ -90,7 +90,7 @@ struct  sockbuf {
 
 struct tcp_socket * sonewconn(struct tcp_socket *head, int connstatus);
 
-long    sbspace(struct sockbuf *sb); 
+uint32_t    sbspace(struct sockbuf *sb); 
 //void    sbdrop(struct sockbuf *sb, int len);
 
 int soabort(struct tcp_socket *so);
