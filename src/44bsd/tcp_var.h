@@ -340,13 +340,33 @@ public:
 #define PRU_SLOWTIMO        19  /* 500ms timeout */
 
 
-// base tick in msec
+#ifdef TREX_SIM
+
 #define TCP_TIMER_TICK_BASE_MS 200 
 #define TCP_TIMER_W_TICK       50
+#define TCP_TIMER_W_DIV        1
 
 #define TCP_FAST_TICK (TCP_TIMER_TICK_BASE_MS/TCP_TIMER_W_TICK)
 #define TCP_SLOW_RATIO_TICK 1
-#define TCP_SLOW_RATIO_MASTER (500/TCP_TIMER_W_TICK)
+#define TCP_SLOW_RATIO_MASTER ((500)/TCP_TIMER_W_TICK)
+#define TCP_SLOW_FAST_RATIO 1
+
+
+#else 
+
+// base tick in msec
+#define TCP_TIMER_TICK_BASE_MS 20 
+#define TCP_TIMER_W_TICK       1
+#define TCP_TIMER_W_DIV        50
+
+#define TCP_FAST_TICK (TCP_TIMER_TICK_BASE_MS/TCP_TIMER_W_TICK)
+#define TCP_SLOW_RATIO_TICK 1
+#define TCP_SLOW_RATIO_MASTER ((TCP_TIMER_W_DIV*500)/TCP_TIMER_W_TICK)
+#define TCP_SLOW_FAST_RATIO   (500/20)
+
+
+#endif
+
 
 #include "h_timer.h"
 
@@ -390,7 +410,7 @@ public:
 
     void on_tick(){
         on_fast_tick();
-        if (m_tick==TCP_SLOW_RATIO_TICK) {
+        if (m_tick==TCP_SLOW_FAST_RATIO) {
             m_tick=0;
             on_slow_tick();
         }else{
@@ -512,9 +532,9 @@ public:
     struct      tcpstat m_tcpstat;  /* tcp statistics */
     uint32_t    tcp_now;        /* for RFC 1323 timestamps */
     tcp_seq     tcp_iss;            /* tcp initial send seq # */
-    uint8_t     m_tick;
+    uint32_t    m_tick;
 
-    CHTimerWheel  m_timer_w; /* TBD-FIXME*/
+    CNATimerWheel m_timer_w; /* TBD-FIXME one timer , should be pointer */
     CTcpCtxCb    * m_cb;
 
     CFlowTable   m_ft;

@@ -322,7 +322,12 @@ static void tcp_timer(void *userdata,
 
 /* tick every 50msec TCP_TIMER_W_TICK */
 void CTcpPerThreadCtx::timer_w_on_tick(){
-    m_timer_w.on_tick((void*)this,tcp_timer);
+#ifndef TREX_SIM
+    uint32_t left;
+    m_timer_w.on_tick_level_count(0,(void*)this,tcp_timer,16,left);
+#else
+    m_timer_w.on_tick_level0((void*)this,tcp_timer);
+#endif
 
     if ( m_tick==TCP_SLOW_RATIO_MASTER ) {
         tcp_maxidle = tcp_keepcnt * tcp_keepintvl;
@@ -364,13 +369,17 @@ bool CTcpPerThreadCtx::Create(uint32_t size,
     memset(&tcp_saveti,0,sizeof(tcp_saveti));
 
     RC_HTW_t tw_res;
-    tw_res = m_timer_w.Create(512,1);
+    tw_res = m_timer_w.Create(1024,1);
+
     if (tw_res != RC_HTW_OK ){
         CHTimerWheelErrorStr err(tw_res);
         printf("Timer wheel configuration error,please look into the manual for details  \n");
         printf("ERROR  %-30s  - %s \n",err.get_str(),err.get_help_str());
         return(false);
     }
+#ifndef TREX_SIM
+    m_timer_w.set_level1_cnt_div(TCP_TIMER_W_DIV);
+#endif
 
     if (!m_ft.Create(size,is_client)){
         printf("ERROR  can't create flow table \n");

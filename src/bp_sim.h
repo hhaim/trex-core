@@ -4179,9 +4179,8 @@ public:
     double                          m_tcp_fif_d_time;
 
 public:
-    double tcp_get_tw_tick_in_sec(){
-        return(50.0/1000.0);
-    }
+    double tcp_get_tw_tick_in_sec();
+
     bool Create_tcp();
     void Delete_tcp();
 

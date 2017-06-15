@@ -754,7 +754,7 @@ rte_mbuf_t   * test_build_packet_size(int pkt_len,
             mhead=m;
         }
 
-        uint16_t   csize=min(chunk_size,pkt_len);
+        uint16_t   csize=(uint16_t)std::min(chunk_size,pkt_len);
         utl_rte_pktmbuf_fill(m,
                        csize,
                        cnt,
@@ -1225,7 +1225,7 @@ int CClientServerTcp::test2(){
 
     m_rtt_sec = 0.05;
 
-    m_sim.add_event( new CTcpSimEventTimers(this, ((double)(TCP_TIMER_W_TICK)/1000.0)));
+    m_sim.add_event( new CTcpSimEventTimers(this, (((double)(TCP_TIMER_W_TICK)/((double)TCP_TIMER_W_DIV*1000.0)))));
     m_sim.add_event( new CTcpSimEventStop(1000.0) );
 
     /* start client */

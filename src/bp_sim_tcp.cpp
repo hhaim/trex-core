@@ -260,6 +260,10 @@ void CFlowGenListPerThread::tcp_handle_tw(CGenNode * node,
 }
 
 
+double CFlowGenListPerThread::tcp_get_tw_tick_in_sec(){
+    return((double)TCP_TIMER_W_TICK/((double)TCP_TIMER_W_DIV* 1000.0));
+}
+
 
 bool CFlowGenListPerThread::Create_tcp(){
 
