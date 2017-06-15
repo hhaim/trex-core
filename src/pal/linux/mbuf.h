@@ -90,6 +90,28 @@ rte_ipv6_phdr_cksum(const struct ipv6_hdr *ipv6_hdr, uint64_t ol_flags){
     return(0);
 }
 
+#define PKT_RX_IP_CKSUM_MASK ((1ULL << 4) | (1ULL << 7))
+
+#define PKT_RX_IP_CKSUM_UNKNOWN 0
+#define PKT_RX_IP_CKSUM_BAD     (1ULL << 4)
+#define PKT_RX_IP_CKSUM_GOOD    (1ULL << 7)
+#define PKT_RX_IP_CKSUM_NONE    ((1ULL << 4) | (1ULL << 7))
+
+/**
+ * Mask of bits used to determine the status of RX L4 checksum.
+ * - PKT_RX_L4_CKSUM_UNKNOWN: no information about the RX L4 checksum
+ * - PKT_RX_L4_CKSUM_BAD: the L4 checksum in the packet is wrong
+ * - PKT_RX_L4_CKSUM_GOOD: the L4 checksum in the packet is valid
+ * - PKT_RX_L4_CKSUM_NONE: the L4 checksum is not correct in the packet
+ *   data, but the integrity of the L4 data is verified.
+ */
+#define PKT_RX_L4_CKSUM_MASK ((1ULL << 3) | (1ULL << 8))
+
+#define PKT_RX_L4_CKSUM_UNKNOWN 0
+#define PKT_RX_L4_CKSUM_BAD     (1ULL << 3)
+#define PKT_RX_L4_CKSUM_GOOD    (1ULL << 8)
+#define PKT_RX_L4_CKSUM_NONE    ((1ULL << 3) | (1ULL << 8))
+
 
 #define PKT_TX_L4_NO_CKSUM   (0ULL << 52) /**< Disable L4 cksum of TX pkt. */
 #define PKT_TX_TCP_CKSUM     (1ULL << 52) /**< TCP cksum of TX pkt. computed by NIC. */

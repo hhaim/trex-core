@@ -1655,4 +1655,40 @@ TEST_F(gt_tcp, tst38) {
     delete lp1;
 
 }
+//////////////////////////////////////
+class CGcCounter {
+public:
+
+    enum count_type_e {
+        ctTYPE_64BIT     = 0x1,
+        ctTYPE_32BIT     = 0x2,
+        ctERROR          = 0x4,
+        ctRATE_PPS       = 0x8,
+        ctRATE_BPS       = 0x10
+        ctHUMANE         = 0x20,
+    };
+
+    CGcCounter (void *p,
+                uint8_t     flags,
+                std::string name,
+                std::string help;
+                ){
+        m_p=p;
+        m_help =help;
+        m_name = name;
+        m_flags =flags;
+    }
+
+private:
+    std::string m_help;
+    std::string m_name;
+    void *      m_p;
+    uint8_t     m_flags;
+};
+
+//////////////////////////////////////
+
+TEST_F(gt_tcp, tst39) {
+    printf(" hey \n");
+}
 
