@@ -237,6 +237,11 @@ void CTcpFlow::init(){
     /* build template */
     tcp_template(&m_tcp);
         /* register the timer */
+
+    #ifndef TREX_SIM  /* FIX ME -- need to lead from DPDK driver and ctx */
+    m_tcp.m_offload_flags = TCP_OFFLOAD_CHKSUM;
+    #endif
+
     m_ctx->timer_w_start(this);
 }
 
@@ -448,8 +453,6 @@ void tcp_template(struct tcpcb *tp){
         tp->offset_tcp = 14+20;
         tp->offset_ip  = 14;
         tp->is_ipv6    = 0;
-        tp->m_pad      = 0;
-
 
         uint8_t *p=tp->template_pkt;
         memcpy(p,default_ipv4_header,sizeof(default_ipv4_header) );
@@ -458,7 +461,7 @@ void tcp_template(struct tcpcb *tp){
         IPHeader *lpIpv4=(IPHeader *)(p);
         lpIpv4->setDestIp(tp->dst_ipv4);
         lpIpv4->setSourceIp(tp->src_ipv4);
-        lpIpv4->updateCheckSum();
+        lpIpv4->ClearCheckSum();
         p+=20;
         TCPHeader *lpTCP=(TCPHeader *)(p);
         lpTCP->setSourcePort(tp->src_port);

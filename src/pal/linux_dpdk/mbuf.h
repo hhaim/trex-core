@@ -35,4 +35,9 @@ typedef struct rte_mempool rte_mempool_t;
 inline void utl_rte_mempool_delete(rte_mempool_t * & pool){
 }
 
+#ifdef RTE_DPDK
+#	include <rte_ip.h>
+#endif /* RTE_DPDK */
+
+
 #endif

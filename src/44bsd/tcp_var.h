@@ -193,7 +193,9 @@ struct tcpcb {
     uint8_t offset_tcp; /* offset of tcp_header, in template */
     uint8_t offset_ip;  /* offset of ip_header in template */
     uint8_t is_ipv6;
-    uint8_t m_pad;
+    uint8_t m_offload_flags;
+    #define TCP_OFFLOAD_CHKSUM   0x0001      /* DPDK_CHECK_SUM */
+
 
     /*====== end =============*/
 

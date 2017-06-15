@@ -44,7 +44,7 @@
 #include "tcpip.h"
 #include "tcp_debug.h"
 #include "tcp_socket.h"
-
+#include "mbuf.h"
 
 #include <assert.h>
 
@@ -75,19 +75,46 @@ const char ** tcp_get_tcpstate(){
 
 
 static inline void tcp_pkt_update_len(struct tcpcb *tp,
-                                     char *p,
-                                     uint32_t tcp_h_pyld){
+                                      CTcpPkt &pkt,
+                                      uint32_t tcp_h_pyld){
 
+    char *p=pkt.get_header_ptr();
 
-    if (!tp->is_ipv6){
-        uint16_t tlen=tp->offset_tcp-tp->offset_ip+tcp_h_pyld;
-        IPHeader * lpv4=(IPHeader *)(p+tp->offset_ip);
-        lpv4->setTotalLength(tlen);
-        lpv4->updateCheckSumFast();
+    if (tp->m_offload_flags & TCP_OFFLOAD_CHKSUM){
+
+        rte_mbuf_t   * m=pkt.m_buf;
+
+        if (!tp->is_ipv6){
+            uint16_t tlen=tp->offset_tcp-tp->offset_ip+tcp_h_pyld;
+            m->l2_len = tp->offset_ip;
+            m->l3_len = tp->offset_tcp-tp->offset_ip;
+            m->ol_flags |= (PKT_TX_IPV4 | PKT_TX_IP_CKSUM | PKT_TX_TCP_CKSUM);
+            IPHeader * ipv4=(IPHeader *)(p+tp->offset_ip);
+            ipv4->setTotalLength(tlen);
+            ipv4->ClearCheckSum();
+            TCPHeader *  tcp=(TCPHeader *)(p+tp->offset_tcp);
+            tcp->setChecksumRaw(rte_ipv4_phdr_cksum((struct ipv4_hdr *)ipv4,(PKT_TX_IPV4 |PKT_TX_IP_CKSUM|PKT_TX_TCP_CKSUM)));
+        }else{
+            uint16_t tlen=tcp_h_pyld;
+            m->l2_len = tp->offset_ip;
+            m->l3_len = tp->offset_tcp-tp->offset_ip;
+            m->ol_flags |= ( PKT_TX_IPV6 | PKT_TX_TCP_CKSUM);
+            IPv6Header * Ipv6=(IPv6Header *)(p+tp->offset_ip);
+            Ipv6->setPayloadLen(tlen);
+            TCPHeader *  tcp=(TCPHeader *)(p+tp->offset_tcp);
+            tcp->setChecksumRaw(rte_ipv6_phdr_cksum((struct ipv6_hdr *)Ipv6,(PKT_TX_IPV6 | PKT_TX_TCP_CKSUM)));
+        }
     }else{
-        uint16_t tlen = tcp_h_pyld;
-        IPv6Header * Ipv6=(IPv6Header *)(p+tp->offset_ip);
-        Ipv6->setPayloadLen(tlen);
+        if (!tp->is_ipv6){
+            uint16_t tlen=tp->offset_tcp-tp->offset_ip+tcp_h_pyld;
+            IPHeader * lpv4=(IPHeader *)(p+tp->offset_ip);
+            lpv4->setTotalLength(tlen);
+            lpv4->updateCheckSumFast();
+        }else{
+            uint16_t tlen = tcp_h_pyld;
+            IPv6Header * Ipv6=(IPv6Header *)(p+tp->offset_ip);
+            Ipv6->setPayloadLen(tlen);
+        }
     }
 }
 
@@ -131,7 +158,7 @@ int tcp_build_cpkt(CTcpPerThreadCtx * ctx,
                    CTcpPkt &pkt){
    int res=_tcp_build_cpkt(ctx,tp,tcphlen,pkt);
    if (res==0){
-       tcp_pkt_update_len(tp,pkt.get_header_ptr(),tcphlen) ;
+       tcp_pkt_update_len(tp,pkt,tcphlen) ;
    }
    return(res);
 }
@@ -247,7 +274,7 @@ int tcp_build_dpkt(CTcpPerThreadCtx * ctx,
 
     int res = tcp_build_dpkt_(ctx,tp,offset,dlen,tcphlen,pkt);
     if (res==0){
-        tcp_pkt_update_len(tp,pkt.get_header_ptr(),tcphlen+dlen) ;
+        tcp_pkt_update_len(tp,pkt,tcphlen+dlen) ;
     }
     return(res);
 }

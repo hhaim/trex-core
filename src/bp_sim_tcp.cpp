@@ -92,8 +92,8 @@ int CTcpDpdkCb::on_tx(CTcpPerThreadCtx *ctx,
     node_tcp.mbuf = m;
 
 #ifdef DEBUG_TX_PACKET
-     fprintf(stdout,"TX---> dir %d \n",m_dir);
-     utl_rte_pktmbuf_dump_k12(stdout,m);
+     //fprintf(stdout,"TX---> dir %d \n",m_dir);
+     //utl_rte_pktmbuf_dump_k12(stdout,m);
 #endif
     
     m_p->m_node_gen.m_v_if->send_node((CGenNode *) &node_tcp);
@@ -287,7 +287,7 @@ bool CFlowGenListPerThread::Create_tcp(){
     m_s_tcp->Create(10000,false);
     m_s_tcp->set_cb(m_s_tcp_io);
 
-    uint32_t tx_num_bytes=500*1024;
+    uint32_t tx_num_bytes=1*1024;
 
     m_buf = new CMbufBuffer();
     m_prog_c = new CTcpAppProgram();
