@@ -219,6 +219,8 @@ private:
     uint32_t        m_stats_err_no_template;  
     uint32_t        m_stats_err_no_memory; 
     uint32_t        m_stats_err_duplicate_client_tuple; 
+    uint32_t        m_stats_err_l3_cs;
+    uint32_t        m_stats_err_l4_cs;
 
 };
 

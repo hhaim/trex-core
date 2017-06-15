@@ -61,6 +61,8 @@ void CFlowTable::dump(FILE *fd){
     fprintf(fd,"stats_err_no_template              : %u \n",m_stats_err_no_template);
     fprintf(fd,"stats_err_no_memory                : %u \n",m_stats_err_no_memory);
     fprintf(fd,"stats_err_duplicate_client_tuple   : %u \n",m_stats_err_duplicate_client_tuple);
+    fprintf(fd,"m_stats_err_l3_cs                  : %u \n",m_stats_err_l3_cs);
+    fprintf(fd,"m_stats_err_l4_cs                  : %u \n",m_stats_err_l4_cs);
 }
 
 
@@ -72,6 +74,8 @@ void CFlowTable::reset_stats(){
    m_stats_err_no_template=0;  
    m_stats_err_no_memory=0;
    m_stats_err_duplicate_client_tuple=0;
+   m_stats_err_l3_cs=0;
+   m_stats_err_l4_cs=0;
 }
 
 
@@ -147,6 +151,15 @@ bool CFlowTable::parse_packet(struct rte_mbuf * mbuf,
     lpf->m_l7_total_len  =  l3_pkt_len - lpf->m_l7_offset;
 
     /* TBD need to check TCP header checksum */
+    if ( (mbuf->ol_flags & PKT_RX_IP_CKSUM_MASK) ==  PKT_RX_IP_CKSUM_BAD ){
+        m_stats_err_l3_cs++;
+        return(false);
+    }
+
+    if ( (mbuf->ol_flags & PKT_RX_L4_CKSUM_BAD) ==  PKT_RX_L4_CKSUM_BAD ){
+        m_stats_err_l4_cs++;
+        return(false);
+    }
 
     tuple.set_proto(lpf->m_proto);
     tuple.set_ipv4(lpf->m_ipv4);
