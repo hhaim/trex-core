@@ -54,6 +54,7 @@
 #ifdef PEDANTIC
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+#include <rte_pci.h>
 #include <rte_ether.h>
 #include <rte_ethdev.h>
 #include <rte_spinlock.h>
@@ -64,6 +65,7 @@
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
 
+                            
 #include "mlx5_utils.h"
 #include "mlx5_rxtx.h"
 #include "mlx5_autoconf.h"
@@ -88,44 +90,6 @@ enum {
 	PCI_DEVICE_ID_MELLANOX_CONNECTX5EX = 0x1019,
 	PCI_DEVICE_ID_MELLANOX_CONNECTX5EXVF = 0x101a,
 };
-
-struct mlx5_stats_priv {
-
-    struct rte_eth_stats m_shadow;
-    uint32_t             m_old_ipackets;
-    uint32_t             m_old_opackets;
-    uint64_t             m_t_ipackets;
-    uint64_t             m_t_opackets;
-
-    uint32_t      n_stats; /* number of counters */
-
-    void    *  et_stats  ;/* point to ethtool counter struct ethtool_stats*/
-
-    /* index into ethtool */
-    uint16_t inx_rx_vport_unicast_bytes;
-    uint16_t inx_rx_vport_multicast_bytes;
-    uint16_t inx_rx_vport_broadcast_bytes;
-    uint16_t inx_rx_vport_unicast_packets;
-    uint16_t inx_rx_vport_multicast_packets;
-    uint16_t inx_rx_vport_broadcast_packets;
-    uint16_t inx_tx_vport_unicast_bytes;
-    uint16_t inx_tx_vport_multicast_bytes;
-    uint16_t inx_tx_vport_broadcast_bytes;
-    uint16_t inx_tx_vport_unicast_packets;
-    uint16_t inx_tx_vport_multicast_packets;
-    uint16_t inx_tx_vport_broadcast_packets;
-
-    uint16_t inx_tx_packets_phy;
-    uint16_t inx_tx_bytes_phy;
-
-    uint16_t inx_rx_wqe_err;
-    uint16_t inx_rx_crc_errors_phy;
-    uint16_t inx_rx_in_range_len_errors_phy;
-    uint16_t inx_rx_symbol_err_phy;
-    uint16_t inx_tx_errors_phy;
-    uint16_t cx_4_workaround;
-};
-
 
 struct mlx5_xstats_ctrl {
 	/* Number of device stats. */
@@ -161,11 +125,18 @@ struct priv {
 	unsigned int hw_fcs_strip:1; /* FCS stripping is supported. */
 	unsigned int hw_padding:1; /* End alignment padding is supported. */
 	unsigned int sriov:1; /* This is a VF or PF with VF devices. */
-	unsigned int mps:1; /* Whether multi-packet send is supported. */
+	unsigned int mps:2; /* Multi-packet send mode (0: disabled). */
+	unsigned int mpw_hdr_dseg:1; /* Enable DSEGs in the title WQEBB. */
 	unsigned int cqe_comp:1; /* Whether CQE compression is enabled. */
 	unsigned int pending_alarm:1; /* An alarm is pending. */
+	unsigned int tso:1; /* Whether TSO is supported. */
+	unsigned int tunnel_en:1;
+	unsigned int isolated:1; /* Whether isolated mode is enabled. */
+	/* Whether Tx offloads for tunneled packets are supported. */
+	unsigned int max_tso_payload_sz; /* Maximum TCP payload for TSO. */
 	unsigned int txq_inline; /* Maximum packet size for inlining. */
 	unsigned int txqs_inline; /* Queue number threshold for inlining. */
+	unsigned int inline_max_packet_sz; /* Max packet size for inlining. */
 	/* RX/TX queues. */
 	unsigned int rxqs_n; /* RX queues array size. */
 	unsigned int txqs_n; /* TX queues array size. */
@@ -186,11 +157,11 @@ struct priv {
 	unsigned int reta_idx_n; /* RETA index size. */
 	struct fdir_filter_list *fdir_filter_list; /* Flow director rules. */
 	struct fdir_queue *fdir_drop_queue; /* Flow director drop queue. */
-	LIST_HEAD(mlx5_flows, rte_flow) flows; /* RTE Flow rules. */
+	struct rte_flow_drop *flow_drop_queue; /* Flow drop queue. */
+	TAILQ_HEAD(mlx5_flows, rte_flow) flows; /* RTE Flow rules. */
 	uint32_t link_speed_capa; /* Link speed capabilities. */
 	struct mlx5_xstats_ctrl xstats_ctrl; /* Extended stats control. */
 	rte_spinlock_t lock; /* Lock for control functions. */
-    struct mlx5_stats_priv m_stats;
 };
 
 /* Local storage for secondary process data. */
@@ -236,6 +207,8 @@ struct priv *mlx5_get_priv(struct rte_eth_dev *dev);
 int mlx5_is_secondary(void);
 int priv_get_ifname(const struct priv *, char (*)[IF_NAMESIZE]);
 int priv_ifreq(const struct priv *, int req, struct ifreq *);
+int priv_is_ib_cntr(const char *);
+int priv_get_cntr_sysfs(struct priv *, const char *, uint64_t *);
 int priv_get_num_vfs(struct priv *, uint16_t *);
 int priv_get_mtu(struct priv *, uint16_t *);
 int priv_set_flags(struct priv *, unsigned int, unsigned int);
@@ -249,7 +222,7 @@ int mlx5_dev_set_flow_ctrl(struct rte_eth_dev *, struct rte_eth_fc_conf *);
 int mlx5_ibv_device_to_pci_addr(const struct ibv_device *,
 				struct rte_pci_addr *);
 void mlx5_dev_link_status_handler(void *);
-void mlx5_dev_interrupt_handler(struct rte_intr_handle *, void *);
+void mlx5_dev_interrupt_handler(void *);
 void priv_dev_interrupt_handler_uninstall(struct priv *, struct rte_eth_dev *);
 void priv_dev_interrupt_handler_install(struct priv *, struct rte_eth_dev *);
 int mlx5_set_link_down(struct rte_eth_dev *dev);
@@ -268,8 +241,8 @@ int hash_rxq_mac_addrs_add(struct hash_rxq *);
 int priv_mac_addr_add(struct priv *, unsigned int,
 		      const uint8_t (*)[ETHER_ADDR_LEN]);
 int priv_mac_addrs_enable(struct priv *);
-void mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
-		       uint32_t);
+int mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
+		      uint32_t);
 void mlx5_mac_addr_set(struct rte_eth_dev *, struct ether_addr *);
 
 /* mlx5_rss.c */
@@ -300,8 +273,6 @@ void mlx5_allmulticast_disable(struct rte_eth_dev *);
 void priv_xstats_init(struct priv *);
 void mlx5_stats_get(struct rte_eth_dev *, struct rte_eth_stats *);
 void mlx5_stats_reset(struct rte_eth_dev *);
-void mlx5_stats_free(struct rte_eth_dev *dev);
-
 int mlx5_xstats_get(struct rte_eth_dev *,
 		    struct rte_eth_xstat *, unsigned int);
 void mlx5_xstats_reset(struct rte_eth_dev *);
@@ -343,7 +314,9 @@ struct rte_flow *mlx5_flow_create(struct rte_eth_dev *,
 int mlx5_flow_destroy(struct rte_eth_dev *, struct rte_flow *,
 		      struct rte_flow_error *);
 int mlx5_flow_flush(struct rte_eth_dev *, struct rte_flow_error *);
+int mlx5_flow_isolate(struct rte_eth_dev *, int, struct rte_flow_error *);
 int priv_flow_start(struct priv *);
 void priv_flow_stop(struct priv *);
+int priv_flow_rxq_in_use(struct priv *, struct rxq *);
 
 #endif /* RTE_PMD_MLX5_H_ */

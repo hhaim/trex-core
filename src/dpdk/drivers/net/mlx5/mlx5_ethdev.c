@@ -234,6 +234,23 @@ try_dev_id:
 }
 
 /**
+ * Check if the counter is located on ib counters file.
+ *
+ * @param[in] cntr
+ *   Counter name.
+ *
+ * @return
+ *   1 if counter is located on ib counters file , 0 otherwise.
+ */
+int
+priv_is_ib_cntr(const char *cntr)
+{
+	if (!strcmp(cntr, "out_of_buffer"))
+		return 1;
+	return 0;
+}
+
+/**
  * Read from sysfs entry.
  *
  * @param[in] priv
@@ -260,10 +277,15 @@ priv_sysfs_read(const struct priv *priv, const char *entry,
 	if (priv_get_ifname(priv, &ifname))
 		return -1;
 
-	MKSTR(path, "%s/device/net/%s/%s", priv->ctx->device->ibdev_path,
-	      ifname, entry);
-
-	file = fopen(path, "rb");
+	if (priv_is_ib_cntr(entry)) {
+		MKSTR(path, "%s/ports/1/hw_counters/%s",
+		      priv->ctx->device->ibdev_path, entry);
+		file = fopen(path, "rb");
+	} else {
+		MKSTR(path, "%s/device/net/%s/%s",
+		      priv->ctx->device->ibdev_path, ifname, entry);
+		file = fopen(path, "rb");
+	}
 	if (file == NULL)
 		return -1;
 	ret = fread(buf, 1, size, file);
@@ -469,6 +491,30 @@ priv_get_mtu(struct priv *priv, uint16_t *mtu)
 }
 
 /**
+ * Read device counter from sysfs.
+ *
+ * @param priv
+ *   Pointer to private structure.
+ * @param name
+ *   Counter name.
+ * @param[out] cntr
+ *   Counter output buffer.
+ *
+ * @return
+ *   0 on success, -1 on failure and errno is set.
+ */
+int
+priv_get_cntr_sysfs(struct priv *priv, const char *name, uint64_t *cntr)
+{
+	unsigned long ulong_ctr;
+
+	if (priv_get_sysfs_ulong(priv, name, &ulong_ctr) == -1)
+		return -1;
+	*cntr = ulong_ctr;
+	return 0;
+}
+
+/**
  * Set device MTU.
  *
  * @param priv
@@ -615,7 +661,7 @@ mlx5_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *info)
 	unsigned int max;
 	char ifname[IF_NAMESIZE];
 
-	info->pci_dev = RTE_DEV_TO_PCI(dev->device);
+	info->pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 
 	priv_lock(priv);
 	/* FIXME: we should ask the device for these values. */
@@ -647,14 +693,16 @@ mlx5_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *info)
 			(DEV_TX_OFFLOAD_IPV4_CKSUM |
 			 DEV_TX_OFFLOAD_UDP_CKSUM |
 			 DEV_TX_OFFLOAD_TCP_CKSUM);
+	if (priv->tso)
+		info->tx_offload_capa |= DEV_TX_OFFLOAD_TCP_TSO;
+	if (priv->tunnel_en)
+		info->tx_offload_capa |= (DEV_TX_OFFLOAD_OUTER_IPV4_CKSUM |
+					  DEV_TX_OFFLOAD_VXLAN_TNL_TSO |
+					  DEV_TX_OFFLOAD_GRE_TNL_TSO);
 	if (priv_get_ifname(priv, &ifname) == 0)
 		info->if_index = if_nametoindex(ifname);
-	/* FIXME: RETA update/query API expects the callee to know the size of
-	 * the indirection table, for this PMD the size varies depending on
-	 * the number of RX queues, it becomes impossible to find the correct
-	 * size if it is not fixed.
-	 * The API should be updated to solve this problem. */
-	info->reta_size = priv->ind_table_max_size;
+	info->reta_size = priv->reta_idx_n ?
+		priv->reta_idx_n : priv->ind_table_max_size;
 	info->hash_key_size = ((*priv->rss_conf) ?
 			       (*priv->rss_conf)[0]->rss_key_len :
 			       0);
@@ -667,15 +715,16 @@ mlx5_dev_supported_ptypes_get(struct rte_eth_dev *dev)
 {
 	static const uint32_t ptypes[] = {
 		/* refers to rxq_cq_to_pkt_type() */
-		RTE_PTYPE_L3_IPV4,
-		RTE_PTYPE_L3_IPV6,
-		RTE_PTYPE_INNER_L3_IPV4,
-		RTE_PTYPE_INNER_L3_IPV6,
+		RTE_PTYPE_L3_IPV4_EXT_UNKNOWN,
+		RTE_PTYPE_L3_IPV6_EXT_UNKNOWN,
+		RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN,
+		RTE_PTYPE_INNER_L3_IPV6_EXT_UNKNOWN,
 		RTE_PTYPE_UNKNOWN
 
 	};
 
-	if (dev->rx_pkt_burst == mlx5_rx_burst)
+	if (dev->rx_pkt_burst == mlx5_rx_burst ||
+	    dev->rx_pkt_burst == mlx5_rx_burst_vec)
 		return ptypes;
 	return NULL;
 }
@@ -875,8 +924,6 @@ mlx5_dev_set_mtu(struct rte_eth_dev *dev, uint16_t mtu)
 	struct priv *priv = dev->data->dev_private;
 	int ret = 0;
 	unsigned int i;
-	uint16_t (*rx_func)(void *, struct rte_mbuf **, uint16_t) =
-		mlx5_rx_burst;
 	unsigned int max_frame_len;
 	int rehash;
 	int restart = priv->started;
@@ -896,7 +943,7 @@ mlx5_dev_set_mtu(struct rte_eth_dev *dev, uint16_t mtu)
 	/* Temporarily replace RX handler with a fake one, assuming it has not
 	 * been copied elsewhere. */
 	dev->rx_pkt_burst = removed_rx_burst;
-	/* Make sure everyone has left mlx5_rx_burst() and uses
+	/* Make sure everyone has left dev->rx_pkt_burst() and uses
 	 * removed_rx_burst() instead. */
 	rte_wmb();
 	usleep(1000);
@@ -943,7 +990,6 @@ recover:
 		struct rxq *rxq = (*priv->rxqs)[i];
 		struct rxq_ctrl *rxq_ctrl =
 			container_of(rxq, struct rxq_ctrl, rxq);
-		int sp;
 		unsigned int mb_len;
 		unsigned int tmp;
 
@@ -951,10 +997,9 @@ recover:
 			continue;
 		mb_len = rte_pktmbuf_data_room_size(rxq->mp);
 		assert(mb_len >= RTE_PKTMBUF_HEADROOM);
-		/* Toggle scattered support (sp) if necessary. */
-		sp = (max_frame_len > (mb_len - RTE_PKTMBUF_HEADROOM));
 		/* Provide new values to rxq_setup(). */
-		dev->data->dev_conf.rxmode.jumbo_frame = sp;
+		dev->data->dev_conf.rxmode.jumbo_frame =
+			(max_frame_len > ETHER_MAX_LEN);
 		dev->data->dev_conf.rxmode.max_rx_pkt_len = max_frame_len;
 		if (rehash)
 			ret = rxq_rehash(dev, rxq_ctrl);
@@ -972,17 +1017,13 @@ recover:
 		/* Double fault, disable RX. */
 		break;
 	}
-	/*
-	 * Use a safe RX burst function in case of error, otherwise mimic
-	 * mlx5_dev_start().
-	 */
+	/* Mimic mlx5_dev_start(). */
 	if (ret) {
 		ERROR("unable to reconfigure RX queues, RX disabled");
-		rx_func = removed_rx_burst;
 	} else if (restart &&
-		 !rehash &&
-		 !priv_create_hash_rxqs(priv) &&
-		 !priv_rehash_flows(priv)) {
+		   !rehash &&
+		   !priv_create_hash_rxqs(priv) &&
+		   !priv_rehash_flows(priv)) {
 		if (dev->data->dev_conf.fdir_conf.mode == RTE_FDIR_MODE_NONE)
 			priv_fdir_enable(priv);
 		priv_dev_interrupt_handler_install(priv, dev);
@@ -990,7 +1031,12 @@ recover:
 	priv->mtu = mtu;
 	/* Burst functions can now be called again. */
 	rte_wmb();
-	dev->rx_pkt_burst = rx_func;
+	/*
+	 * Use a safe RX burst function in case of error, otherwise select RX
+	 * burst function again.
+	 */
+	if (!ret)
+		priv_select_rx_function(priv);
 out:
 	priv_unlock(priv);
 	assert(ret >= 0);
@@ -1139,7 +1185,7 @@ mlx5_ibv_device_to_pci_addr(const struct ibv_device *device,
 		/* Extract information. */
 		if (sscanf(line,
 			   "PCI_SLOT_NAME="
-			   "%" SCNx16 ":%" SCNx8 ":%" SCNx8 ".%" SCNx8 "\n",
+			   "%" SCNx32 ":%" SCNx8 ":%" SCNx8 ".%" SCNx8 "\n",
 			   &pci_addr->domain,
 			   &pci_addr->bus,
 			   &pci_addr->devid,
@@ -1216,7 +1262,8 @@ mlx5_dev_link_status_handler(void *arg)
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
 	if (ret)
-		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
+					      NULL);
 }
 
 /**
@@ -1228,18 +1275,18 @@ mlx5_dev_link_status_handler(void *arg)
  *   Callback argument.
  */
 void
-mlx5_dev_interrupt_handler(struct rte_intr_handle *intr_handle, void *cb_arg)
+mlx5_dev_interrupt_handler(void *cb_arg)
 {
 	struct rte_eth_dev *dev = cb_arg;
 	struct priv *priv = dev->data->dev_private;
 	int ret;
 
-	(void)intr_handle;
 	priv_lock(priv);
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
 	if (ret)
-		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL);
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
+					      NULL);
 }
 
 /**
@@ -1538,7 +1585,18 @@ priv_select_tx_function(struct priv *priv)
 {
 	priv->dev->tx_pkt_burst = mlx5_tx_burst;
 	/* Select appropriate TX function. */
-	if (priv->mps && priv->txq_inline) {
+	if (priv->mps == MLX5_MPW_ENHANCED) {
+		if (priv_check_vec_tx_support(priv) > 0) {
+			if (priv_check_raw_vec_tx_support(priv) > 0)
+				priv->dev->tx_pkt_burst = mlx5_tx_burst_raw_vec;
+			else
+				priv->dev->tx_pkt_burst = mlx5_tx_burst_vec;
+			DEBUG("selected Enhanced MPW TX vectorized function");
+		} else {
+			priv->dev->tx_pkt_burst = mlx5_tx_burst_empw;
+			DEBUG("selected Enhanced MPW TX function");
+		}
+	} else if (priv->mps && priv->txq_inline) {
 		priv->dev->tx_pkt_burst = mlx5_tx_burst_mpw_inline;
 		DEBUG("selected MPW inline TX function");
 	} else if (priv->mps) {
@@ -1556,5 +1614,11 @@ priv_select_tx_function(struct priv *priv)
 void
 priv_select_rx_function(struct priv *priv)
 {
-	priv->dev->rx_pkt_burst = mlx5_rx_burst;
+	if (priv_check_vec_rx_support(priv) > 0) {
+		priv_prep_vec_rx_function(priv);
+		priv->dev->rx_pkt_burst = mlx5_rx_burst_vec;
+		DEBUG("selected RX vectorized function");
+	} else {
+		priv->dev->rx_pkt_burst = mlx5_rx_burst;
+	}
 }
