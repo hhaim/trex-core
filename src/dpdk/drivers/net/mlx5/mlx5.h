@@ -65,6 +65,21 @@
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
 
+/* DPDK 17.08 patchs */
+#define __rte_always_inline inline __attribute__((always_inline))
+
+#define RTE_ETH_TX_DESC_FULL    0 /**< Desc filled for hw, waiting xmit. */
+#define RTE_ETH_TX_DESC_DONE    1 /**< Desc done, packet is transmitted. */
+#define RTE_ETH_TX_DESC_UNAVAIL 2 /**< Desc used by driver or hw. */
+
+#define RTE_ETH_RX_DESC_AVAIL    0 /**< Desc available for hw. */
+#define RTE_ETH_RX_DESC_DONE     1 /**< Desc done, filled by hw. */
+#define RTE_ETH_RX_DESC_UNAVAIL  2 /**< Desc used by driver or hw. */
+
+
+/* DPDK 17.08 patchs  --- */
+
+
                             
 #include "mlx5_utils.h"
 #include "mlx5_rxtx.h"
