@@ -203,6 +203,7 @@ mlx5_dev_close(struct rte_eth_dev *dev)
 	}
 	if (priv->reta_idx != NULL)
 		rte_free(priv->reta_idx);
+    mlx5_stats_free(dev);
 	priv_unlock(priv);
 	memset(priv, 0, sizeof(*priv));
 }
@@ -439,6 +440,14 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 	int idx;
 	int i;
 
+    /* TREX PATCH, lazy ibv_init */
+    static int ibv_was_init=0;
+
+    if (ibv_was_init==0) {
+        ibv_fork_init();
+        ibv_was_init=1;
+    }
+
 	(void)pci_drv;
 	assert(pci_drv == &mlx5_driver.pci_drv);
 	/* Get mlx5_dev[] index. */
@@ -623,6 +632,12 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 			goto port_error;
 		}
 		mlx5_args_assign(priv, &args);
+
+        /* TREX PATCH */
+        /* set for maximum performance default */
+        priv->txq_inline  =64;
+        priv->txqs_inline =4;
+
 		if (ibv_exp_query_device(ctx, &exp_device_attr)) {
 			ERROR("ibv_exp_query_device() failed");
 			goto port_error;
