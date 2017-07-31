@@ -268,7 +268,8 @@ priv_fdir_overlap(const struct priv *priv,
 static int
 priv_fdir_flow_add(struct priv *priv,
 		   struct mlx5_fdir_filter *mlx5_fdir_filter,
-		   struct fdir_queue *fdir_queue)
+		   struct fdir_queue *fdir_queue,
+           int drop_rule)
 {
 	struct ibv_exp_flow *flow;
 	struct fdir_flow_desc *desc = &mlx5_fdir_filter->desc;
@@ -453,7 +454,15 @@ priv_fdir_flow_add(struct priv *priv,
 create_flow:
 
 	errno = 0;
-	flow = ibv_exp_create_flow(fdir_queue->qp, attr);
+
+    struct ibv_qp *qp;
+    if (drop_rule) {
+        qp=priv->flow_drop_queue->qp;
+    }else{
+        qp=fdir_queue->qp; 
+    }
+
+	flow = ibv_exp_create_flow(qp, attr);
 	if (flow == NULL) {
 		/* It's not clear whether errno is always set in this case. */
 		ERROR("%p: flow director configuration failed, errno=%d: %s",
@@ -684,12 +693,15 @@ priv_fdir_filter_enable(struct priv *priv,
 	if (mlx5_fdir_filter->flow != NULL)
 		return 0;
 
+    int drop_rule=0;
 	/* Get fdir_queue for specific queue. */
-	if (mlx5_fdir_filter->behavior == RTE_ETH_FDIR_REJECT)
-		fdir_queue = priv_get_fdir_drop_queue(priv);
-	else
-		fdir_queue = priv_get_fdir_queue(priv,
-						 mlx5_fdir_filter->queue);
+	if (mlx5_fdir_filter->behavior == RTE_ETH_FDIR_REJECT){
+        drop_rule=1;
+        fdir_queue = priv_get_fdir_drop_queue(priv);
+    } else{
+        fdir_queue = priv_get_fdir_queue(priv,
+                         mlx5_fdir_filter->queue);
+    }
 
 	if (fdir_queue == NULL) {
 		ERROR("failed to create flow director rxq for queue %d",
@@ -698,7 +710,7 @@ priv_fdir_filter_enable(struct priv *priv,
 	}
 
 	/* Create flow */
-	return priv_fdir_flow_add(priv, mlx5_fdir_filter, fdir_queue);
+	return priv_fdir_flow_add(priv, mlx5_fdir_filter, fdir_queue,drop_rule);
 }
 
 /**

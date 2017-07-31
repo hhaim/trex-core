@@ -52,13 +52,6 @@
 #include "mlx5.h"
 #include "mlx5_prm.h"
 
-/* Number of Work Queue necessary for the DROP queue. */
-#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
-#define MLX5_DROP_WQ_N 4
-#else
-#define MLX5_DROP_WQ_N 1
-#endif
-
 static int
 mlx5_flow_create_eth(const struct rte_flow_item *item,
 		     const void *default_mask,
@@ -286,13 +279,6 @@ struct mlx5_flow {
 	uint64_t hash_fields; /**< Fields that participate in the hash. */
 };
 
-/** Structure for Drop queue. */
-struct rte_flow_drop {
-	struct ibv_exp_rwq_ind_table *ind_table; /**< Indirection table. */
-	struct ibv_qp *qp; /**< Verbs queue pair. */
-	struct ibv_exp_wq *wqs[MLX5_DROP_WQ_N]; /**< Verbs work queue. */
-	struct ibv_cq *cq; /**< Verbs completion queue. */
-};
 
 struct mlx5_flow_action {
 	uint32_t queue:1; /**< Target is a receive queue. */

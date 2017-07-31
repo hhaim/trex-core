@@ -151,8 +151,8 @@ def check_ofed(ctx):
 
     ofed_ver_re = re.compile('.*[-](\d)[.](\d)[-].*')
 
-    ofed_ver= 40
-    ofed_ver_show= '4.0'
+    ofed_ver= 41
+    ofed_ver_show= '4.1'
 
     if not os.path.isfile(ofed_info):
         ctx.end_msg('not found', 'YELLOW')
@@ -178,7 +178,7 @@ def check_ofed(ctx):
         ctx.end_msg("not found valid  OFED version '%s' " % (lines[0]),'YELLOW')
         return False
 
-    ctx.end_msg('Found needed version %s' % ofed_ver_show)
+    ctx.end_msg('Found needed version %s' % str(lines[0]))
     return True
 
 

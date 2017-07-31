@@ -219,6 +219,23 @@ struct priv {
     struct mlx5_stats_priv m_stats;
 };
 
+/* Number of Work Queue necessary for the DROP queue. */
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
+#define MLX5_DROP_WQ_N 4
+#else
+#define MLX5_DROP_WQ_N 1
+#endif
+
+
+/** Structure for Drop queue. */
+struct rte_flow_drop {
+	struct ibv_exp_rwq_ind_table *ind_table; /**< Indirection table. */
+	struct ibv_qp *qp; /**< Verbs queue pair. */
+	struct ibv_exp_wq *wqs[MLX5_DROP_WQ_N]; /**< Verbs work queue. */
+	struct ibv_cq *cq; /**< Verbs completion queue. */
+};
+
+
 /* Local storage for secondary process data. */
 struct mlx5_secondary_data {
 	struct rte_eth_dev_data data; /* Local device data. */
