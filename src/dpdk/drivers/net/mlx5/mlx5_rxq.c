@@ -1438,7 +1438,7 @@ priv_rx_intr_vec_disable(struct priv *priv)
 {
 	struct rte_intr_handle *intr_handle = priv->dev->intr_handle;
 
-	rte_intr_free_epoll_fd(intr_handle);
+	//rte_intr_free_epoll_fd(intr_handle);
 	free(intr_handle->intr_vec);
 	intr_handle->nb_efd = 0;
 	intr_handle->intr_vec = NULL;

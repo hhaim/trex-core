@@ -77,6 +77,7 @@
 #define RTE_ETH_RX_DESC_UNAVAIL  2 /**< Desc used by driver or hw. */
 
 
+#define  MLX5_OPCODE_LSO_MPW
 /* DPDK 17.08 patchs  --- */
 
 

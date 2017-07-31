@@ -382,8 +382,160 @@ __extension__
 typedef uint8_t  MARKER8[0];  /**< generic marker with 1B alignment */
 __extension__
 typedef uint64_t MARKER64[0]; /**< marker that allows us to overwrite 8 bytes
+
                                * with a single assignment */
 
+/* DPDK 17.08   */
+/**
+ * The generic rte_mbuf, containing a packet mbuf.
+ */
+struct rte_mbuf {
+	MARKER cacheline0;
+
+	void *buf_addr;           /**< Virtual address of segment buffer. */
+	/**
+	 * Physical address of segment buffer.
+	 * Force alignment to 8-bytes, so as to ensure we have the exact
+	 * same mbuf cacheline0 layout for 32-bit and 64-bit. This makes
+	 * working on vector drivers easier.
+	 */
+	phys_addr_t buf_physaddr __rte_aligned(sizeof(phys_addr_t));
+
+	/* next 8 bytes are initialised on RX descriptor rearm */
+	MARKER64 rearm_data;
+	uint16_t data_off;
+
+	/**
+	 * Reference counter. Its size should at least equal to the size
+	 * of port field (16 bits), to support zero-copy broadcast.
+	 * It should only be accessed using the following functions:
+	 * rte_mbuf_refcnt_update(), rte_mbuf_refcnt_read(), and
+	 * rte_mbuf_refcnt_set(). The functionality of these functions (atomic,
+	 * or non-atomic) is controlled by the CONFIG_RTE_MBUF_REFCNT_ATOMIC
+	 * config option.
+	 */
+	RTE_STD_C11
+	union {
+		rte_atomic16_t refcnt_atomic; /**< Atomically accessed refcnt */
+		uint16_t refcnt;              /**< Non-atomically accessed refcnt */
+	};
+	uint16_t nb_segs;         /**< Number of segments. */
+
+	/** Input port (16 bits to support more than 256 virtual ports). */
+	uint16_t port;
+
+	uint64_t ol_flags;        /**< Offload features. */
+
+	/* remaining bytes are set on RX when pulling packet from descriptor */
+	MARKER rx_descriptor_fields1;
+
+	/*
+	 * The packet type, which is the combination of outer/inner L2, L3, L4
+	 * and tunnel types. The packet_type is about data really present in the
+	 * mbuf. Example: if vlan stripping is enabled, a received vlan packet
+	 * would have RTE_PTYPE_L2_ETHER and not RTE_PTYPE_L2_VLAN because the
+	 * vlan is stripped from the data.
+	 */
+	RTE_STD_C11
+	union {
+		uint32_t packet_type; /**< L2/L3/L4 and tunnel information. */
+		struct {
+			uint32_t l2_type:4; /**< (Outer) L2 type. */
+			uint32_t l3_type:4; /**< (Outer) L3 type. */
+			uint32_t l4_type:4; /**< (Outer) L4 type. */
+			uint32_t tun_type:4; /**< Tunnel type. */
+			uint32_t inner_l2_type:4; /**< Inner L2 type. */
+			uint32_t inner_l3_type:4; /**< Inner L3 type. */
+			uint32_t inner_l4_type:4; /**< Inner L4 type. */
+		};
+	};
+
+	uint32_t pkt_len;         /**< Total pkt len: sum of all segments. */
+	uint16_t data_len;        /**< Amount of data in segment buffer. */
+	/** VLAN TCI (CPU order), valid if PKT_RX_VLAN_STRIPPED is set. */
+	uint16_t vlan_tci;
+
+	union {
+		uint32_t rss;     /**< RSS hash result if RSS enabled */
+		struct {
+			RTE_STD_C11
+			union {
+				struct {
+					uint16_t hash;
+					uint16_t id;
+				};
+				uint32_t lo;
+				/**< Second 4 flexible bytes */
+			};
+			uint32_t hi;
+			/**< First 4 flexible bytes or FD ID, dependent on
+			     PKT_RX_FDIR_* flag in ol_flags. */
+		} fdir;           /**< Filter identifier if FDIR enabled */
+		struct {
+			uint32_t lo;
+			uint32_t hi;
+		} sched;          /**< Hierarchical scheduler */
+		uint32_t usr;	  /**< User defined tags. See rte_distributor_process() */
+	} hash;                   /**< hash information */
+
+	/** Outer VLAN TCI (CPU order), valid if PKT_RX_QINQ_STRIPPED is set. */
+	uint16_t vlan_tci_outer;
+
+	uint16_t buf_len;         /**< Length of segment buffer. */
+
+	/** Valid if PKT_RX_TIMESTAMP is set. The unit and time reference
+	 * are not normalized but are always the same for a given port.
+	 */
+	uint64_t timestamp;
+
+	/* second cache line - fields only used in slow path or on TX */
+	MARKER cacheline1 __rte_cache_min_aligned;
+
+	RTE_STD_C11
+	union {
+		void *userdata;   /**< Can be used for external metadata */
+		uint64_t udata64; /**< Allow 8-byte userdata on 32-bit */
+	};
+
+	struct rte_mempool *pool; /**< Pool from which mbuf was allocated. */
+	struct rte_mbuf *next;    /**< Next segment of scattered packet. */
+
+	/* fields to support TX offloads */
+	RTE_STD_C11
+	union {
+		uint64_t tx_offload;       /**< combined for easy fetch */
+		__extension__
+		struct {
+			uint64_t l2_len:7;
+			/**< L2 (MAC) Header Length for non-tunneling pkt.
+			 * Outer_L4_len + ... + Inner_L2_len for tunneling pkt.
+			 */
+			uint64_t l3_len:9; /**< L3 (IP) Header Length. */
+			uint64_t l4_len:8; /**< L4 (TCP/UDP) Header Length. */
+			uint64_t tso_segsz:16; /**< TCP TSO segment size */
+
+			/* fields for TX offloading of tunnels */
+			uint64_t outer_l3_len:9; /**< Outer L3 (IP) Hdr Length. */
+			uint64_t outer_l2_len:7; /**< Outer L2 (MAC) Hdr Length. */
+
+			/* uint64_t unused:8; */
+		};
+	};
+
+	/** Size of the application private data. In case of an indirect
+	 * mbuf, it stores the direct mbuf private data size. */
+	uint16_t priv_size;
+
+	/** Timesync flags for use with IEEE1588. */
+	uint16_t timesync;
+
+	/** Sequence number. See also rte_reorder_insert(). */
+	uint32_t seqn;
+
+} __rte_cache_aligned;
+
+#if 0
+/* DPDK 17.02 */
 /**
  * The generic rte_mbuf, containing a packet mbuf.
  */
@@ -515,6 +667,8 @@ struct rte_mbuf {
 	/** Timesync flags for use with IEEE1588. */
 	uint16_t timesync;
 } __rte_cache_aligned;
+
+#endif
 
 /**
  * Prefetch the first part of the mbuf
@@ -792,6 +946,8 @@ static inline struct rte_mbuf *rte_mbuf_raw_alloc(struct rte_mempool *mp)
 	return m;
 }
 
+
+
 /**
  * @internal Put mbuf back into its original mempool.
  * The use of that function is reserved for RTE internal needs.
@@ -806,6 +962,16 @@ __rte_mbuf_raw_free(struct rte_mbuf *m)
 	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 0);
 	rte_mempool_put(m->pool, m);
 }
+
+/************** TREX-NEED-TO-REMOVE-DPDK1708 */
+
+static inline void
+rte_mbuf_raw_free(struct rte_mbuf *m)
+{
+    __rte_mbuf_raw_free(m);
+}
+
+/************** TREX-NEED-TO-REMOVE-DPDK1708-END */
 
 /* Operations on ctrl mbuf */
 
@@ -1786,6 +1952,60 @@ rte_pktmbuf_linearize(struct rte_mbuf *mbuf)
  *   the packet.
  */
 void rte_pktmbuf_dump(FILE *f, const struct rte_mbuf *m, unsigned dump_len);
+
+
+/************** TREX-NEED-TO-REMOVE-DPDK1708 */
+
+/**
+ * Decrease reference counter and unlink a mbuf segment
+ *
+ * This function does the same than a free, except that it does not
+ * return the segment to its pool.
+ * It decreases the reference counter, and if it reaches 0, it is
+ * detached from its parent for an indirect mbuf.
+ *
+ * @param m
+ *   The mbuf to be unlinked
+ * @return
+ *   - (m) if it is the last reference. It can be recycled or freed.
+ *   - (NULL) if the mbuf still has remaining references on it.
+ */
+static inline struct rte_mbuf *
+rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
+{
+	__rte_mbuf_sanity_check(m, 0);
+
+	if (likely(rte_mbuf_refcnt_read(m) == 1)) {
+
+		if (RTE_MBUF_INDIRECT(m))
+			rte_pktmbuf_detach(m);
+
+		if (m->next != NULL) {
+			m->next = NULL;
+			m->nb_segs = 1;
+		}
+
+		return m;
+
+       } else if (rte_atomic16_add_return(&m->refcnt_atomic, -1) == 0) {
+
+
+		if (RTE_MBUF_INDIRECT(m))
+			rte_pktmbuf_detach(m);
+
+		if (m->next != NULL) {
+			m->next = NULL;
+			m->nb_segs = 1;
+		}
+		rte_mbuf_refcnt_set(m, 1);
+
+		return m;
+	}
+	return NULL;
+}
+
+/************** TREX-NEED-TO-REMOVE-DPDK1708-END */
+
 
 #ifdef __cplusplus
 }

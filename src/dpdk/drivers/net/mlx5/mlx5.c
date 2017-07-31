@@ -56,7 +56,7 @@
 #endif
 #include <rte_malloc.h>
 #include <rte_ethdev.h>
-#include <rte_ethdev_pci.h>
+//#include <rte_ethdev_pci.h>
 #include <rte_pci.h>
 #include <rte_common.h>
 #include <rte_kvargs.h>
@@ -234,7 +234,7 @@ static const struct eth_dev_ops mlx5_dev_ops = {
 	.flow_ctrl_get = mlx5_dev_get_flow_ctrl,
 	.flow_ctrl_set = mlx5_dev_set_flow_ctrl,
 	.mac_addr_remove = mlx5_mac_addr_remove,
-	.mac_addr_add = mlx5_mac_addr_add,
+	//.mac_addr_add = mlx5_mac_addr_add,
 	.mac_addr_set = mlx5_mac_addr_set,
 	.mtu_set = mlx5_dev_set_mtu,
 	.vlan_strip_queue_set = mlx5_vlan_strip_queue_set,
@@ -244,8 +244,8 @@ static const struct eth_dev_ops mlx5_dev_ops = {
 	.rss_hash_update = mlx5_rss_hash_update,
 	.rss_hash_conf_get = mlx5_rss_hash_conf_get,
 	.filter_ctrl = mlx5_dev_filter_ctrl,
-	.rx_descriptor_status = mlx5_rx_descriptor_status,
-	.tx_descriptor_status = mlx5_tx_descriptor_status,
+	//.rx_descriptor_status = mlx5_rx_descriptor_status,
+	//.tx_descriptor_status = mlx5_tx_descriptor_status,
 #ifdef HAVE_UPDATE_CQ_CI
 	.rx_queue_intr_enable = mlx5_rx_intr_enable,
 	.rx_queue_intr_disable = mlx5_rx_intr_disable,
@@ -380,7 +380,8 @@ mlx5_args(struct mlx5_args *args, struct rte_devargs *devargs)
 	return 0;
 }
 
-static struct rte_pci_driver mlx5_driver;
+//static struct rte_pci_driver mlx5_driver;
+static struct eth_driver mlx5_driver;
 
 /**
  * Assign parameters from args into priv, only non default
@@ -439,7 +440,7 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 	int i;
 
 	(void)pci_drv;
-	assert(pci_drv == &mlx5_driver);
+	assert(pci_drv == &mlx5_driver.pci_drv);
 	/* Get mlx5_dev[] index. */
 	idx = mlx5_dev_idx(&pci_dev->addr);
 	if (idx == -1) {
@@ -788,7 +789,7 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 
 		eth_dev->device = &pci_dev->device;
 		rte_eth_copy_pci_info(eth_dev, pci_dev);
-		eth_dev->device->driver = &mlx5_driver.driver;
+		eth_dev->driver = &mlx5_driver;
 		priv->dev = eth_dev;
 		eth_dev->dev_ops = &mlx5_dev_ops;
 		TAILQ_INIT(&priv->flows);
@@ -871,14 +872,27 @@ static const struct rte_pci_id mlx5_pci_id_map[] = {
 	}
 };
 
-static struct rte_pci_driver mlx5_driver = {
+static struct eth_driver mlx5_driver = {
+	.pci_drv = {
+		.driver = {
+			.name = MLX5_DRIVER_NAME
+		},
+		.id_table = mlx5_pci_id_map,
+		.probe = mlx5_pci_probe,
+		.drv_flags = RTE_PCI_DRV_INTR_LSC,
+	},
+	.dev_private_size = sizeof(struct priv)
+};
+
+
+/*static struct rte_pci_driver mlx5_driver = {
 	.driver = {
 		.name = MLX5_DRIVER_NAME
 	},
 	.id_table = mlx5_pci_id_map,
 	.probe = mlx5_pci_probe,
 	.drv_flags = RTE_PCI_DRV_INTR_LSC,
-};
+};*/
 
 /**
  * Driver initialization routine.
@@ -895,7 +909,7 @@ rte_mlx5_pmd_init(void)
 	 */
 	setenv("RDMAV_HUGEPAGES_SAFE", "1", 1);
 	ibv_fork_init();
-	rte_pci_register(&mlx5_driver);
+    rte_eal_pci_register(&mlx5_driver.pci_drv);
 }
 
 RTE_PMD_EXPORT_NAME(net_mlx5, __COUNTER__);

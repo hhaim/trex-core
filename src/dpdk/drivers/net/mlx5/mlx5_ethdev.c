@@ -646,6 +646,8 @@ mlx5_dev_configure(struct rte_eth_dev *dev)
 	return -ret;
 }
 
+#define RTE_ETH_DEV_TO_PCI(eth_dev)	RTE_DEV_TO_PCI((eth_dev)->device)
+
 /**
  * DPDK callback to get information about the device.
  *
@@ -1262,8 +1264,8 @@ mlx5_dev_link_status_handler(void *arg)
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
 	if (ret)
-		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
-					      NULL);
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL
+					      );
 }
 
 /**
@@ -1285,8 +1287,8 @@ mlx5_dev_interrupt_handler(void *cb_arg)
 	ret = priv_dev_link_status_handler(priv, dev);
 	priv_unlock(priv);
 	if (ret)
-		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
-					      NULL);
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL
+					      );
 }
 
 /**
@@ -1302,9 +1304,9 @@ priv_dev_interrupt_handler_uninstall(struct priv *priv, struct rte_eth_dev *dev)
 {
 	if (!dev->data->dev_conf.intr_conf.lsc)
 		return;
-	rte_intr_callback_unregister(&priv->intr_handle,
+	/*rte_intr_callback_unregister(&priv->intr_handle,
 				     mlx5_dev_interrupt_handler,
-				     dev);
+				     dev);*/
 	if (priv->pending_alarm)
 		rte_eal_alarm_cancel(mlx5_dev_link_status_handler, dev);
 	priv->pending_alarm = 0;
@@ -1336,9 +1338,9 @@ priv_dev_interrupt_handler_install(struct priv *priv, struct rte_eth_dev *dev)
 	} else {
 		priv->intr_handle.fd = priv->ctx->async_fd;
 		priv->intr_handle.type = RTE_INTR_HANDLE_EXT;
-		rte_intr_callback_register(&priv->intr_handle,
+		/*rte_intr_callback_register(&priv->intr_handle,
 					   mlx5_dev_interrupt_handler,
-					   dev);
+					   dev);*/
 	}
 }
 
