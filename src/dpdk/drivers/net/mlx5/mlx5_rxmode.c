@@ -130,7 +130,7 @@ hash_rxq_special_flow_enable_vlan(struct hash_rxq *hash_rxq,
 {
 	struct priv *priv = hash_rxq->priv;
 	struct ibv_exp_flow *flow;
-	FLOW_ATTR_SPEC_ETH(data, priv_flow_attr(priv, NULL, 0, hash_rxq->type));
+	FLOW_ATTR_SPEC_ETH(data, priv_flow_attr(priv, NULL, 0, hash_rxq->type,0));
 	struct ibv_exp_flow_attr *attr = &data->attr;
 	struct ibv_exp_flow_spec_eth *spec = &data->spec;
 	const uint8_t *mac;
@@ -151,7 +151,7 @@ hash_rxq_special_flow_enable_vlan(struct hash_rxq *hash_rxq,
 	 * This layout is expected by libibverbs.
 	 */
 	assert(((uint8_t *)attr + sizeof(*attr)) == (uint8_t *)spec);
-	priv_flow_attr(priv, attr, sizeof(data), hash_rxq->type);
+	priv_flow_attr(priv, attr, sizeof(data), hash_rxq->type,0);
 	/* The first specification must be Ethernet. */
 	assert(spec->type == IBV_EXP_FLOW_SPEC_ETH);
 	assert(spec->size == sizeof(*spec));

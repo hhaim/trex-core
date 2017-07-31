@@ -547,9 +547,9 @@ public:
         m_cap = TREX_DRV_CAP_DROP_Q | TREX_DRV_CAP_MAC_ADDR_CHG ;
         // In Mellanox, default mode is Q_MODE_MANY_DROP_Q.
         // put it, unless user already choose mode using command line arg (--software for example)
-        if (CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_NORMAL) {
+        /*if (CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_NORMAL) {
             CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_MANY_DROP_Q);
-        }
+        } */
     }
 
     TRexPortAttr * create_port_attr(tvpid_t tvpid,repid_t repid) {
@@ -582,11 +582,11 @@ public:
             p.rx_drop_q_num = 4;
             break;
         case CGlobalInfo::Q_MODE_NORMAL:
-            fprintf(stderr, "Internal error. MLX card in Q_MODE_NORMAL mode\n");
-            assert(0);
+            p.rx_drop_q_num = 1;
+            break;
         }
         p.rx_desc_num_data_q = RX_DESC_NUM_DATA_Q;
-        p.rx_desc_num_drop_q = RX_DESC_NUM_DROP_Q_MLX;
+        p.rx_desc_num_drop_q = RX_DESC_NUM_DROP_Q;
         p.tx_desc_num = TX_DESC_NUM;
         p.rx_mbuf_type = MBUF_9k;
     }
@@ -7306,7 +7306,11 @@ void CTRexExtendedDriverBaseMlnx5G::add_del_rules(enum rte_filter_op op, repid_t
 #endif
 
     filter.action.rx_queue = queue;
-    filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
+    if (ip_id==3){
+        filter.action.behavior = RTE_ETH_FDIR_REJECT;
+    }else{
+        filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
+    }
     filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;
     filter.soft_id = filter_soft_id++;
     filter.input.flow_type = type;
@@ -7340,18 +7344,21 @@ void CTRexExtendedDriverBaseMlnx5G::add_del_rules(enum rte_filter_op op, repid_t
 
 int CTRexExtendedDriverBaseMlnx5G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
     repid_t repid=_if->get_repid();
-
+    
     if (set_on) {
         add_del_rx_filter_rules(_if, false);
+        add_del_rules(RTE_ETH_FILTER_DELETE, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 3, 17, MAIN_DPDK_RX_Q);
         add_del_rules(RTE_ETH_FILTER_ADD, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 2, 17, MAIN_DPDK_RX_Q);
     } else {
         add_del_rules(RTE_ETH_FILTER_DELETE, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 2, 17, MAIN_DPDK_RX_Q);
+        add_del_rules(RTE_ETH_FILTER_ADD, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 3, 17, MAIN_DPDK_RX_Q);
         add_del_rx_filter_rules(_if, true);
     }
 
     return 0;
 
 }
+
 
 int CTRexExtendedDriverBaseMlnx5G::add_del_rx_filter_rules(CPhyEthIF * _if, bool set_on) {
     repid_t repid=_if->get_repid();

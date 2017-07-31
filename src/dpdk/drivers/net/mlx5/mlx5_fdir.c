@@ -121,7 +121,8 @@ fdir_filter_to_flow_desc(const struct rte_eth_fdir_filter *fdir_filter,
 		return;
 	}
 #else
-    if (fdir_filter->input.flow.ip4_flow.ip_id == 2) {
+    if ((fdir_filter->input.flow.ip4_flow.ip_id == 2) || 
+        (fdir_filter->input.flow.ip4_flow.ip_id == 3)) {
         desc->type = HASH_RXQ_ETH;
         desc->ip_id = fdir_filter->input.flow.ip4_flow.ip_id;
         return;
@@ -277,7 +278,7 @@ priv_fdir_flow_add(struct priv *priv,
 		priv->dev->data->dev_conf.fdir_conf.mode;
 	struct rte_eth_fdir_masks *mask =
 		&priv->dev->data->dev_conf.fdir_conf.mask;
-	FLOW_ATTR_SPEC_ETH(data, priv_flow_attr(priv, NULL, 0, desc->type));
+	FLOW_ATTR_SPEC_ETH(data, priv_flow_attr(priv, NULL, 0, desc->type,drop_rule));
 	struct ibv_exp_flow_attr *attr = &data->attr;
 	uintptr_t spec_offset = (uintptr_t)&data->spec;
 	struct ibv_exp_flow_spec_eth *spec_eth;
@@ -304,7 +305,7 @@ priv_fdir_flow_add(struct priv *priv,
 	 * This layout is expected by libibverbs.
 	 */
 	assert(((uint8_t *)attr + sizeof(*attr)) == (uint8_t *)spec_offset);
-	priv_flow_attr(priv, attr, sizeof(data), desc->type);
+	priv_flow_attr(priv, attr, sizeof(data), desc->type,drop_rule);
 
 	/* Set Ethernet spec */
 	spec_eth = (struct ibv_exp_flow_spec_eth *)spec_offset;
@@ -333,9 +334,11 @@ priv_fdir_flow_add(struct priv *priv,
 	}
 #else
     // empty mask means "match everything". This rule will match all packets, no matter what is the ether type
-    if (desc->ip_id == 2) {
+    if ((desc->ip_id == 2) || 
+        (desc->ip_id == 3)) {
         spec_eth->val.ether_type = 0x0000;
         spec_eth->mask.ether_type = 0x0000;
+        spec_offset += spec_eth->size;
         goto create_flow;
     }
 #endif    
@@ -344,7 +347,7 @@ priv_fdir_flow_add(struct priv *priv,
 	case HASH_RXQ_IPV4:
 	case HASH_RXQ_UDPV4:
 	case HASH_RXQ_TCPV4:
-		spec_offset += spec_eth->size;
+        spec_offset += spec_eth->size;
 
 		/* Set IP spec */
 		spec_ipv4 = (struct ibv_exp_flow_spec_ipv4_ext *)spec_offset;
@@ -377,10 +380,11 @@ priv_fdir_flow_add(struct priv *priv,
         }
 #endif
 
+        spec_offset += spec_ipv4->size;
+
 		if (desc->type == HASH_RXQ_IPV4)
 			goto create_flow;
 
-		spec_offset += spec_ipv4->size;
 		break;
 	case HASH_RXQ_IPV6:
 	case HASH_RXQ_UDPV6:
@@ -424,11 +428,11 @@ priv_fdir_flow_add(struct priv *priv,
 
 		/* Update priority */
 		attr->priority = 1;
+        spec_offset += spec_ipv6->size;
 
 		if (desc->type == HASH_RXQ_IPV6)
 			goto create_flow;
 
-		spec_offset += spec_ipv6->size;
 		break;
 	default:
 		ERROR("invalid flow attribute type");
@@ -450,6 +454,7 @@ priv_fdir_flow_add(struct priv *priv,
 
 	/* Update priority */
 	attr->priority = 0;
+    spec_offset += spec_tcp_udp->size;
 
 create_flow:
 

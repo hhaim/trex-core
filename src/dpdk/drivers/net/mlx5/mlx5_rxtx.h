@@ -301,7 +301,7 @@ extern uint8_t rss_hash_default_key[];
 extern const size_t rss_hash_default_key_len;
 
 size_t priv_flow_attr(struct priv *, struct ibv_exp_flow_attr *,
-		      size_t, enum hash_rxq_type);
+		      size_t, enum hash_rxq_type,int drop);
 int priv_create_hash_rxqs(struct priv *);
 void priv_destroy_hash_rxqs(struct priv *);
 int priv_allow_flow_type(struct priv *, enum hash_rxq_flow_type);

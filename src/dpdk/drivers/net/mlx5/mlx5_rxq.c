@@ -223,7 +223,7 @@ const size_t rss_hash_default_key_len = sizeof(rss_hash_default_key);
  */
 size_t
 priv_flow_attr(struct priv *priv, struct ibv_exp_flow_attr *flow_attr,
-	       size_t flow_attr_size, enum hash_rxq_type type)
+	       size_t flow_attr_size, enum hash_rxq_type type,int drop)
 {
 	size_t offset = sizeof(*flow_attr);
 	const struct hash_rxq_init *init = &hash_rxq_init[type];
@@ -234,6 +234,10 @@ priv_flow_attr(struct priv *priv, struct ibv_exp_flow_attr *flow_attr,
 		offset += init->flow_spec.hdr.size;
 		init = init->underlayer;
 	} while (init != NULL);
+    uint8_t drop_spec_size=sizeof(struct ibv_exp_flow_spec_action_drop);
+    if (drop){
+        offset += drop_spec_size; 
+    }
 	if (offset > flow_attr_size)
 		return offset;
 	flow_attr_size = offset;
@@ -246,6 +250,19 @@ priv_flow_attr(struct priv *priv, struct ibv_exp_flow_attr *flow_attr,
 		.port = priv->port,
 		.flags = 0,
 	};
+    if (drop){
+        offset -= drop_spec_size;
+        struct ibv_exp_flow_spec_action_drop drop_spec = (struct ibv_exp_flow_spec_action_drop){
+                .type = IBV_EXP_FLOW_SPEC_ACTION_DROP,
+                .size = drop_spec_size,
+        };
+
+        memcpy((void *)((uintptr_t)flow_attr + offset),
+               &drop_spec,
+               drop_spec_size);
+        ++flow_attr->num_of_specs;
+    }
+
 	do {
 		offset -= init->flow_spec.hdr.size;
 		memcpy((void *)((uintptr_t)flow_attr + offset),
