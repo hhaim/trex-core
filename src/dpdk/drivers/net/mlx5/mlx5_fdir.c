@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+
 #define TREX_PATCH
 
 
@@ -899,7 +900,9 @@ priv_fdir_filter_add(struct priv *priv,
 	/* Duplicate filters are currently unsupported. */
 	mlx5_fdir_filter = priv_find_filter_in_list(priv, fdir_filter);
 	if (mlx5_fdir_filter != NULL) {
+#ifndef TREX_PATCH
 		ERROR("filter already exists");
+#endif
 		return EEXIST;
 	}
 
@@ -1025,8 +1028,10 @@ priv_fdir_filter_delete(struct priv *priv,
 		return 0;
 	}
 
+#ifndef TREX_PATCH
 	ERROR("%p: flow director delete failed, cannot find filter",
 	      (void *)priv);
+#endif
 	return ENOENT;
 }
 

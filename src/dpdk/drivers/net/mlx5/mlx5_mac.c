@@ -472,7 +472,7 @@ priv_mac_addrs_enable(struct priv *priv)
  * @param vmdq
  *   VMDq pool index to associate address with (ignored).
  */
-int
+void
 mlx5_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 		  uint32_t index, uint32_t vmdq)
 {
@@ -480,7 +480,7 @@ mlx5_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 	int re;
 
 	if (mlx5_is_secondary())
-		return -ENOTSUP;
+		return ;
 
 	(void)vmdq;
 	priv_lock(priv);
@@ -495,7 +495,7 @@ mlx5_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 			       mac_addr->addr_bytes);
 end:
 	priv_unlock(priv);
-	return -re;
+	return;
 }
 
 /**

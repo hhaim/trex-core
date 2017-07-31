@@ -296,7 +296,7 @@ int hash_rxq_mac_addrs_add(struct hash_rxq *);
 int priv_mac_addr_add(struct priv *, unsigned int,
 		      const uint8_t (*)[ETHER_ADDR_LEN]);
 int priv_mac_addrs_enable(struct priv *);
-int mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
+void mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
 		      uint32_t);
 void mlx5_mac_addr_set(struct rte_eth_dev *, struct ether_addr *);
 
