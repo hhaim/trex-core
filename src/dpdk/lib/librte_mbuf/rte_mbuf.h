@@ -483,11 +483,10 @@ struct rte_mbuf {
 
 	uint16_t buf_len;         /**< Length of segment buffer. */
 
-	/** Valid if PKT_RX_TIMESTAMP is set. The unit and time reference
-	 * are not normalized but are always the same for a given port.
-	 */
-	uint64_t timestamp;
+	 /** core locality  */
+    uint16_t m_core_locality;
 
+    uint8_t pad[6];
 	/* second cache line - fields only used in slow path or on TX */
 	MARKER cacheline1 __rte_cache_min_aligned;
 
@@ -533,6 +532,25 @@ struct rte_mbuf {
 	uint32_t seqn;
 
 } __rte_cache_aligned;
+
+
+
+/**
+ * MBUF core locality type
+ *  
+ * when RTE_MBUF_CORE_LOCALITY_MULTI is set, the MBUF can be
+ * used with multiple cores 
+ *  
+ * if RTE_MBUF_CORE_LOCALITY_LOCAL then the MBUF should be used 
+ * with the allocating core only 
+ * 
+ */
+typedef enum {
+    RTE_MBUF_CORE_LOCALITY_MULTI = 0,
+    RTE_MBUF_CORE_LOCALITY_LOCAL = 1,
+} mbuf_type_e;
+
+
 
 #if 0
 /* DPDK 17.02 */
@@ -817,7 +835,11 @@ struct rte_pktmbuf_pool_private {
 static inline uint16_t
 rte_mbuf_refcnt_read(const struct rte_mbuf *m)
 {
-	return (uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+    if (likely(m->m_core_locality == RTE_MBUF_CORE_LOCALITY_LOCAL)) {
+        return m->refcnt;
+    } else {
+        return (uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+    }
 }
 
 /**
@@ -830,7 +852,11 @@ rte_mbuf_refcnt_read(const struct rte_mbuf *m)
 static inline void
 rte_mbuf_refcnt_set(struct rte_mbuf *m, uint16_t new_value)
 {
-	rte_atomic16_set(&m->refcnt_atomic, new_value);
+    if (likely(m->m_core_locality == RTE_MBUF_CORE_LOCALITY_LOCAL)) {
+        m->refcnt = new_value;
+    } else {
+        rte_atomic16_set(&m->refcnt_atomic, new_value);
+    }
 }
 
 /**
@@ -860,7 +886,12 @@ rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 		return 1 + value;
 	}
 #endif
-	return (uint16_t)(rte_atomic16_add_return(&m->refcnt_atomic, value));
+    if (likely(m->m_core_locality == RTE_MBUF_CORE_LOCALITY_LOCAL)) {
+        m->refcnt = (uint16_t)(m->refcnt + value);
+        return m->refcnt;
+    } else {
+        return (uint16_t)(rte_atomic16_add_return(&m->refcnt_atomic, value));
+    }
 }
 
 #else /* ! RTE_MBUF_REFCNT_ATOMIC */
@@ -1209,6 +1240,9 @@ static inline void rte_pktmbuf_reset(struct rte_mbuf *m)
 	m->nb_segs = 1;
 	m->port = 0xff;
 
+    /* by default, MBUFs are created with locality of multicore */
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+    
 	m->ol_flags = 0;
 	m->packet_type = 0;
 	rte_pktmbuf_reset_headroom(m);

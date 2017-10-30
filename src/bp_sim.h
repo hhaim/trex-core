@@ -1371,6 +1371,22 @@ public:
         return (m_mem_pool[socket].pktmbuf_alloc(size));
     }
 
+    static inline rte_mbuf_t   * pktmbuf_alloc_small_local(socket_id_t socket){
+        rte_mbuf_t *m = pktmbuf_alloc_small(socket);
+        if (m) {
+            m->m_core_locality = RTE_MBUF_CORE_LOCALITY_LOCAL;
+        }
+        return m;
+    }
+      
+    static inline rte_mbuf_t   * pktmbuf_alloc_local(socket_id_t socket,uint16_t size) {
+        rte_mbuf_t *m = pktmbuf_alloc(socket, size);
+        if (m) {
+            m->m_core_locality = RTE_MBUF_CORE_LOCALITY_LOCAL;
+        }
+        return m;
+    }
+    
     static inline rte_mbuf_t * pktmbuf_alloc_by_port(uint8_t port_id, uint16_t size){
         socket_id_t socket = m_socket.port_to_socket(port_id);
         if (size<=_64_MBUF_SIZE) {
