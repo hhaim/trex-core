@@ -3,6 +3,7 @@ from .stl_general_test import CStlGeneral_Test, CTRexScenario
 from trex_stl_lib.api import *
 import os, sys
 import glob
+import pprint
 
 
 def get_error_in_percentage (golden, value):
@@ -53,9 +54,9 @@ class STLClient_Test(CStlGeneral_Test):
         self.drv_name = drv_name
 
         # due to defect trex-325 
-        if  self.drv_name == 'net_mlx5':
-            print("WARNING disable strict due to trex-325 on mlx5")
-            self.strict = False
+        #if  self.drv_name == 'net_mlx5':
+        #    print("WARNING disable strict due to trex-325 on mlx5")
+        #    self.strict = False
 
 
         self.pkt = STLPktBuilder(pkt = Ether()/IP(src="16.0.0.1",dst="48.0.0.1")/UDP(dport=12,sport=1025)/IP()/'a_payload_example')
@@ -79,6 +80,7 @@ class STLClient_Test(CStlGeneral_Test):
 
 
     def verify (self, expected, got):
+        print("expected : %d  got: %d" %(expected, got))
         if self.strict:
             assert expected == got
         else:
@@ -331,6 +333,8 @@ class STLClient_Test(CStlGeneral_Test):
 
                 assert self.tx_port in stats, '{0} - no stats for TX port'.format(profile)
                 assert self.rx_port in stats, '{0} - no stats for RX port'.format(profile)
+
+                pprint.pprint(stats)
 
                 self.verify(stats[self.tx_port]['opackets'], stats[self.rx_port]['ipackets'])
                 self.verify(stats[self.rx_port]['opackets'], stats[self.tx_port]['ipackets'])
