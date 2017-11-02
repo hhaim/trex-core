@@ -635,13 +635,15 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 
         /* TREX PATCH */
         /* set for maximum performance default */
-        priv->txq_inline  =64;
-        priv->txqs_inline =4;
+        //priv->txq_inline  =64;
+        //priv->txqs_inline =4;
 
 		if (ibv_exp_query_device(ctx, &exp_device_attr)) {
 			ERROR("ibv_exp_query_device() failed");
 			goto port_error;
 		}
+
+        priv->txq_inline  = 512;
 
 		priv->hw_csum =
 			((exp_device_attr.exp_device_cap_flags &
