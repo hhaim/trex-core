@@ -216,6 +216,11 @@ struct rte_eth_stats {
 	/**< Total number of successfully transmitted queue bytes. */
 	uint64_t q_errors[RTE_ETHDEV_QUEUE_STAT_CNTRS];
 	/**< Total number of queue packets received that are dropped. */
+
+    // imarom: i40e_vf might return error so place holder to mark it
+    #ifdef TREX_PATCH
+        uint8_t err_flag;
+    #endif
 };
 
 /**
@@ -453,6 +458,19 @@ struct rte_eth_rss_conf {
 #define ETH_RSS_VXLAN              (1ULL << RTE_ETH_FLOW_VXLAN)
 #define ETH_RSS_GENEVE             (1ULL << RTE_ETH_FLOW_GENEVE)
 #define ETH_RSS_NVGRE              (1ULL << RTE_ETH_FLOW_NVGRE)
+
+/* Napatech ADD ON */
+#define ETH_RSS_INNER_IPV4	       (1ULL << RTE_ETH_FLOW_INNER_IPV4)
+#define ETH_RSS_INNER_IPV4_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_TCP)
+#define ETH_RSS_INNER_IPV4_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_UDP)
+#define ETH_RSS_INNER_IPV4_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV4_SCTP)
+#define ETH_RSS_INNER_IPV4_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV4_OTHER)
+#define ETH_RSS_INNER_IPV6         (1ULL << RTE_ETH_FLOW_INNER_IPV6)
+#define ETH_RSS_INNER_IPV6_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_TCP)
+#define ETH_RSS_INNER_IPV6_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_UDP)
+#define ETH_RSS_INNER_IPV6_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV6_SCTP)
+#define ETH_RSS_INNER_IPV6_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV6_OTHER)
+
 
 #define ETH_RSS_IP ( \
 	ETH_RSS_IPV4 | \
@@ -872,6 +890,8 @@ struct rte_fdir_conf {
 	struct rte_eth_fdir_masks mask;
 	struct rte_eth_fdir_flex_conf flex_conf;
 	/**< Flex payload configuration. */
+    // TREX_PATCH
+    uint8_t flexbytes_offset;
 };
 
 /**

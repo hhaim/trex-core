@@ -1743,10 +1743,16 @@ i40e_dev_rx_queue_setup(struct rte_eth_dev *dev,
 	uint16_t len, i;
 	uint16_t reg_idx, base, bsf, tc_mapping;
 	int q_offset, use_def_burst_func = 1;
+#ifdef TREX_PATCH_LOW_LATENCY
+    int is_vf = 0;
+#endif
 
 	if (hw->mac.type == I40E_MAC_VF || hw->mac.type == I40E_MAC_X722_VF) {
 		vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
 		vsi = &vf->vsi;
+#ifdef TREX_PATCH_LOW_LATENCY
+        is_vf = 1;
+#endif
 		if (!vsi)
 			return -EINVAL;
 		reg_idx = queue_idx;
@@ -1859,18 +1865,27 @@ i40e_dev_rx_queue_setup(struct rte_eth_dev *dev,
 		ad->rx_bulk_alloc_allowed = false;
 	}
 
-	for (i = 0; i < I40E_MAX_TRAFFIC_CLASS; i++) {
-		if (!(vsi->enabled_tc & (1 << i)))
-			continue;
-		tc_mapping = rte_le_to_cpu_16(vsi->info.tc_mapping[i]);
-		base = (tc_mapping & I40E_AQ_VSI_TC_QUE_OFFSET_MASK) >>
-			I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT;
-		bsf = (tc_mapping & I40E_AQ_VSI_TC_QUE_NUMBER_MASK) >>
-			I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT;
+#ifdef TREX_PATCH_LOW_LATENCY
+    if (! is_vf) {
+        rxq->dcb_tc =0;
+    } else { 
+#endif
 
-		if (queue_idx >= base && queue_idx < (base + BIT(bsf)))
-			rxq->dcb_tc = i;
-	}
+    	for (i = 0; i < I40E_MAX_TRAFFIC_CLASS; i++) {
+    		if (!(vsi->enabled_tc & (1 << i)))
+    			continue;
+    		tc_mapping = rte_le_to_cpu_16(vsi->info.tc_mapping[i]);
+    		base = (tc_mapping & I40E_AQ_VSI_TC_QUE_OFFSET_MASK) >>
+    			I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT;
+    		bsf = (tc_mapping & I40E_AQ_VSI_TC_QUE_NUMBER_MASK) >>
+    			I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT;
+    
+    		if (queue_idx >= base && queue_idx < (base + BIT(bsf)))
+    			rxq->dcb_tc = i;
+    	}
+#ifdef TREX_PATCH_LOW_LATENCY
+    }
+#endif
 
 	return 0;
 }
@@ -2021,6 +2036,11 @@ i40e_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	uint16_t reg_idx, i, base, bsf, tc_mapping;
 	int q_offset;
 
+#ifdef TREX_PATCH_LOW_LATENCY
+    u8 low_latency = 0;
+    int is_vf = 1;
+#endif
+
 	if (hw->mac.type == I40E_MAC_VF || hw->mac.type == I40E_MAC_X722_VF) {
 		vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
 		vsi = &vf->vsi;
@@ -2032,6 +2052,12 @@ i40e_dev_tx_queue_setup(struct rte_eth_dev *dev,
 		vsi = i40e_pf_get_vsi_by_qindex(pf, queue_idx);
 		if (!vsi)
 			return -EINVAL;
+#ifdef TREX_PATCH_LOW_LATENCY
+        if (queue_idx == pf->dev_data->nb_tx_queues-1) {
+            low_latency = 1;
+        }
+        is_vf = 0;
+#endif
 		q_offset = i40e_get_queue_offset_by_qindex(pf, queue_idx);
 		if (q_offset < 0)
 			return -EINVAL;
@@ -2180,18 +2206,32 @@ i40e_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	/* Use a simple TX queue without offloads or multi segs if possible */
 	i40e_set_tx_function_flag(dev, txq);
 
-	for (i = 0; i < I40E_MAX_TRAFFIC_CLASS; i++) {
-		if (!(vsi->enabled_tc & (1 << i)))
-			continue;
-		tc_mapping = rte_le_to_cpu_16(vsi->info.tc_mapping[i]);
-		base = (tc_mapping & I40E_AQ_VSI_TC_QUE_OFFSET_MASK) >>
-			I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT;
-		bsf = (tc_mapping & I40E_AQ_VSI_TC_QUE_NUMBER_MASK) >>
-			I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT;
+    #ifdef TREX_PATCH_LOW_LATENCY
+    if (!is_vf) {
+        if (low_latency) {
+            txq->dcb_tc=1;
+        }else{
+            txq->dcb_tc=0;
+        }
+    } else {
+   #endif
 
-		if (queue_idx >= base && queue_idx < (base + BIT(bsf)))
-			txq->dcb_tc = i;
-	}
+    	for (i = 0; i < I40E_MAX_TRAFFIC_CLASS; i++) {
+    		if (!(vsi->enabled_tc & (1 << i)))
+    			continue;
+    		tc_mapping = rte_le_to_cpu_16(vsi->info.tc_mapping[i]);
+    		base = (tc_mapping & I40E_AQ_VSI_TC_QUE_OFFSET_MASK) >>
+    			I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT;
+    		bsf = (tc_mapping & I40E_AQ_VSI_TC_QUE_NUMBER_MASK) >>
+    			I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT;
+    
+    		if (queue_idx >= base && queue_idx < (base + BIT(bsf)))
+    			txq->dcb_tc = i;
+    	}
+
+   #ifdef TREX_PATCH_LOW_LATENCY
+    }
+   #endif
 
 	return 0;
 }
