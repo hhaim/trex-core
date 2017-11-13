@@ -57,7 +57,7 @@
 #include "vnic_intr.h"
 #include "vnic_nic.h"
 
-#ifdef RTE_MACHINE_CPUFLAG_SSE4_2
+#ifdef RTE_ARCH_X86
 #include <rte_hash_crc.h>
 #define DEFAULT_HASH_FUNC       rte_hash_crc
 #else
@@ -132,27 +132,6 @@ copy_fltr_v1(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
 	fltr->u.ipv4.flags = FILTER_FIELDS_IPV4_5TUPLE;
 }
 
-#ifdef TREX_PATCH
-void
-copy_fltr_recv_all(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
-             struct rte_eth_fdir_masks *masks) {
-	struct filter_generic_1 *gp = &fltr->u.generic_1;
-	memset(gp, 0, sizeof(*gp));
-
-    struct ether_hdr eth_mask, eth_val;
-    memset(&eth_mask, 0, sizeof(eth_mask));
-    memset(&eth_val, 0, sizeof(eth_val));
-
-    eth_val.ether_type = 0xdead;
-    eth_mask.ether_type = 0;
-
-    gp->position = 0;
-    enic_set_layer(gp, 0, FILTER_GENERIC_1_L2,
-			       &eth_mask, &eth_val, sizeof(struct ether_hdr));
-
-}
-#endif
-
 /* Copy Flow Director filter to a VIC generic filter (requires advanced
  * filter support.
  */
@@ -165,12 +144,6 @@ copy_fltr_v2(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
 
 	fltr->type = FILTER_DPDK_1;
 	memset(gp, 0, sizeof(*gp));
-
-#ifdef TREX_PATCH
-    // important for this to be below 2.
-    // If added with position 2, IPv6 UDP and ICMP seems to be caught by some other rule
-    gp->position = 1;
-#endif
 
 	if (input->flow_type == RTE_ETH_FLOW_NONFRAG_IPV4_UDP) {
 		struct udp_hdr udp_mask, udp_val;
@@ -365,18 +338,14 @@ int enic_fdir_del_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	case -EINVAL:
 	case -ENOENT:
 		enic->fdir.stats.f_remove++;
-#ifdef TREX_PATCH
-		return pos;
-#else
 		return -EINVAL;
-#endif
 	default:
 		/* The entry is present in the table */
 		key = enic->fdir.nodes[pos];
 
 		/* Delete the filter */
 		vnic_dev_classifier(enic->vdev, CLSF_DEL,
-			&key->fltr_id, NULL);
+			&key->fltr_id, NULL, NULL);
 		rte_free(key);
 		enic->fdir.nodes[pos] = NULL;
 		enic->fdir.stats.free++;
@@ -396,8 +365,10 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	u32 flowtype_supported;
 	u16 flex_bytes;
 	u16 queue;
+	struct filter_action_v2 action;
 
 	memset(&fltr, 0, sizeof(fltr));
+	memset(&action, 0, sizeof(action));
 	flowtype_supported = enic->fdir.types_mask
 			     & (1 << params->input.flow_type);
 
@@ -470,7 +441,7 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 			 * Delete the filter and add the modified one later
 			 */
 			vnic_dev_classifier(enic->vdev, CLSF_DEL,
-				&key->fltr_id, NULL);
+				&key->fltr_id, NULL, NULL);
 			enic->fdir.stats.free++;
 		}
 
@@ -480,20 +451,13 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	key->filter = *params;
 	key->rq_index = queue;
 
-#ifdef TREX_PATCH
-    switch (params->soft_id) {
-    case 100:
-        copy_fltr_recv_all(&fltr, &params->input, &enic->rte_dev->data->dev_conf.fdir_conf.mask);
-        break;
-    default:
-#endif
 	enic->fdir.copy_fltr_fn(&fltr, &params->input,
 				&enic->rte_dev->data->dev_conf.fdir_conf.mask);
-#ifdef TREX_PATCH
-    }
-#endif
+	action.type = FILTER_ACTION_RQ_STEERING;
+	action.rq_idx = queue;
 
-	if (!vnic_dev_classifier(enic->vdev, CLSF_ADD, &queue, &fltr)) {
+	if (!vnic_dev_classifier(enic->vdev, CLSF_ADD, &queue, &fltr,
+	    &action)) {
 		key->fltr_id = queue;
 	} else {
 		dev_err(enic, "Add classifier entry failed\n");
@@ -503,7 +467,8 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	}
 
 	if (do_free)
-		vnic_dev_classifier(enic->vdev, CLSF_DEL, &old_fltr_id, NULL);
+		vnic_dev_classifier(enic->vdev, CLSF_DEL, &old_fltr_id, NULL,
+				    NULL);
 	else{
 		enic->fdir.stats.free--;
 		enic->fdir.stats.add++;
@@ -529,7 +494,7 @@ void enic_clsf_destroy(struct enic *enic)
 		key = enic->fdir.nodes[index];
 		if (key) {
 			vnic_dev_classifier(enic->vdev, CLSF_DEL,
-				&key->fltr_id, NULL);
+				&key->fltr_id, NULL, NULL);
 			rte_free(key);
 			enic->fdir.nodes[index] = NULL;
 		}

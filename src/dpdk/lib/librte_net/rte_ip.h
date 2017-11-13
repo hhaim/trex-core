@@ -237,7 +237,7 @@ rte_raw_cksum(const void *buf, size_t len)
  * @param off
  *   The offset in bytes to start the checksum.
  * @param len
- *   The length in bytes of the data to ckecksum.
+ *   The length in bytes of the data to checksum.
  * @param cksum
  *   A pointer to the checksum, filled on success.
  * @return
@@ -318,12 +318,6 @@ rte_ipv4_cksum(const struct ipv4_hdr *ipv4_hdr)
 	return (cksum == 0xffff) ? cksum : ~cksum;
 }
 
-
-static inline uint16_t rte_ipv4_header_len(const struct ipv4_hdr *ipv4_hdr){
-   return((ipv4_hdr->version_ihl &0xf)<<2);
-}
-
-
 /**
  * Process the pseudo-header checksum of an IPv4 header.
  *
@@ -362,7 +356,7 @@ rte_ipv4_phdr_cksum(const struct ipv4_hdr *ipv4_hdr, uint64_t ol_flags)
 	} else {
 		psd_hdr.len = rte_cpu_to_be_16(
 			(uint16_t)(rte_be_to_cpu_16(ipv4_hdr->total_length)
-				- rte_ipv4_header_len(ipv4_hdr)));
+				- sizeof(struct ipv4_hdr)));
 	}
 	return rte_raw_cksum(&psd_hdr, sizeof(psd_hdr));
 }

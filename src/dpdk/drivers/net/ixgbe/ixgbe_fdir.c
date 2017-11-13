@@ -247,13 +247,8 @@ configure_fdir_flags(const struct rte_fdir_conf *conf, uint32_t *fdirctrl)
 		return -EINVAL;
 	};
 
-
-#ifdef TREX_PATCH
-	*fdirctrl |= (conf->flexbytes_offset << IXGBE_FDIRCTRL_FLEX_SHIFT);
-#else
 	*fdirctrl |= (IXGBE_DEFAULT_FLEXBYTES_OFFSET / sizeof(uint16_t)) <<
 		     IXGBE_FDIRCTRL_FLEX_SHIFT;
-#endif
 
 	if (conf->mode >= RTE_FDIR_MODE_PERFECT &&
 	    conf->mode <= RTE_FDIR_MODE_PERFECT_TUNNEL) {
@@ -307,7 +302,7 @@ fdir_set_input_mask_82599(struct rte_eth_dev *dev)
 	 * mask VM pool and DIPv6 since there are currently not supported
 	 * mask FLEX byte, it will be set in flex_conf
 	 */
-	uint32_t fdirm = IXGBE_FDIRM_POOL | IXGBE_FDIRM_DIPv6 | IXGBE_FDIRM_FLEX;
+	uint32_t fdirm = IXGBE_FDIRM_POOL | IXGBE_FDIRM_DIPv6;
 	uint32_t fdirtcpm;  /* TCP source and destination port masks. */
 	uint32_t fdiripv6m; /* IPv6 source and destination masks. */
 	volatile uint32_t *reg;
@@ -337,6 +332,10 @@ fdir_set_input_mask_82599(struct rte_eth_dev *dev)
 		PMD_INIT_LOG(ERR, "invalid vlan_tci_mask");
 		return -EINVAL;
 	}
+
+	/* flex byte mask */
+	if (info->mask.flex_bytes_mask == 0)
+		fdirm |= IXGBE_FDIRM_FLEX;
 
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRM, fdirm);
 
@@ -538,6 +537,31 @@ ixgbe_fdir_set_input_mask(struct rte_eth_dev *dev)
 	return -ENOTSUP;
 }
 
+int
+ixgbe_fdir_set_flexbytes_offset(struct rte_eth_dev *dev,
+				uint16_t offset)
+{
+	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	uint32_t fdirctrl;
+	int i;
+
+	fdirctrl = IXGBE_READ_REG(hw, IXGBE_FDIRCTRL);
+
+	fdirctrl &= ~IXGBE_FDIRCTRL_FLEX_MASK;
+	fdirctrl |= ((offset >> 1) /* convert to word offset */
+		<< IXGBE_FDIRCTRL_FLEX_SHIFT);
+
+	IXGBE_WRITE_REG(hw, IXGBE_FDIRCTRL, fdirctrl);
+	IXGBE_WRITE_FLUSH(hw);
+	for (i = 0; i < IXGBE_FDIR_INIT_DONE_POLL; i++) {
+		if (IXGBE_READ_REG(hw, IXGBE_FDIRCTRL) &
+			IXGBE_FDIRCTRL_INIT_DONE)
+			break;
+		msec_delay(1);
+	}
+	return 0;
+}
+
 static int
 fdir_set_input_mask(struct rte_eth_dev *dev,
 		    const struct rte_eth_fdir_masks *input_mask)
@@ -569,7 +593,7 @@ ixgbe_set_fdir_flex_conf(struct rte_eth_dev *dev,
 	uint16_t i;
 
 	fdirm = IXGBE_READ_REG(hw, IXGBE_FDIRM);
-#ifndef TREX_PATCH
+
 	if (conf == NULL) {
 		PMD_DRV_LOG(ERR, "NULL pointer.");
 		return -EINVAL;
@@ -610,11 +634,6 @@ ixgbe_set_fdir_flex_conf(struct rte_eth_dev *dev,
 			return -EINVAL;
 		}
 	}
-#else
-        fdirm &= ~IXGBE_FDIRM_FLEX;
-        flexbytes = 1;
-        // fdirctrl gets flex_bytes_offset in configure_fdir_flags
-#endif
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRM, fdirm);
 	info->mask.flex_bytes_mask = flexbytes ? UINT16_MAX : 0;
 	info->flex_bytes_offset = (uint8_t)((*fdirctrl &
@@ -646,9 +665,6 @@ ixgbe_fdir_configure(struct rte_eth_dev *dev)
 	    hw->mac.type != ixgbe_mac_X550EM_x &&
 	    hw->mac.type != ixgbe_mac_X550EM_a &&
 	    mode != RTE_FDIR_MODE_SIGNATURE &&
-#ifdef TREX_PATCH
-	    mode != RTE_FDIR_MODE_PERFECT_MAC_VLAN &&
-#endif
 	    mode != RTE_FDIR_MODE_PERFECT)
 		return -ENOSYS;
 
@@ -667,7 +683,7 @@ ixgbe_fdir_configure(struct rte_eth_dev *dev)
 
 	/*
 	 * The defaults in the HW for RX PB 1-7 are not zero and so should be
-	 * intialized to zero for non DCB mode otherwise actual total RX PB
+	 * initialized to zero for non DCB mode otherwise actual total RX PB
 	 * would be bigger than programmed and filter space would run into
 	 * the PB 0 region.
 	 */
@@ -743,6 +759,7 @@ ixgbe_fdir_filter_to_atr_input(const struct rte_eth_fdir_filter *fdir_filter,
 			fdir_filter->input.flow.udp4_flow.src_port;
 		input->formatted.dst_port =
 			fdir_filter->input.flow.udp4_flow.dst_port;
+		/* fall-through */
 	/*for SCTP flow type, port and verify_tag are meaningless in ixgbe.*/
 	case RTE_ETH_FLOW_NONFRAG_IPV4_SCTP:
 	case RTE_ETH_FLOW_NONFRAG_IPV4_OTHER:
@@ -758,6 +775,7 @@ ixgbe_fdir_filter_to_atr_input(const struct rte_eth_fdir_filter *fdir_filter,
 			fdir_filter->input.flow.udp6_flow.src_port;
 		input->formatted.dst_port =
 			fdir_filter->input.flow.udp6_flow.dst_port;
+		/* fall-through */
 	/*for SCTP flow type, port and verify_tag are meaningless in ixgbe.*/
 	case RTE_ETH_FLOW_NONFRAG_IPV6_SCTP:
 	case RTE_ETH_FLOW_NONFRAG_IPV6_OTHER:
@@ -1245,7 +1263,7 @@ ixgbe_fdir_filter_program(struct rte_eth_dev *dev,
 
 	/*
 	 * Sanity check for x550.
-	 * When adding a new filter with flow type set to IPv4-other,
+	 * When adding a new filter with flow type set to IPv4,
 	 * the flow director mask should be configed before,
 	 * and the L4 protocol and ports are masked.
 	 */
@@ -1254,11 +1272,14 @@ ixgbe_fdir_filter_program(struct rte_eth_dev *dev,
 	     hw->mac.type == ixgbe_mac_X550EM_x ||
 	     hw->mac.type == ixgbe_mac_X550EM_a) &&
 	    (rule->ixgbe_fdir.formatted.flow_type ==
-	     RTE_ETH_FLOW_NONFRAG_IPV4_OTHER) &&
+	     IXGBE_ATR_FLOW_TYPE_IPV4 ||
+	     rule->ixgbe_fdir.formatted.flow_type ==
+	     IXGBE_ATR_FLOW_TYPE_IPV6) &&
 	    (info->mask.src_port_mask != 0 ||
-	     info->mask.dst_port_mask != 0)) {
+	     info->mask.dst_port_mask != 0) &&
+	     rule->mode != RTE_FDIR_MODE_PERFECT_MAC_VLAN) {
 		PMD_DRV_LOG(ERR, "By this device,"
-			    " IPv4-other is not supported without"
+			    " IPv4 is not supported without"
 			    " L4 protocol and ports masked!");
 		return -ENOTSUP;
 	}
@@ -1268,15 +1289,12 @@ ixgbe_fdir_filter_program(struct rte_eth_dev *dev,
 		is_perfect = TRUE;
 
 	if (is_perfect) {
-#ifndef TREX_PATCH
-        // No reason not to use IPV6 in perfect filters. It is working.
 		if (rule->ixgbe_fdir.formatted.flow_type &
 		    IXGBE_ATR_L4TYPE_IPV6_MASK) {
 			PMD_DRV_LOG(ERR, "IPv6 is not supported in"
 				    " perfect mode!");
 			return -ENOTSUP;
 		}
-#endif
 		fdirhash = atr_compute_perfect_hash_82599(&rule->ixgbe_fdir,
 							  dev->data->dev_conf.fdir_conf.pballoc);
 		fdirhash |= rule->soft_id <<
@@ -1330,7 +1348,7 @@ ixgbe_fdir_filter_program(struct rte_eth_dev *dev,
 				   0);
 		if (!node)
 			return -ENOMEM;
-		(void)rte_memcpy(&node->ixgbe_fdir,
+		rte_memcpy(&node->ixgbe_fdir,
 				 &rule->ixgbe_fdir,
 				 sizeof(union ixgbe_atr_input));
 		node->fdirflags = fdircmd_flags;
