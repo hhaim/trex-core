@@ -235,7 +235,8 @@ def configure(conf):
 
     conf.find_program('ldd')
     conf.check_cxx(lib = 'z', errmsg = missing_pkg_msg(fedora = 'zlib-devel', ubuntu = 'zlib1g-dev'))
-    no_mlx          = conf.options.no_mlx
+    no_mlx          = True
+    #conf.options.no_mlx
     with_ntacc      = conf.options.with_ntacc
     with_sanitized  = conf.options.sanitized
     
