@@ -6126,7 +6126,7 @@ i40e_dev_interrupt_handler(void *param)
 	if (icr0 & I40E_PFINT_ICR0_STORM_DETECT_MASK)
 		PMD_DRV_LOG(INFO, "ICR0: a change in the storm control state");
 	if (icr0 & I40E_PFINT_ICR0_HMC_ERR_MASK)
-		PMD_DRV_LOG(ERR, "ICR0: HMC error");
+		PMD_DRV_LOG(INFO, "ICR0: HMC error");
 	if (icr0 & I40E_PFINT_ICR0_PE_CRITERR_MASK)
 		PMD_DRV_LOG(ERR, "ICR0: protocol engine critical error");
 
@@ -9172,7 +9172,7 @@ i40e_ethertype_filter_set(struct i40e_pf *pf,
 	}
 	if (filter->ether_type == ETHER_TYPE_IPv4 ||
 		filter->ether_type == ETHER_TYPE_IPv6) {
-		PMD_DRV_LOG(ERR,
+		PMD_DRV_LOG(INFO,
 			"unsupported ether_type(0x%04x) in control packet filter.",
 			filter->ether_type);
 		return -EINVAL;
