@@ -2065,17 +2065,19 @@ Get user friendly devices description from saved env. var
 Changes certain attributes based on description
 */
 void DpdkTRexPortAttr::update_description(){
-#if 0
-    struct rte_pci_addr pci_addr ={ 0, 0 , 0, 0};;
-    char pci[16];
+    char pci[18];
     char * envvar;
     std::string pci_envvar_name;
-    if (rte_eth_devices[m_port_id].device->devargs) {
-        pci_addr = rte_eth_devices[m_port_id].device->devargs->pci.addr;
+    struct rte_pci_addr *pci_addr = NULL;
+    struct rte_eth_dev_info dev_info;
+    rte_eth_dev_info_get(m_repid , &dev_info);
+    pci_addr = &(dev_info.pci_dev->addr);
+    if (pci_addr) {
+        rte_pci_device_name(pci_addr,pci, sizeof(pci));
+        intf_info_st.pci_addr = pci;
+    }else{
+        intf_info_st.pci_addr="none";
     }
-    pci_addr = rte_eth_devices[m_repid].device->devargs->pci.addr;
-    snprintf(pci, sizeof(pci), "%04x:%02x:%02x.%d", pci_addr.domain, pci_addr.bus, pci_addr.devid, pci_addr.function);
-    intf_info_st.pci_addr = pci;
     pci_envvar_name = "pci" + intf_info_st.pci_addr;
     std::replace(pci_envvar_name.begin(), pci_envvar_name.end(), ':', '_');
     std::replace(pci_envvar_name.begin(), pci_envvar_name.end(), '.', '_');
@@ -2095,7 +2097,6 @@ void DpdkTRexPortAttr::update_description(){
     if ( CGlobalInfo::m_options.preview.getVMode() > 0){
         printf("port %d desc: %s\n", m_repid, intf_info_st.description.c_str());
     }
-#endif
 }
 
 int DpdkTRexPortAttr::set_led(bool on){
