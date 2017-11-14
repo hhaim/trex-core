@@ -37,20 +37,9 @@ typedef struct rte_mempool rte_mempool_t;
 inline void utl_rte_mempool_delete(rte_mempool_t * & pool){
 }
 
-/* TBD need to fill this */
-static inline int rte_mempool_sc_get(struct rte_mempool *mp, void **obj_p){
-    *obj_p=(void *)0;
-    return(0);
-}
 
-/* TBD need to fill this */
-static inline void rte_mempool_sp_put(struct rte_mempool *mp, void *obj){
-
-}
-
-/* TBD need to fill this */
 static inline unsigned rte_mempool_count(rte_mempool_t  *mp){
-    return (10);
+        return rte_mempool_avail_count(mp);
 }
 
 
