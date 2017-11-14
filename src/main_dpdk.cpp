@@ -26,6 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <zmq.h>
+#include <rte_config.h>
 #include <rte_common.h>
 #include <rte_log.h>
 #include <rte_memory.h>
@@ -52,6 +53,8 @@
 #include <rte_random.h>
 #include <rte_version.h>
 #include <rte_ip.h>
+#include <rte_bus_pci.h>
+
 #include "stt_cp.h"
 
 #include "bp_sim.h"
@@ -2062,6 +2065,7 @@ Get user friendly devices description from saved env. var
 Changes certain attributes based on description
 */
 void DpdkTRexPortAttr::update_description(){
+#if 0
     struct rte_pci_addr pci_addr ={ 0, 0 , 0, 0};;
     char pci[16];
     char * envvar;
@@ -2091,6 +2095,7 @@ void DpdkTRexPortAttr::update_description(){
     if ( CGlobalInfo::m_options.preview.getVMode() > 0){
         printf("port %d desc: %s\n", m_repid, intf_info_st.description.c_str());
     }
+#endif
 }
 
 int DpdkTRexPortAttr::set_led(bool on){
@@ -6532,7 +6537,7 @@ void dump_interfaces_info() {
         ether_format_addr(mac_str, sizeof mac_str, &mac_addr);
         printf("PCI: %04x:%02x:%02x.%d - MAC: %s - Driver: %s\n",
             pci_addr->domain, pci_addr->bus, pci_addr->devid, pci_addr->function, mac_str,
-            rte_eth_devices[port_id].data->drv_name);
+            rte_eth_devices[port_id].data->name); /* TBD need to check if this bring the same name */
     }
 }
 
@@ -6603,9 +6608,9 @@ int main_test(int argc , char * argv[]){
 
 
     if ( CGlobalInfo::m_options.preview.getVMode() == 0  ) {
-        rte_set_log_level(1);
-
+        rte_log_set_global_level(1);
     }
+
     uid_t uid;
     uid = geteuid ();
     if ( uid != 0 ) {
