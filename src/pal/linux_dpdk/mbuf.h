@@ -39,6 +39,7 @@ inline void utl_rte_mempool_delete(rte_mempool_t * & pool){
 
 /* TBD need to fill this */
 static inline int rte_mempool_sc_get(struct rte_mempool *mp, void **obj_p){
+    *obj_p=(void *)0;
     return(0);
 }
 

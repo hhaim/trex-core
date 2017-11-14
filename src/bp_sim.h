@@ -3097,7 +3097,7 @@ private:
 } __rte_cache_aligned ;
 
 inline CGenNode * CFlowGenListPerThread::create_node(void){
-    CGenNode * res;
+    CGenNode * res=(CGenNode *)0;
     if ( unlikely (rte_mempool_sc_get(m_node_pool, (void **)&res) <0) ){
         no_memory_error();
         return (0);
