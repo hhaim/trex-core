@@ -4577,8 +4577,8 @@ int  CGlobalTRex::ixgbe_prob_init(void){
         printf("max_tx_queues  : %d \n",dev_info.max_tx_queues);
         printf("max_mac_addrs  : %d \n",dev_info.max_mac_addrs);
 
-        printf("rx_offload_capa : 0x%x \n",dev_info.rx_offload_capa);
-        printf("tx_offload_capa : 0x%x \n",dev_info.tx_offload_capa);
+        printf("rx_offload_capa : 0x%lx \n",dev_info.rx_offload_capa);
+        printf("tx_offload_capa : 0x%lx \n",dev_info.tx_offload_capa);
         printf("rss reta_size   : %d \n",dev_info.reta_size);
         printf("flow_type_rss   : 0x%lx \n",dev_info.flow_type_rss_offloads);
     }
