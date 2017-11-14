@@ -797,6 +797,7 @@ struct rte_pktmbuf_pool_private {
 
 #ifdef RTE_MBUF_REFCNT_ATOMIC
 
+
 /**
  * Reads the value of an mbuf's refcnt.
  * @param m
@@ -808,11 +809,21 @@ static inline uint16_t
 rte_mbuf_refcnt_read(const struct rte_mbuf *m)
 {
     #ifdef TREX_PATCH
-        if (likely(m->m_core_locality > RTE_MBUF_CORE_LOCALITY_MULTI)) {
-            return m->refcnt;
-        } else {
-           return (uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
-        }
+     uint16_t res;
+      switch (m->m_core_locality) {
+      case     RTE_MBUF_CORE_LOCALITY_MULTI :
+          res=(uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+          break;
+      case     RTE_MBUF_CORE_LOCALITY_LOCAL :
+          res=m->refcnt;
+          break;
+      case     RTE_MBUF_CORE_LOCALITY_CONST :
+          res=7;
+          break;
+      default:
+          res=(uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+      };
+      return (res);
     #else
         return (uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
     #endif
@@ -999,6 +1010,13 @@ rte_mbuf_raw_free(struct rte_mbuf *m)
 	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 1);
 	RTE_ASSERT(m->next == NULL);
 	RTE_ASSERT(m->nb_segs == 1);
+    RTE_ASSERT(m->m_core_locality!=RTE_MBUF_CORE_LOCALITY_CONST);
+
+    #ifdef TREX_PATCH
+    if (m->m_core_locality != RTE_MBUF_CORE_LOCALITY_MULTI) {
+        m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+    }
+    #endif
 	__rte_mbuf_sanity_check(m, 0);
 	rte_mempool_put(m->pool, m);
 }
@@ -1462,8 +1480,11 @@ rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
 		}
 
 		return m;
-
-       } else if (rte_atomic16_add_return(&m->refcnt_atomic, -1) == 0) {
+#ifdef TREX_PATCH
+    } else if (likely(rte_mbuf_refcnt_update(m, -1) == 0)) {
+#else
+    } else if (rte_atomic16_add_return(&m->refcnt_atomic, -1) == 0)  {
+#endif
 
 
 		if (RTE_MBUF_INDIRECT(m))

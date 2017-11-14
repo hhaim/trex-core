@@ -144,6 +144,9 @@ rte_pktmbuf_init(struct rte_mempool *mp,
 	m->pool = mp;
 	m->nb_segs = 1;
 	m->port = MBUF_INVALID_PORT;
+    #ifdef TREX_PATCH
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+    #endif
 	rte_mbuf_refcnt_set(m, 1);
 	m->next = NULL;
 }
