@@ -7818,7 +7818,7 @@ int CTRexExtendedDriverBase40G::dump_fdir_global_stats(CPhyEthIF * _if, FILE *fd
 }
 
 bool CTRexExtendedDriverBase40G::get_extended_stats(CPhyEthIF * _if,CPhyEthIFStats *stats) {
-    return get_extended_stats_fixed(_if, stats, 0, 4);
+    return get_extended_stats_fixed(_if, stats, 4, 4);
 }
 
 int CTRexExtendedDriverBase40G::wait_for_stable_link(){
