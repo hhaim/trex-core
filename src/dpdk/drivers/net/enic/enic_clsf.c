@@ -483,14 +483,13 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	key->filter = *params;
 	key->rq_index = queue;
 
-    #ifdef TREX_PATCH
+#ifdef TREX_PATCH
     switch (params->soft_id) {
     case 100:
         copy_fltr_recv_all(&fltr, &params->input, &enic->rte_dev->data->dev_conf.fdir_conf.mask);
         break;
     default:
-    #endif
-
+#endif
 	enic->fdir.copy_fltr_fn(&fltr, &params->input,
 				&enic->rte_dev->data->dev_conf.fdir_conf.mask);
 #ifdef TREX_PATCH

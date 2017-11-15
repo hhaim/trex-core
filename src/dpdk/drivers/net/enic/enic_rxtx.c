@@ -567,7 +567,7 @@ uint16_t enic_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
 		tso = ol_flags & PKT_TX_TCP_SEG;
 
 		/* drop packet if it's too big to send */
-		if (unlikely(!tso && pkt_len > ENIC_TX_MAX_PKT_SIZE)) {
+		if (unlikely(!tso && (pkt_len > ENIC_TX_MAX_PKT_SIZE))) {
 			rte_pktmbuf_free(tx_pkt);
 			rte_atomic64_inc(tx_oversized);
 			continue;
