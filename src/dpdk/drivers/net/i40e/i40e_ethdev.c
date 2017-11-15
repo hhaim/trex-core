@@ -2764,18 +2764,24 @@ i40e_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	/* call read registers - updates values, now write them to struct */
 	i40e_read_stats_registers(pf, hw);
 
-	stats->ipackets = ns->eth.rx_unicast +
-			ns->eth.rx_multicast +
-			ns->eth.rx_broadcast -
-			ns->eth.rx_discards -
-			pf->main_vsi->eth_stats.rx_discards;
 #ifndef TREX_PATCH
-	stats->opackets = pf->main_vsi->eth_stats.tx_unicast +
-			pf->main_vsi->eth_stats.tx_multicast +
-			pf->main_vsi->eth_stats.tx_broadcast;
-	stats->ibytes   = ns->eth.rx_bytes;
+    stats->ipackets = ns->eth.rx_unicast +
+            ns->eth.rx_multicast +
+            ns->eth.rx_broadcast -
+            ns->eth.rx_discards -
+            pf->main_vsi->eth_stats.rx_discards;
+    stats->opackets = ns->eth.tx_unicast +
+            ns->eth.tx_multicast +
+            ns->eth.tx_broadcast;
+    stats->ibytes   = ns->eth.rx_bytes;
+
 #else
     /* Hanoch: move to global transmit and not pf->vsi and we have two high and low priorty */
+    stats->ipackets = pf->main_vsi->eth_stats.rx_unicast +
+            pf->main_vsi->eth_stats.rx_multicast +
+            pf->main_vsi->eth_stats.rx_broadcast -
+            pf->main_vsi->eth_stats.rx_discards;
+
     stats->opackets = ns->eth.tx_unicast +ns->eth.tx_multicast +ns->eth.tx_broadcast;
 	stats->ibytes   = pf->main_vsi->eth_stats.rx_bytes;
 #endif
@@ -10609,11 +10615,7 @@ i40e_dcb_init_configure(struct rte_eth_dev *dev, bool sw_dcb)
 			hw->local_dcbx_config.etscfg.willing = 0;
 			hw->local_dcbx_config.etscfg.maxtcs = 0;
 			hw->local_dcbx_config.etscfg.tcbwtable[0] = 100;
-			hw->local_dcbx_config.etscfg.tsatable[0] =
-						I40E_IEEE_TSA_ETS;
-            /* all UPs mapping to TC0 */
-            for (i = 0; i < I40E_MAX_USER_PRIORITY; i++)
-                hw->local_dcbx_config.etscfg.prioritytable[i] = 0;
+			hw->local_dcbx_config.etscfg.tsatable[0] = I40E_IEEE_TSA_ETS;
 
 #ifdef TREX_PATCH_LOW_LATENCY
             hw->local_dcbx_config.etscfg.tcbwtable[1] = 0;
