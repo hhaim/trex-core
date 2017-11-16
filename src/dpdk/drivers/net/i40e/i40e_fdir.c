@@ -1370,7 +1370,7 @@ i40e_check_fdir_programming_status(struct i40e_rx_queue *rxq)
 				PMD_DRV_LOG(ERR, "invalid programming status"
 					    " reported, error = %u.", error);
 		} else
-			PMD_DRV_LOG(ERR, "unknown programming status"
+			PMD_DRV_LOG(INFO, "unknown programming status"
 				    " reported, len = %d, id = %u.", len, id);
 		rxdp->wb.qword1.status_error_len = 0;
 		rxq->rx_tail++;
