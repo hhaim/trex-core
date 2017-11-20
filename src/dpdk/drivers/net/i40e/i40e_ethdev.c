@@ -1652,7 +1652,11 @@ __vsi_queues_bind_intr(struct i40e_vsi *vsi, uint16_t msix_vect,
 	/* Bind all RX queues to allocated MSIX interrupt */
 	for (i = 0; i < nb_queue; i++) {
 		val = (msix_vect << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
+            #ifdef TREX_PATCH
+            I40E_QINT_RQCTL_ITR_INDX_MASK |
+            #else
 			itr_idx << I40E_QINT_RQCTL_ITR_INDX_SHIFT |
+            #endif
 			((base_queue + i + 1) <<
 			 I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
 			(0 << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
