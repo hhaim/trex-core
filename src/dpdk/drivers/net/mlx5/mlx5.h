@@ -79,6 +79,47 @@ enum {
 	PCI_DEVICE_ID_MELLANOX_CONNECTX5EXVF = 0x101a,
 };
 
+#ifdef TREX_PATCH
+
+struct mlx5_stats_priv {
+
+    struct rte_eth_stats m_shadow;
+    uint32_t             m_old_ipackets;
+    uint32_t             m_old_opackets;
+    uint64_t             m_t_ipackets;
+    uint64_t             m_t_opackets;
+
+    uint32_t      n_stats; /* number of counters */
+
+    void    *  et_stats  ;/* point to ethtool counter struct ethtool_stats*/
+
+    /* index into ethtool */
+    uint16_t inx_rx_vport_unicast_bytes;
+    uint16_t inx_rx_vport_multicast_bytes;
+    uint16_t inx_rx_vport_broadcast_bytes;
+    uint16_t inx_rx_vport_unicast_packets;
+    uint16_t inx_rx_vport_multicast_packets;
+    uint16_t inx_rx_vport_broadcast_packets;
+    uint16_t inx_tx_vport_unicast_bytes;
+    uint16_t inx_tx_vport_multicast_bytes;
+    uint16_t inx_tx_vport_broadcast_bytes;
+    uint16_t inx_tx_vport_unicast_packets;
+    uint16_t inx_tx_vport_multicast_packets;
+    uint16_t inx_tx_vport_broadcast_packets;
+
+    uint16_t inx_tx_packets_phy;
+    uint16_t inx_tx_bytes_phy;
+
+    uint16_t inx_rx_wqe_err;
+    uint16_t inx_rx_crc_errors_phy;
+    uint16_t inx_rx_in_range_len_errors_phy;
+    uint16_t inx_rx_symbol_err_phy;
+    uint16_t inx_tx_errors_phy;
+    uint16_t cx_4_workaround;
+};
+
+#endif
+
 struct mlx5_xstats_ctrl {
 	/* Number of device stats. */
 	uint16_t stats_n;
@@ -149,6 +190,7 @@ struct priv {
 	rte_spinlock_t lock; /* Lock for control functions. */
 	int primary_socket; /* Unix socket for primary process. */
 	struct rte_intr_handle intr_handle_socket; /* Interrupt handler. */
+    struct mlx5_stats_priv m_stats; /* TREX_PATCH */
 };
 
 /**
@@ -239,6 +281,8 @@ void mlx5_allmulticast_disable(struct rte_eth_dev *);
 void priv_xstats_init(struct priv *);
 int mlx5_stats_get(struct rte_eth_dev *, struct rte_eth_stats *);
 void mlx5_stats_reset(struct rte_eth_dev *);
+void mlx5_stats_free(struct rte_eth_dev *dev); /* TREX_PATCH */
+
 int mlx5_xstats_get(struct rte_eth_dev *,
 		    struct rte_eth_xstat *, unsigned int);
 void mlx5_xstats_reset(struct rte_eth_dev *);

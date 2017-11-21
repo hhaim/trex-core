@@ -259,6 +259,7 @@ mlx5_dev_close(struct rte_eth_dev *dev)
 	ret = priv_mr_verify(priv);
 	if (ret)
 		WARN("%p: some Memory Region still remain", (void *)priv);
+    mlx5_stats_free(dev);
 	priv_unlock(priv);
 	memset(priv, 0, sizeof(*priv));
 }
@@ -554,6 +555,16 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 	struct ibv_counter_set_description cs_desc;
 #endif
 
+    /* TREX PATCH, lazy ibv_init */
+    static int ibv_was_init=0;
+
+    if (ibv_was_init==0) {
+        ibv_fork_init();
+        ibv_was_init=1;
+    }
+
+
+
 	(void)pci_drv;
 	assert(pci_drv == &mlx5_driver);
 	/* Get mlx5_dev[] index. */
@@ -787,11 +798,17 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 			      strerror(err));
 			goto port_error;
 		}
+
 		mlx5_args_assign(priv, &args);
 		if (ibv_query_device_ex(ctx, NULL, &device_attr_ex)) {
 			ERROR("ibv_query_device_ex() failed");
 			goto port_error;
 		}
+
+        /* TREX PATCH */
+        /* set for maximum performance default */
+        priv->txq_inline  =512;
+
 
 		priv->hw_csum =
 			!!(device_attr_ex.device_cap_flags_ex &
@@ -1041,7 +1058,7 @@ rte_mlx5_pmd_init(void)
 	/* Match the size of Rx completion entry to the size of a cacheline. */
 	if (RTE_CACHE_LINE_SIZE == 128)
 		setenv("MLX5_CQE_SIZE", "128", 0);
-	ibv_fork_init();
+	// ibv_fork_init(); TREX_PATCH remove 
 	rte_pci_register(&mlx5_driver);
 }
 
