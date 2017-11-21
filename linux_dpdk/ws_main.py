@@ -235,8 +235,7 @@ def configure(conf):
 
     conf.find_program('ldd')
     conf.check_cxx(lib = 'z', errmsg = missing_pkg_msg(fedora = 'zlib-devel', ubuntu = 'zlib1g-dev'))
-    no_mlx          = True
-    #conf.options.no_mlx
+    no_mlx          = conf.options.no_mlx
     with_ntacc      = conf.options.with_ntacc
     with_sanitized  = conf.options.sanitized
     
@@ -1135,14 +1134,15 @@ def build_prog (bld, build_obj):
           target   = build_obj.get_mlx5_target()
         )
 
-        bld.shlib(
-        features='c',
-        includes = dpdk_includes_path+dpdk_includes_verb_path,
-        cflags   = (cflags + DPDK_FLAGS ),
-        use =['ibverbs'],
-        source   = mlx4_dpdk.file_list(top),
-        target   = build_obj.get_mlx4_target()
-       )
+        # remove the mlx4 driver for now
+        #bld.shlib(
+        #features='c',
+        #includes = dpdk_includes_path+dpdk_includes_verb_path,
+        #cflags   = (cflags + DPDK_FLAGS ),
+        #use =['ibverbs'],
+        #source   = mlx4_dpdk.file_list(top),
+        #target   = build_obj.get_mlx4_target()
+       #)
 
     if bld.env.WITH_NTACC == True:
         bld.shlib(
