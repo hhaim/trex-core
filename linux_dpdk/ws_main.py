@@ -1128,8 +1128,7 @@ def build_prog (bld, build_obj):
           features='c',
           includes = dpdk_includes_path+dpdk_includes_verb_path,
           cflags   = (cflags + DPDK_FLAGS ),
-          use =['ibverbs'],
-
+          use =['ibverbs','mlx5'],
           source   = mlx5_dpdk.file_list(top),
           target   = build_obj.get_mlx5_target()
         )
@@ -1207,11 +1206,13 @@ def build(bld):
         if bld.env['LIB_IBVERBS']:
             Logs.pprint('GREEN', 'Info: Using external libverbs.')
             bld.read_shlib(name='ibverbs')
+            bld.read_shlib(name='mlx5')
         else:
             Logs.pprint('GREEN', 'Info: Using internal libverbs.')
             ibverbs_lib_path='external_libs/ibverbs/'
             dpdk_includes_verb_path =' \n ../external_libs/ibverbs/include/ \n'
             bld.read_shlib( name='ibverbs' , paths=[top+ibverbs_lib_path] )
+            bld.read_shlib( name='mlx5',paths=[top+ibverbs_lib_path])
             check_ibverbs_deps(bld)
 
     for obj in build_types:
