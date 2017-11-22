@@ -54,6 +54,7 @@
 #include <rte_version.h>
 #include <rte_ip.h>
 #include <rte_bus_pci.h>
+#include <rte_flow.h>
 
 #include "stt_cp.h"
 
@@ -590,6 +591,437 @@ private:
 
 };
 
+////////////////////////////////////////////////////////////
+
+typedef enum { mfDISABLE     = 0x12, 
+               mfPASS_ALL_RX = 0x13, 
+               mfDROP_ALL_PASS_TOS =0x14,
+               mfPASS_TOS =0x15
+} dpdk_filter_mode_t;
+
+
+class CDpdkFilterPort {
+public:
+    CDpdkFilterPort();
+    ~CDpdkFilterPort();
+
+    void set_rx_q(uint8_t rx_q){
+        m_rx_q=rx_q;
+    }
+
+    void set_port_id(repid_t repid){
+        m_repid=repid;
+    }
+
+    /* in case of TCP we don't want to drop*/
+    void set_drop_all_mode(bool enable){
+        m_drop_all=enable;
+    }
+    
+    void set_mode(dpdk_filter_mode_t mode);
+
+public:
+    /* driver old interface, need refactoring  */
+    int configure_rx_filter_rules() {
+        if (m_drop_all){
+            set_mode(mfDROP_ALL_PASS_TOS);
+        }else{
+            set_mode(mfPASS_TOS);
+        }
+        return(0);
+    }
+
+    int set_rcv_all(bool set_on){
+        if (set_on) {
+            set_mode(mfPASS_ALL_RX);
+        }else{
+            configure_rx_filter_rules();
+        }
+        return(0);
+    }
+
+
+private:
+    void set_tos_filter(bool enable);
+    void set_drop_all_filter(bool enable);
+    void set_pass_all_filter(bool enable);
+    void _set_mode(dpdk_filter_mode_t mode,
+                   bool enable);
+    void clear_filter(struct rte_flow * &  filter);
+private:
+    repid_t             m_repid;
+    uint8_t             m_rx_q;
+    bool                m_drop_all;
+    dpdk_filter_mode_t  m_mode;
+    struct rte_flow *   m_rx_ipv4_tos;
+    struct rte_flow *   m_rx_ipv6_tos;
+    struct rte_flow *   m_rx_drop_all;
+    struct rte_flow *   m_rx_pass_rx_all;
+};
+
+#define MAX_PATTERN_NUM 5
+
+static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
+                                               uint8_t rx_q,
+                                               bool ipv6,
+                                               struct rte_flow_error *error){
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[MAX_PATTERN_NUM];
+	struct rte_flow_action action[MAX_PATTERN_NUM];
+	struct rte_flow *flow = NULL;
+	struct rte_flow_action_queue queue = { .index = rx_q };
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_item_vlan vlan_spec;
+	struct rte_flow_item_vlan vlan_mask;
+	struct rte_flow_item_ipv4 ipv4_spec;
+	struct rte_flow_item_ipv4 ipv4_mask;
+
+    struct rte_flow_item_ipv6 ipv6_spec;
+    struct rte_flow_item_ipv6 ipv6_mask;
+
+	int res;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	/*
+	 * set the rule attribute.
+	 * in this case only ingress packets will be checked.
+	 */
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
+
+	/*
+	 * create the action sequence.
+	 * one action only,  move packet to queue
+	 */
+
+	action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action[0].conf = &queue;
+	action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	/*
+	 * set the first level of the pattern (eth).
+	 * since in this example we just want to get the
+	 * ipv4 we set this level to allow all.
+	 */
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = 0;
+	eth_mask.type = 0;
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec = &eth_spec;
+	pattern[0].mask = &eth_mask;
+
+	/*
+	 * setting the second level of the pattern (vlan).
+	 * since in this example we just want to get the
+	 * ipv4 we also set this level to allow all.
+	 */
+	memset(&vlan_spec, 0, sizeof(struct rte_flow_item_vlan));
+	memset(&vlan_mask, 0, sizeof(struct rte_flow_item_vlan));
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_VLAN;
+	pattern[1].spec = &vlan_spec;
+	pattern[1].mask = &vlan_mask;
+
+    if (ipv6){
+        memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
+        memset(&ipv6_mask, 0, sizeof(struct rte_flow_item_ipv6));
+        ipv6_spec.hdr.vtc_flow = 0x1<<20;
+        ipv6_mask.hdr.vtc_flow = 0x1<<20;
+        pattern[2].type = RTE_FLOW_ITEM_TYPE_IPV6;
+        pattern[2].spec = &ipv6_spec;
+        pattern[2].mask = &ipv6_mask;
+
+    }else{
+        /*
+         * setting the third level of the pattern (ip).
+         * in this example this is the level we care about
+         * so we set it according to the parameters.
+         */
+        memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
+        memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
+        ipv4_spec.hdr.type_of_service = 0x1;
+        ipv4_mask.hdr.type_of_service = 0x1;
+        pattern[2].type = RTE_FLOW_ITEM_TYPE_IPV4;
+        pattern[2].spec = &ipv4_spec;
+        pattern[2].mask = &ipv4_mask;
+    }
+
+	/* the final level must be always type end */
+	pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
+
+	res = rte_flow_validate(port_id, &attr, pattern, action, error);
+	if (!res)
+		flow = rte_flow_create(port_id, &attr, pattern, action, error);
+
+	return flow;
+}
+
+static struct rte_flow * filter_drop_all(uint8_t port_id,
+                                         struct rte_flow_error *error){
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[MAX_PATTERN_NUM];
+	struct rte_flow_action action[MAX_PATTERN_NUM];
+	struct rte_flow *flow = NULL;
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+
+	int res;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	/*
+	 * set the rule attribute.
+	 * in this case only ingress packets will be checked.
+	 */
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
+    //attr.group =1;  /* not supported yet*/
+
+	/*
+	 * create the action sequence.
+	 * one action only,  move packet to queue
+	 */
+
+    action[0].type = RTE_FLOW_ACTION_TYPE_DROP;
+    action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	/*
+	 * set the first level of the pattern (eth).
+	 * since in this example we just want to get the
+	 * ipv4 we set this level to allow all.
+	 */
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = 0;
+	eth_mask.type = 0;
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec = &eth_spec;
+	pattern[0].mask = &eth_mask;
+
+	/* the final level must be always type end */
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_END;
+
+	res = rte_flow_validate(port_id, &attr, pattern, action, error);
+	if (!res)
+		flow = rte_flow_create(port_id, &attr, pattern, action, error);
+
+	return flow;
+}
+
+static struct rte_flow * filter_pass_all_to_rx(uint8_t port_id,
+                                               uint8_t rx_q,
+                                               struct rte_flow_error *error){
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[MAX_PATTERN_NUM];
+	struct rte_flow_action action[MAX_PATTERN_NUM];
+	struct rte_flow *flow = NULL;
+    struct rte_flow_action_queue queue = { .index = rx_q };
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+
+	int res;
+
+	memset(pattern, 0, sizeof(pattern));
+	memset(action, 0, sizeof(action));
+
+	/*
+	 * set the rule attribute.
+	 * in this case only ingress packets will be checked.
+	 */
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
+
+	/*
+	 * create the action sequence.
+	 * one action only,  move packet to queue
+	 */
+
+    action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+    action[0].conf = &queue;
+    action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	/*
+	 * set the first level of the pattern (eth).
+	 * since in this example we just want to get the
+	 * ipv4 we set this level to allow all.
+	 */
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = 0;
+	eth_mask.type = 0;
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].spec = &eth_spec;
+	pattern[0].mask = &eth_mask;
+
+	/* the final level must be always type end */
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_END;
+
+	res = rte_flow_validate(port_id, &attr, pattern, action, error);
+	if (!res)
+		flow = rte_flow_create(port_id, &attr, pattern, action, error);
+
+	return flow;
+}
+
+inline void check_dpdk_filter_result(struct rte_flow * flow,
+                                     struct rte_flow_error * err){
+    if (flow==NULL) {
+        printf("Failed to create dpdk flow rule msg: %s\n",err->message);
+        exit(1);
+    }
+}
+
+inline void check_dpdk_filter_result(int res,
+                                     struct rte_flow_error * err){
+    if (res!=0) {
+        printf("Failed to delete dpdk flow rule msg: %s\n",err->message);
+        exit(1);
+    }
+}
+
+void CDpdkFilterPort::clear_filter(struct rte_flow * &  filter){
+    struct rte_flow_error error;
+    int res;
+    assert(filter);
+    res=rte_flow_destroy(m_repid,filter,&error);
+    check_dpdk_filter_result(res,&error);
+    filter=0;
+}
+
+void CDpdkFilterPort::set_tos_filter(bool enable){
+    struct rte_flow_error error;
+    if (enable) {
+        m_rx_ipv4_tos = filter_tos_flow_to_rq(m_repid,
+                                              m_rx_q,
+                                              false,
+                                              &error);
+        check_dpdk_filter_result(m_rx_ipv4_tos,&error);
+        m_rx_ipv6_tos = filter_tos_flow_to_rq(m_repid,
+                                              m_rx_q,
+                                              true,
+                                              &error);
+        check_dpdk_filter_result(m_rx_ipv6_tos,&error);
+    }else{
+        clear_filter(m_rx_ipv4_tos);
+        clear_filter(m_rx_ipv6_tos);
+    }
+}
+
+void CDpdkFilterPort::set_drop_all_filter(bool enable){
+    struct rte_flow_error error;
+    if (enable){
+        m_rx_drop_all = filter_drop_all(m_repid,&error);
+        check_dpdk_filter_result(m_rx_drop_all,&error);
+    }else{
+        clear_filter(m_rx_drop_all);
+    }
+}
+
+void CDpdkFilterPort::set_pass_all_filter(bool enable){
+    struct rte_flow_error error;
+    if (enable){
+        m_rx_pass_rx_all = filter_pass_all_to_rx(m_repid,m_rx_q,&error);
+        check_dpdk_filter_result(m_rx_pass_rx_all,&error);
+    }else{
+        clear_filter(m_rx_pass_rx_all);
+    }
+}
+
+
+void CDpdkFilterPort::_set_mode(dpdk_filter_mode_t mode,
+                                bool enable){
+    switch (mode) {
+    case mfDISABLE:
+        break;
+    case mfPASS_ALL_RX:
+        set_pass_all_filter(enable);
+        break;
+    case mfDROP_ALL_PASS_TOS:
+        set_tos_filter(enable);
+        set_drop_all_filter(enable);
+        break;
+    case mfPASS_TOS:
+        set_tos_filter(enable);
+        break;
+    default:
+        assert(0);
+    };
+}
+
+
+void CDpdkFilterPort::set_mode(dpdk_filter_mode_t mode){
+
+    printf(" set_filter %d mode:%d \n",(int)m_repid,(int)mode);
+
+    if (mode==m_mode) {
+        /* nothing to do */
+        return;
+    }
+    _set_mode(m_mode,false); /* disable old mode */
+    _set_mode(mode,true);    /* enable new mode */
+    m_mode = mode;
+}
+
+
+CDpdkFilterPort::CDpdkFilterPort(){
+    m_repid=255;
+    m_rx_q = 255;
+    m_drop_all=false;
+    m_mode = mfDISABLE;
+    m_rx_ipv4_tos=0;
+    m_rx_ipv6_tos=0;
+    m_rx_drop_all=0;
+    m_rx_pass_rx_all=0;
+}
+
+CDpdkFilterPort::~CDpdkFilterPort(){
+    set_mode(mfDISABLE);
+}
+
+
+class CDpdkFilterManager {
+public:
+    CDpdkFilterManager(){
+        int i;
+        for (i=0;i<TREX_MAX_PORTS; i++) {
+            m_port[i]=0;
+        }
+    }
+
+    int configure_rx_filter_rules(repid_t repid) {
+        CDpdkFilterPort * lp=get_port(repid);
+        return(lp->configure_rx_filter_rules());
+    }
+
+    int set_rcv_all(repid_t repid,bool set_on){
+        CDpdkFilterPort * lp=get_port(repid);
+        return(lp->set_rcv_all(set_on));
+    }
+
+private:
+    CDpdkFilterPort * get_port(repid_t repid);
+private:
+    CDpdkFilterPort * m_port[TREX_MAX_PORTS];
+};
+
+CDpdkFilterPort * CDpdkFilterManager::get_port(repid_t repid){
+    CDpdkFilterPort * lp=m_port[repid];
+    if (lp) {
+        return(lp);
+    }
+    lp = new CDpdkFilterPort();
+    lp->set_port_id(repid);
+    lp->set_drop_all_mode(get_is_tcp_mode()?false:true);
+    lp->set_rx_q(MAIN_DPDK_RX_Q);
+    m_port[repid]=lp;
+    return(lp);
+}
+
+
 
 class CTRexExtendedDriverBaseMlnx5G : public CTRexExtendedDriverBase {
 public:
@@ -600,14 +1032,7 @@ public:
             CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_ONE_QUEUE);
             m_cap = /*TREX_DRV_CAP_DROP_Q  | TREX_DRV_CAP_MAC_ADDR_CHG */0;
         }else{
-            m_cap = TREX_DRV_CAP_DROP_Q | TREX_DRV_CAP_MAC_ADDR_CHG|TREX_DRV_DEFAULT_RSS_ON_RX_QUEUES ;
-            // In Mellanox, default mode is Q_MODE_MANY_DROP_Q.
-            // put it, unless user already choose mode using command line arg (--software for example)
-            if (CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_NORMAL) {
-                if (get_is_tcp_mode()==false) {
-                    CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_MANY_DROP_Q);
-                }
-            }
+            m_cap = TREX_DRV_CAP_DROP_Q | TREX_DRV_CAP_MAC_ADDR_CHG;
         }
     }
 
@@ -655,7 +1080,6 @@ public:
 
     }
     virtual void update_configuration(port_cfg_t * cfg);
-    virtual int configure_rx_filter_rules(CPhyEthIF * _if);
     virtual bool get_extended_stats(CPhyEthIF * _if,CPhyEthIFStats *stats);
     virtual void clear_extended_stats(CPhyEthIF * _if);
     virtual void reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len);
@@ -672,12 +1096,17 @@ public:
     // disabling flow control on 40G using DPDK API causes the interface to malfunction
     virtual bool flow_control_disable_supported(){return false;}
     virtual CFlowStatParser *get_flow_stat_parser();
-    virtual int set_rcv_all(CPhyEthIF * _if, bool set_on);
+
+    virtual int set_rcv_all(CPhyEthIF * _if, bool set_on){
+        return(m_filter_manager.set_rcv_all(_if->get_repid(),set_on));
+    }
+
+    virtual int configure_rx_filter_rules(CPhyEthIF * _if){
+        return(m_filter_manager.configure_rx_filter_rules(_if->get_repid()));
+    }
 
 private:
-    virtual void add_del_rules(enum rte_filter_op op, repid_t  repid, uint16_t type, uint16_t ip_id, uint8_t l4_proto
-                               , int queue);
-    virtual int add_del_rx_filter_rules(CPhyEthIF * _if, bool set_on);
+    CDpdkFilterManager  m_filter_manager;
 };
 
 
@@ -7901,6 +8330,7 @@ void CTRexExtendedDriverMlnx4::update_configuration(port_cfg_t * cfg) {
 /////////////////////////////////////////////////////////////////////
 /* MLX5 */
 
+
 void CTRexExtendedDriverBaseMlnx5G::clear_extended_stats(CPhyEthIF * _if){
     repid_t repid=_if->get_repid();
 
@@ -7914,113 +8344,18 @@ void CTRexExtendedDriverBaseMlnx5G::update_configuration(port_cfg_t * cfg){
     cfg->m_port_conf.fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
     cfg->m_port_conf.fdir_conf.pballoc = RTE_FDIR_PBALLOC_64K;
     cfg->m_port_conf.fdir_conf.status = RTE_FDIR_NO_REPORT_STATUS;
+
+    
     /* update mask */
-    cfg->m_port_conf.fdir_conf.mask.ipv4_mask.proto=0xff;
-    cfg->m_port_conf.fdir_conf.mask.ipv4_mask.tos=0x01;
-    cfg->m_port_conf.fdir_conf.mask.ipv6_mask.proto=0xff;
-    cfg->m_port_conf.fdir_conf.mask.ipv6_mask.tc=0x01;
+    //cfg->m_port_conf.fdir_conf.mask.ipv4_mask.proto=0xff;
+    //cfg->m_port_conf.fdir_conf.mask.ipv4_mask.tos=0x01;
+    //cfg->m_port_conf.fdir_conf.mask.ipv6_mask.proto=0xff;
+    //cfg->m_port_conf.fdir_conf.mask.ipv6_mask.tc=0x01;
 
     /* enable RSS */
-    cfg->m_port_conf.rxmode.mq_mode =ETH_MQ_RX_RSS;
+    //cfg->m_port_conf.rxmode.mq_mode =ETH_MQ_RX_RSS;
     // This field does not do anything in case of mlx driver. Put it anyway in case it will be supported sometime.
-    cfg->m_port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
-}
-
-/*
-   In case of MLX5 driver, the rule is not really added according to givern parameters.
-   ip_id == 1 means add rule on TOS (or traffic_class) field.
-   ip_id == 2 means add rule to receive all packets.
- */
-void CTRexExtendedDriverBaseMlnx5G::add_del_rules(enum rte_filter_op op, repid_t  repid, uint16_t type,
-                                                  uint16_t ip_id, uint8_t l4_proto, int queue) {
-    int ret = rte_eth_dev_filter_supported(repid, RTE_ETH_FILTER_FDIR);
-    static int filter_soft_id = 0;
-
-    if ( ret != 0 ) {
-        rte_exit(EXIT_FAILURE, "rte_eth_dev_filter_supported err=%d, port=%u \n", ret, repid);
-    }
-
-    struct rte_eth_fdir_filter filter;
-
-    memset(&filter,0,sizeof(struct rte_eth_fdir_filter));
-
-#if 0
-    printf("MLNX add_del_rules::%s rules: port:%d type:%d ip_id:%x l4:%d q:%d\n"
-           , (op == RTE_ETH_FILTER_ADD) ?  "add" : "del"
-           , port_id, type, ip_id, l4_proto, queue);
-#endif
-
-    filter.action.rx_queue = queue;
-    filter.action.behavior = RTE_ETH_FDIR_ACCEPT;
-    filter.action.report_status = RTE_ETH_FDIR_NO_REPORT_STATUS;
-    filter.soft_id = filter_soft_id++;
-    filter.input.flow_type = type;
-
-    switch (type) {
-    case RTE_ETH_FLOW_NONFRAG_IPV4_UDP:
-    case RTE_ETH_FLOW_NONFRAG_IPV4_TCP:
-    case RTE_ETH_FLOW_NONFRAG_IPV4_SCTP:
-    case RTE_ETH_FLOW_NONFRAG_IPV4_OTHER:
-        filter.input.flow.ip4_flow.ip_id = ip_id;
-        if (l4_proto != 0)
-            filter.input.flow.ip4_flow.proto = l4_proto;
-        break;
-    case RTE_ETH_FLOW_NONFRAG_IPV6_UDP:
-    case RTE_ETH_FLOW_NONFRAG_IPV6_TCP:
-    case RTE_ETH_FLOW_NONFRAG_IPV6_OTHER:
-        filter.input.flow.ipv6_flow.flow_label = ip_id;
-        filter.input.flow.ipv6_flow.proto = l4_proto;
-        break;
-    }
-
-    ret = rte_eth_dev_filter_ctrl(repid, RTE_ETH_FILTER_FDIR, op, (void*)&filter);
-    if ( ret != 0 ) {
-        if (((op == RTE_ETH_FILTER_ADD) && (ret == -EEXIST)) || ((op == RTE_ETH_FILTER_DELETE) && (ret == -ENOENT)))
-            return;
-
-        rte_exit(EXIT_FAILURE, "rte_eth_dev_filter_ctrl: err=%d, port=%u\n",
-                 ret, repid);
-    }
-}
-
-int CTRexExtendedDriverBaseMlnx5G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
-    repid_t repid=_if->get_repid();
-
-    if (set_on) {
-        add_del_rx_filter_rules(_if, false);
-        add_del_rules(RTE_ETH_FILTER_ADD, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 2, 17, MAIN_DPDK_RX_Q);
-    } else {
-        add_del_rules(RTE_ETH_FILTER_DELETE, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 2, 17, MAIN_DPDK_RX_Q);
-        add_del_rx_filter_rules(_if, true);
-    }
-    return 0;
-}
-
-int CTRexExtendedDriverBaseMlnx5G::add_del_rx_filter_rules(CPhyEthIF * _if, bool set_on) {
-    repid_t repid=_if->get_repid();
-    enum rte_filter_op op;
-
-    if (set_on) {
-        op = RTE_ETH_FILTER_ADD;
-    } else {
-        op = RTE_ETH_FILTER_DELETE;
-    }
-
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 1, 17, MAIN_DPDK_RX_Q);
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV4_TCP, 1, 6, MAIN_DPDK_RX_Q);
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV4_OTHER, 1, 1, MAIN_DPDK_RX_Q);  /*ICMP*/
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV4_OTHER, 1, 132, MAIN_DPDK_RX_Q);  /*SCTP*/
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV6_UDP, 1, 17, MAIN_DPDK_RX_Q);
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV6_TCP, 1, 6, MAIN_DPDK_RX_Q);
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV6_OTHER, 1, 1, MAIN_DPDK_RX_Q);  /*ICMP*/
-    add_del_rules(op, repid, RTE_ETH_FLOW_NONFRAG_IPV6_OTHER, 1, 132, MAIN_DPDK_RX_Q);  /*SCTP*/
-
-    return 0;
-}
-
-int CTRexExtendedDriverBaseMlnx5G::configure_rx_filter_rules(CPhyEthIF * _if) {
-    set_rcv_all(_if, false);
-    return add_del_rx_filter_rules(_if, true);
+    //cfg->m_port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 }
 
 void CTRexExtendedDriverBaseMlnx5G::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len) {
