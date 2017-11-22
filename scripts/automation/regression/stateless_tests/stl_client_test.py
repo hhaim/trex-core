@@ -53,9 +53,9 @@ class STLClient_Test(CStlGeneral_Test):
         self.drv_name = drv_name
 
         # due to defect trex-325 
-        if  self.drv_name == 'net_mlx5':
-            print("WARNING disable strict due to trex-325 on mlx5")
-            self.strict = False
+        #if  self.drv_name == 'net_mlx5':
+        #    print("WARNING disable strict due to trex-325 on mlx5")
+        #    self.strict = False
 
 
         self.pkt = STLPktBuilder(pkt = Ether()/IP(src="16.0.0.1",dst="48.0.0.1")/UDP(dport=12,sport=1025)/IP()/'a_payload_example')
