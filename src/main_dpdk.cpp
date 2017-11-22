@@ -596,10 +596,11 @@ class CTRexExtendedDriverBaseMlnx5G : public CTRexExtendedDriverBase {
 public:
     CTRexExtendedDriverBaseMlnx5G(){
 
-        if (get_is_tcp_mode()) { /* PATCH for trex-481, move the device to software mode in case of TCP, 
-                                   better to have less accurate latency than errors of out-of-order  */
+        if (get_is_tcp_mode()) { 
+            /* PATCH for trex-481, move the device to software mode in case of TCP, 
+              better to have less accurate latency than errors of out-of-order  */
             CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_ONE_QUEUE);
-            m_cap = /*TREX_DRV_CAP_DROP_Q  | TREX_DRV_CAP_MAC_ADDR_CHG */0;
+            m_cap = 0 /* TREX_DRV_CAP_DROP_Q  | TREX_DRV_CAP_MAC_ADDR_CHG | TREX_DRV_DEFAULT_RSS_ON_RX_QUEUES*/ ;
         }else{
             m_cap = TREX_DRV_CAP_DROP_Q | TREX_DRV_CAP_MAC_ADDR_CHG;
         }
@@ -7902,7 +7903,6 @@ void CTRexExtendedDriverMlnx4::update_configuration(port_cfg_t * cfg) {
 
 void CTRexExtendedDriverBaseMlnx5G::clear_extended_stats(CPhyEthIF * _if){
     repid_t repid=_if->get_repid();
-
     rte_eth_stats_reset(repid);
 }
 
@@ -7913,18 +7913,6 @@ void CTRexExtendedDriverBaseMlnx5G::update_configuration(port_cfg_t * cfg){
     cfg->m_port_conf.fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
     cfg->m_port_conf.fdir_conf.pballoc = RTE_FDIR_PBALLOC_64K;
     cfg->m_port_conf.fdir_conf.status = RTE_FDIR_NO_REPORT_STATUS;
-
-    
-    /* update mask */
-    //cfg->m_port_conf.fdir_conf.mask.ipv4_mask.proto=0xff;
-    //cfg->m_port_conf.fdir_conf.mask.ipv4_mask.tos=0x01;
-    //cfg->m_port_conf.fdir_conf.mask.ipv6_mask.proto=0xff;
-    //cfg->m_port_conf.fdir_conf.mask.ipv6_mask.tc=0x01;
-
-    /* enable RSS */
-    //cfg->m_port_conf.rxmode.mq_mode =ETH_MQ_RX_RSS;
-    // This field does not do anything in case of mlx driver. Put it anyway in case it will be supported sometime.
-    //cfg->m_port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 }
 
 void CTRexExtendedDriverBaseMlnx5G::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len) {
