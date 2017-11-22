@@ -374,6 +374,7 @@ main_src = SrcGroup(dir='src',
              'bp_sim_stf.cpp',
              'utl_sync_barrier.cpp',
              'trex_build_info.cpp',
+             'dpdk_drv_filter.cpp'
              ]);
 
 cmn_src = SrcGroup(dir='src/common',
