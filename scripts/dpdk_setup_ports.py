@@ -470,11 +470,11 @@ Other network devices
 
 
     def verify_ofed_os(self):
-        err_msg = 'Warning: Mellanox NICs where tested only with RedHat/CentOS 7.3\n'
+        err_msg = 'Warning: Mellanox NICs where tested only with RedHat/CentOS 7.4\n'
         err_msg += 'Correct usage with other Linux distributions is not guaranteed.'
         try:
             dist = platform.dist()
-            if dist[0] not in ('redhat', 'centos') or not dist[1].startswith('7.3'):
+            if dist[0] not in ('redhat', 'centos') or not dist[1].startswith('7.4'):
                 print(err_msg)
         except Exception as e:
             print('Error while determining OS type: %s' % e)
