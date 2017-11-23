@@ -68,9 +68,10 @@ test_rx_check_sfr: &rx_sfr
     rx_sample_rate      : 128
     bw_per_core         : 20.871
 
-test_rx_check_sfr_ipv6:
-    <<                  : *rx_sfr
-    bw_per_core         : 19.198
+# disable due to trex-504
+#test_rx_check_sfr_ipv6:
+#    <<                  : *rx_sfr
+#    bw_per_core         : 19.198
 
 
 ### stateless ###
