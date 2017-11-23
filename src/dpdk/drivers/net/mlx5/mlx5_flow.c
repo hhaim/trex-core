@@ -1454,9 +1454,11 @@ mlx5_flow_create_ipv6(const struct rte_flow_item *item,
 		       RTE_DIM(ipv6.mask.src_ip));
 		memcpy(&ipv6.mask.dst_ip, mask->hdr.dst_addr,
 		       RTE_DIM(ipv6.mask.dst_ip));
-		ipv6.mask.flow_label = mask->hdr.vtc_flow;
+		ipv6.mask.flow_label = (mask->hdr.vtc_flow & 0xfffff);
 		ipv6.mask.next_hdr = mask->hdr.proto;
 		ipv6.mask.hop_limit = mask->hdr.hop_limits;
+        ipv6.mask.flow_label = mask->hdr.vtc_flow;
+        ipv6.mask.traffic_class = (uint8_t)(mask->hdr.vtc_flow>>20);
 		/* Remove unwanted bits from values. */
 		for (i = 0; i < RTE_DIM(ipv6.val.src_ip); ++i) {
 			ipv6.val.src_ip[i] &= ipv6.mask.src_ip[i];
@@ -1465,6 +1467,8 @@ mlx5_flow_create_ipv6(const struct rte_flow_item *item,
 		ipv6.val.flow_label &= ipv6.mask.flow_label;
 		ipv6.val.next_hdr &= ipv6.mask.next_hdr;
 		ipv6.val.hop_limit &= ipv6.mask.hop_limit;
+        ipv6.val.traffic_class = (spec->hdr.vtc_flow>>20);
+        ipv6.val.traffic_class &= ipv6.mask.traffic_class;
 	}
 	mlx5_flow_create_copy(parser, &ipv6, ipv6_size);
 	return 0;
