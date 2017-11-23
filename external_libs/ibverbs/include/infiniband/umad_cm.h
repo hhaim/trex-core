@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2005 Intel Corporation.  All rights reserved.
+ * Copyright (c) 2010 Intel Corporation.  All rights reserved.
+ * Copyright (c) 2014 Mellanox Technologies LTD. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -30,36 +31,37 @@
  * SOFTWARE.
  */
 
-#ifndef INFINIBAND_MARSHALL_H
-#define INFINIBAND_MARSHALL_H
+#ifndef _UMAD_CM_H
+#define _UMAD_CM_H
 
-#include <infiniband/verbs.h>
-#include <infiniband/sa.h>
-#include <infiniband/kern-abi.h>
-#include <infiniband/sa-kern-abi.h>
+#include <infiniband/umad_types.h>
 
 #ifdef __cplusplus
 #  define BEGIN_C_DECLS extern "C" {
 #  define END_C_DECLS   }
-#else /* !__cplusplus */
+#else				/* !__cplusplus */
 #  define BEGIN_C_DECLS
 #  define END_C_DECLS
-#endif /* __cplusplus */
+#endif				/* __cplusplus */
 
 BEGIN_C_DECLS
 
-void ibv_copy_qp_attr_from_kern(struct ibv_qp_attr *dst,
-				struct ibv_kern_qp_attr *src);
-
-void ibv_copy_ah_attr_from_kern(struct ibv_ah_attr *dst,
-				struct ibv_kern_ah_attr *src);
-
-void ibv_copy_path_rec_from_kern(struct ibv_sa_path_rec *dst,
-				 struct ibv_kern_path_rec *src);
-
-void ibv_copy_path_rec_to_kern(struct ibv_kern_path_rec *dst,
-			       struct ibv_sa_path_rec *src);
+/* Communication management attributes */
+enum {
+	UMAD_CM_ATTR_REQ		= 0x0010,
+	UMAD_CM_ATTR_MRA		= 0x0011,
+	UMAD_CM_ATTR_REJ		= 0x0012,
+	UMAD_CM_ATTR_REP		= 0x0013,
+	UMAD_CM_ATTR_RTU		= 0x0014,
+	UMAD_CM_ATTR_DREQ		= 0x0015,
+	UMAD_CM_ATTR_DREP		= 0x0016,
+	UMAD_CM_ATTR_SIDR_REQ		= 0x0017,
+	UMAD_CM_ATTR_SIDR_REP		= 0x0018,
+	UMAD_CM_ATTR_LAP		= 0x0019,
+	UMAD_CM_ATTR_APR		= 0x001A,
+	UMAD_CM_ATTR_SAP		= 0x001B,
+	UMAD_CM_ATTR_SPR		= 0x001C,
+};
 
 END_C_DECLS
-
-#endif /* INFINIBAND_MARSHALL_H */
+#endif				/* _UMAD_CM_H */

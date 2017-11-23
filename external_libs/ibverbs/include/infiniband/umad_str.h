@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2004, 2005, 2010 Intel Corporation.  All rights reserved.
+ * Copyright (c) 2013 Lawrence Livermore National Security. All rights reserved.
+ *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
  * General Public License (GPL) Version 2, available from the file
@@ -26,16 +29,29 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
  */
+#ifndef _UMAD_STR_H
+#define _UMAD_STR_H
 
-#ifndef INFINIBAND_SA_KERN_ABI_H
-#define INFINIBAND_SA_KERN_ABI_H
+#include <infiniband/umad.h>
 
-#warning "This header is obsolete, use rdma/ib_user_sa.h instead"
+#ifdef __cplusplus
+#  define BEGIN_C_DECLS extern "C" {
+#  define END_C_DECLS   }
+#else				/* !__cplusplus */
+#  define BEGIN_C_DECLS
+#  define END_C_DECLS
+#endif				/* __cplusplus */
 
-#include <rdma/ib_user_sa.h>
+BEGIN_C_DECLS
 
-#define ib_kern_path_rec ib_user_path_rec
-#define ibv_kern_path_rec ib_user_path_rec
+const char * umad_class_str(uint8_t mgmt_class);
+const char * umad_method_str(uint8_t mgmt_class, uint8_t method);
+const char * umad_attribute_str(uint8_t mgmt_class, __be16 attr_id);
 
-#endif
+const char * umad_common_mad_status_str(__be16 status);
+const char * umad_sa_mad_status_str(__be16 status);
+
+END_C_DECLS
+#endif /* _UMAD_STR_H */
