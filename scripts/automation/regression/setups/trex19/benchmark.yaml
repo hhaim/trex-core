@@ -45,11 +45,11 @@ test_static_routing_imix_asymmetric:
     cores               : 13
     bw_per_core         : 50.561
 
-
-test_ipv6_simple:
-    multiplier          : 50
-    cores               : 13
-    bw_per_core         : 19.5
+# disable due to trex-504
+#test_ipv6_simple:
+#    multiplier          : 50
+#    cores               : 13
+#    bw_per_core         : 19.5
 
 
 test_rx_check_http: &rx_http
