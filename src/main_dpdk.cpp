@@ -245,6 +245,12 @@ public:
         p.rx_mbuf_type = MBUF_2048;
     }
 
+    uint16_t get_number_of_drop_queues(){
+        CTrexDpdkParams p;
+        get_dpdk_drv_params(p) ;
+        return (p.rx_drop_q_num);
+    }
+
 protected:
     // flags describing interface capabilities
     uint32_t m_cap;
@@ -524,6 +530,20 @@ public:
     virtual int verify_fw_ver(tvpid_t   tvpid);
     virtual CFlowStatParser *get_flow_stat_parser();
     virtual int set_rcv_all(CPhyEthIF * _if, bool set_on);
+
+    virtual void get_dpdk_drv_params(CTrexDpdkParams &p){
+        CTRexExtendedDriverBase::get_dpdk_drv_params(p);
+
+        if ( !get_is_tcp_mode()){
+            /*  configure a few drop queue */ 
+            if ( CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_NORMAL ){
+                p.rx_drop_q_num = 3;
+            }
+        }
+    }
+
+
+
 
 private:
     virtual void add_del_rules(enum rte_filter_op op, repid_t  repid, uint16_t type, uint8_t ttl
@@ -1962,9 +1982,22 @@ void CPhyEthIF::stop_rx_drop_queue() {
             exit(1);
         }
     }
-    // OK to only stop MAIN_DPDK_DROP_Q here. The only driver in which there are
-    // more than 1 drop q is Mellanox. stop_queue does not work in this case anyway.
-    get_ex_drv()->stop_queue(this, MAIN_DPDK_DROP_Q);
+    CTRexExtendedDriverBase * drv=get_ex_drv();
+    uint16_t drop_queues = drv->get_number_of_drop_queues();
+    assert(drop_queues>0);
+
+    if (drop_queues==1){
+        // OK to only stop MAIN_DPDK_DROP_Q here. The only driver in which there are
+        // more than 1 drop q is Mellanox. stop_queue does not work in this case anyway.
+        drv->stop_queue(this, MAIN_DPDK_DROP_Q);
+    }else{
+        int i;
+        for (i=0; i<drop_queues+1; i++) {
+            if (i!=MAIN_DPDK_RX_Q) {
+                drv->stop_queue(this, i);
+            }
+        }
+    }
 }
 
 
