@@ -7827,6 +7827,7 @@ i40e_pf_config_rss(struct i40e_pf *pf)
 		return -ENOTSUP;
 	}
 
+    #ifndef TREX_PATCH
 	for (i = 0, j = 0; i < hw->func_caps.rss_table_size; i++, j++) {
 		if (j == num)
 			j = 0;
@@ -7835,6 +7836,7 @@ i40e_pf_config_rss(struct i40e_pf *pf)
 		if ((i & 3) == 3)
 			I40E_WRITE_REG(hw, I40E_PFQF_HLUT(i >> 2), lut);
 	}
+    #endif
 
 	rss_conf = pf->dev_data->dev_conf.rx_adv_conf.rss_conf;
 	if ((rss_conf.rss_hf & pf->adapter->flow_types_mask) == 0) {
