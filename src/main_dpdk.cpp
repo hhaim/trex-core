@@ -7578,7 +7578,7 @@ void CTRexExtendedDriverBase40G::update_configuration(port_cfg_t * cfg){
     cfg->m_port_conf.fdir_conf.pballoc = RTE_FDIR_PBALLOC_64K;
     cfg->m_port_conf.fdir_conf.status = RTE_FDIR_NO_REPORT_STATUS;
     cfg->m_port_conf.rxmode.mq_mode =ETH_MQ_RX_RSS;
-    cfg->m_port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP |ETH_RSS_TCP;
+    cfg->m_port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_PROTO_MASK;
 }
 
 // What is the type of the rule the respective hw_id counter counts.
