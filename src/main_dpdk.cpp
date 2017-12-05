@@ -147,13 +147,13 @@ static char g_image_postfix[10];
 static CPciPorts port_map;
 #define TREX_NAME "_t-rex-64"
 
-static uint16_t all_eth_types[]  = {
+/*static uint16_t all_eth_types[]  = {
     0x0800, 0x0806, 0x0842, 0x22F3, 0x22EA, 0x6003, 0x8035, 0x809B, 0x80F3, 0x8100,
     0x8137, 0x8204, 0x86DD, 0x8808, 0x8809, 0x8819, 0x8847, 0x8848, 0x8863, 0x8864,
     0x886D, 0x8870, 0x887B, 0x888E, 0x8892, 0x889A, 0x88A2, 0x88A4, 0x88A8, 0x88AB,
     0x88B8, 0x88B9, 0x88BA, 0x88CC, 0x88CD, 0x88DC, 0x88E1, 0x88E3, 0x88E5, 0x88E7,
     0x88F7, 0x88FB, 0x8902, 0x8906, 0x8914, 0x8915, 0x891D, 0x892F, 0x9000, 0x9100,
-};
+};*/
 
 class CTRexExtendedDriverBase {
 protected:
@@ -7594,6 +7594,8 @@ static struct fdir_hw_id_params_t fdir_hw_id_rule_params[512];
 // So, the rule will apply if packet has either the correct ttl or IP ID, depending if we are in statfull or stateless.
 void CTRexExtendedDriverBase40G::add_del_rules(enum rte_filter_op op, repid_t  repid, uint16_t type, uint8_t ttl
                                                , uint16_t ip_id, uint8_t l4_proto, int queue, uint16_t stat_idx) {
+    #if 0
+    
     int ret=rte_eth_dev_filter_supported(repid, RTE_ETH_FILTER_FDIR);
     static int filter_soft_id = 0;
 
@@ -7653,9 +7655,11 @@ void CTRexExtendedDriverBase40G::add_del_rules(enum rte_filter_op op, repid_t  r
                  ret, repid);
     }
 #endif
+#endif
 }
 
 int CTRexExtendedDriverBase40G::add_del_eth_type_rule(repid_t  repid, enum rte_filter_op op, uint16_t eth_type) {
+    #if 0
     int ret;
     struct rte_eth_ethertype_filter filter;
 
@@ -7666,6 +7670,8 @@ int CTRexExtendedDriverBase40G::add_del_eth_type_rule(repid_t  repid, enum rte_f
     ret = rte_eth_dev_filter_ctrl(repid, RTE_ETH_FILTER_ETHERTYPE, op, (void *) &filter);
 
     return ret;
+    #endif
+    return (0);
 }
 
 
@@ -7749,6 +7755,7 @@ int CTRexExtendedDriverBase40G::configure_rx_filter_rules(CPhyEthIF * _if) {
     repid_t repid=_if->get_repid();
 
     if (get_is_stateless()) {
+        #if 0
         i40e_trex_fdir_reg_init(repid, I40E_TREX_INIT_STL);
 
         add_del_rules(RTE_ETH_FILTER_ADD, repid, RTE_ETH_FLOW_NONFRAG_IPV4_UDP, 0
@@ -7765,6 +7772,7 @@ int CTRexExtendedDriverBase40G::configure_rx_filter_rules(CPhyEthIF * _if) {
                       , FLOW_STAT_PAYLOAD_IP_ID, 0, MAIN_DPDK_RX_Q, FDIR_PAYLOAD_RULES_HW_ID);
 
         rte_eth_fdir_stats_reset(repid, NULL, FDIR_TEMP_HW_ID, 1);
+        #endif
         return 0; // Other rules are configured dynamically in stateless
     } else {
         i40e_trex_fdir_reg_init(repid, I40E_TREX_INIT_STF);
@@ -7894,7 +7902,7 @@ CFlowStatParser *CTRexExtendedDriverBase40G::get_flow_stat_parser() {
 }
 
 int CTRexExtendedDriverBase40G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
-
+#if 0
     repid_t repid=_if->get_repid();
 
     enum rte_filter_op op = set_on ? RTE_ETH_FILTER_ADD : RTE_ETH_FILTER_DELETE;
@@ -7921,6 +7929,7 @@ int CTRexExtendedDriverBase40G::set_rcv_all(CPhyEthIF * _if, bool set_on) {
         configure_rx_filter_rules(_if);
     }
 
+#endif
     return 0;
 }
 
