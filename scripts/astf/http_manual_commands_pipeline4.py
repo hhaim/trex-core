@@ -30,11 +30,11 @@ class Prof1():
         self.tcp_reset = False
 
         # IP used in packet headers.
-        self.p1_src_start_ip = '172.16.0.2'
-        self.p1_src_end_ip = '172.16.0.33'
+        self.p1_src_start_ip = '16.0.0.1'
+        self.p1_src_end_ip = '16.0.0.10'
 
-        self.p1_dst_start_ip = '192.168.0.1'
-        self.p1_dst_end_ip = '192.168.0.1'
+        self.p1_dst_start_ip = '48.0.0.1'
+        self.p1_dst_end_ip = '48.0.0.10'
 
         self.http_req = (b'GET /0KB.bin HTTP/1.1\r\n'
                           'Host: {host}\r\n'
@@ -63,18 +63,18 @@ class Prof1():
         prog_c.set_label("a:");
         prog_c.send(self.http_req)
         prog_c.delay_rand(10, 50);
-        prog_c.recv((len(self.http_res)),True )
+        prog_c.recv((len(self.http_res)),True)
         prog_c.jmp_nz("i", "a:")
         if self.tcp_reset:
             prog_c.reset()
 
         prog_s = ASTFProgram()
-        prog_s.set_var("j", self.transaction_per_conn);
-        prog_s.set_label("b:");
+        prog_s.set_var("i", self.transaction_per_conn);
+        prog_s.set_label("a:");
         prog_s.recv((len(self.http_req)),True)
-        prog_s.delay_rand(10000, 50000);
+        prog_s.delay_rand(10, 50);
         prog_s.send(self.http_res )
-        prog_s.jmp_nz("j", "b:")
+        prog_s.jmp_nz("i", "a:")
 
         # ip generator
         ip_gen_c = ASTFIPGenDist(ip_range=[self.p1_src_start_ip,
