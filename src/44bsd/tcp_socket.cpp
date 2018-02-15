@@ -331,7 +331,7 @@ void CTcpApp::process_cmd(CTcpAppCmd * cmd){
             uint32_t  flags = cmd->u.m_rx_cmd.m_flags;
             /* clear rx counter */
             if (flags & CTcpAppCmdRxBuffer::rxcmd_CLEAR) {
-                m_cmd_rx_bytes =0;
+                set_rx_clear(true);
             }
             /* disable rx thread if needed */
             set_rx_disabled((flags & CTcpAppCmdRxBuffer::rxcmd_DISABLE_RX)?true:false);
