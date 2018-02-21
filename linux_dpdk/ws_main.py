@@ -609,6 +609,10 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                  #virtio
                  'drivers/net/virtio/virtio_rxtx_simple_sse.c',
 
+                 #vmxnet3
+                 'drivers/net/vmxnet3/vmxnet3_ethdev.c',
+                 'drivers/net/vmxnet3/vmxnet3_rxtx.c',
+
                  #libs
                  'lib/librte_eal/common/arch/x86/rte_cpuflags.c',
                  'lib/librte_eal/common/arch/x86/rte_spinlock.c',
