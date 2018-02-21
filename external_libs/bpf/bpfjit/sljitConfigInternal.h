@@ -393,7 +393,9 @@ typedef double sljit_f64;
 #ifndef SLJIT_W
 
 /* Defining long constants. */
-#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
+#if (defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED)
+#define SLJIT_W(w)	(w##l)
+#elif (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
 #define SLJIT_W(w)	(w##ll)
 #else
 #define SLJIT_W(w)	(w)
@@ -565,11 +567,11 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void* ptr);
 #elif (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 
 #ifndef _WIN64
-#define SLJIT_NUMBER_OF_REGISTERS 12
+#define SLJIT_NUMBER_OF_REGISTERS 13
 #define SLJIT_NUMBER_OF_SAVED_REGISTERS 6
 #define SLJIT_LOCALS_OFFSET_BASE 0
 #else
-#define SLJIT_NUMBER_OF_REGISTERS 12
+#define SLJIT_NUMBER_OF_REGISTERS 13
 #define SLJIT_NUMBER_OF_SAVED_REGISTERS 8
 #define SLJIT_LOCALS_OFFSET_BASE (compiler->locals_offset)
 #endif /* _WIN64 */
