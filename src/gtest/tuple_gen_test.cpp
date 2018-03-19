@@ -676,6 +676,7 @@ TEST(tuple_gen_yaml,yam_is_valid) {
 TEST(tuple_gen,astf_mode1) {
     CTupleGeneratorSmart gen;
     gen.Create(1, 1);
+    gen.set_astf_rss_mode(1,3);
     gen.add_client_pool(cdSEQ_DIST,0x10000001,0x10000001,64000,g_dummy,0,0);
     gen.add_server_pool(cdSEQ_DIST,0x30000001,0x400000ff,64000,false);
     CTupleTemplateGeneratorSmart template_1;
@@ -683,11 +684,22 @@ TEST(tuple_gen,astf_mode1) {
 
     CTupleBase result;
     int i;
+    uint16_t golden[]={ 0x937a ,
+                         0x9386, 
+                         0x9326, 
+                         0x93e6, 
+                         0x9356, 
+                         0x93b6, 
+                         0x930e, 
+                         0x93ce, 
+                         0x936e, 
+                         0x939e};
+
     for (i=0; i<10; i++) {
         template_1.GenerateTuple(result);
-        printf(" %x: %x \n",result.getClient(),result.getClientPort());
+        EXPECT_EQ(result.getClient(),0x10000001);
+        EXPECT_EQ(result.getClientPort(),golden[i]);
     }
-
     template_1.Delete();
     gen.Delete();
 }
