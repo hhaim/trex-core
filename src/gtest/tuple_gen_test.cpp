@@ -673,6 +673,25 @@ TEST(tuple_gen_yaml,yam_is_valid) {
 
 
 
+TEST(tuple_gen,astf_mode1) {
+    CTupleGeneratorSmart gen;
+    gen.Create(1, 1);
+    gen.add_client_pool(cdSEQ_DIST,0x10000001,0x10000001,64000,g_dummy,0,0);
+    gen.add_server_pool(cdSEQ_DIST,0x30000001,0x400000ff,64000,false);
+    CTupleTemplateGeneratorSmart template_1;
+    template_1.Create(&gen,0,0);
+
+    CTupleBase result;
+    int i;
+    for (i=0; i<10; i++) {
+        template_1.GenerateTuple(result);
+        printf(" %x: %x \n",result.getClient(),result.getClientPort());
+    }
+
+    template_1.Delete();
+    gen.Delete();
+}
+
 
 
 

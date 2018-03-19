@@ -757,6 +757,9 @@ public:
 private:
     uint32_t m_id;
     uint32_t m_thread_id;
+    uint32_t m_rss_thread_id; /* per port thread id */
+    bool     m_astf_mode;
+
     std::vector<CClientPool*> m_client_pool;
     std::vector<CServerPoolBase*> m_server_pool;
     bool     m_was_init;
