@@ -96,12 +96,6 @@ void CClientPool::Create(IP_DIST_t       dist_value,
     CreateBase(); 
 }
 
-static uint16_t align_lsb(uint16_t val,
-                          uint16_t rss_thread_id,
-                          uint16_t rss_thread_max){
-    val = (val - (val%rss_thread_max)) + rss_thread_id;
-    return(val);
-}
 
 /* base on thread_id and client_index 
   client index would be the same for all thread 
@@ -110,6 +104,7 @@ static uint16_t generate_rand_sport(uint32_t client_index,
                                     uint16_t threadid,
                                     uint16_t rss_thread_id,
                                     uint16_t rss_thread_max,
+                                    uint8_t  reta_mask,
                                     bool     rss_astf_mode){
 
     uint32_t rand  = ((214013*(client_index + 11213*threadid) + 2531011));
@@ -117,7 +112,7 @@ static uint16_t generate_rand_sport(uint32_t client_index,
     uint16_t port = MIN_PORT+(rand16%(MAX_PORT-MIN_PORT))+1;
 
     if (rss_astf_mode) {
-        port = align_lsb(port,rss_thread_id,rss_thread_max);
+        port = rss_align_lsb(port,rss_thread_id,rss_thread_max,reta_mask);
     }
     return (port);
 }
@@ -154,13 +149,14 @@ void CClientPool::configure_client(uint32_t indx){
     uint16_t port = generate_rand_sport(indx,m_thread_id,
                                              m_rss_thread_id,
                                              m_rss_thread_max,
+                                             m_reta_mask,
                                              m_rss_astf_mode);
     CIpInfoBase* lp=m_ip_info[indx];
     lp->set_start_port(port);
     if (m_rss_astf_mode){
-        lp->set_min_port(align_lsb(MIN_PORT,m_rss_thread_id,m_rss_thread_max));
+        lp->set_min_port(rss_align_lsb(MIN_PORT,m_rss_thread_id,m_rss_thread_max,m_reta_mask));
         lp->set_inc_port(m_rss_thread_max);
-        lp->set_sport_reverse_lsb(true);
+        lp->set_sport_reverse_lsb(true,m_reta_mask);
     }
 }
 
@@ -215,7 +211,7 @@ bool CTupleGeneratorSmart::add_client_pool(IP_DIST_t      client_dist,
     CClientPool* pool = new CClientPool();
     pool->set_thread_id((uint16_t)m_thread_id);
     if (m_rss_astf_mode) {
-        pool->set_rss_thread_id(m_rss_thread_id,m_rss_thread_max);
+        pool->set_rss_thread_id(m_rss_thread_id,m_rss_thread_max,m_reta_mask);
     }
     pool->Create(client_dist,
                  min_client,

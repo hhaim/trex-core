@@ -44,6 +44,35 @@ limitations under the License.
 typedef uint16_t  pool_index_t;
 #define CS_MAX_POOLS UINT16_MAX
 
+static inline uint16_t rss_align_lsb(uint16_t val,
+                              uint16_t rss_thread_id,
+                              uint16_t rss_thread_max,
+                              uint8_t reta_mask){
+    /* input to reta table */
+
+    uint16_t hash_input = (val& reta_mask);
+    /* make it align to core id */
+    hash_input = (hash_input - (hash_input%rss_thread_max)) + rss_thread_id;
+    if (hash_input>reta_mask) {
+        hash_input=rss_thread_id;
+    }
+    val = (val & ~((uint16_t)reta_mask)) | hash_input ;
+    return(val);
+
+}
+
+static inline uint8_t reverse_bits8(uint8_t b) {
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
+}
+
+static inline uint16_t rss_reverse_bits_port(uint16_t port){        
+    return ( (port&0xff00) + reverse_bits8(port&0xff));
+}
+
+
 class CTupleBase {
 public:
 
@@ -184,7 +213,7 @@ class CIpInfoBase {
 
         virtual void set_min_port(uint16_t a)=0;
         virtual void set_inc_port(uint16_t a)=0;
-        virtual void set_sport_reverse_lsb(bool enable)=0; /* for RSS */
+        virtual void set_sport_reverse_lsb(bool enable,uint8_t reta_mask)=0; /* for RSS */
 
         virtual void return_all_ports() = 0;
         virtual ClientCfgBase * get_client_cfg(){
@@ -220,7 +249,7 @@ class CIpInfoL : public CIpInfoBase {
         assert(0);
     }
 
-    void set_sport_reverse_lsb(bool enable){
+    void set_sport_reverse_lsb(bool enable,uint8_t reta_mask){
         assert(0);
     }
 
@@ -244,12 +273,6 @@ class CIpInfoL : public CIpInfoBase {
     }
 };
 
-static inline uint8_t reverse_bits8(uint8_t b) {
-   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-   return b;
-}
 
 
 class CIpInfo : public CIpInfoBase {
@@ -258,7 +281,9 @@ class CIpInfo : public CIpInfoBase {
     uint16_t    m_head_port;
     uint16_t    m_port_inc;
     uint16_t    m_min_port;
-    uint16_t    m_reverse_port;
+    uint8_t     m_reverse_port;
+    uint8_t     m_reta_mask;
+
     friend class CClientInfoUT;
 
  private:
@@ -267,7 +292,7 @@ class CIpInfo : public CIpInfoBase {
         if (m_reverse_port==0) {
             return(port);
         }
-        return ( (port&0xff00) + reverse_bits8(port&0xff));
+        return (rss_reverse_bits_port(port));
     }
 
     bool is_port_available(uint16_t port) {
@@ -310,13 +335,27 @@ class CIpInfo : public CIpInfoBase {
                 /*FIXME: need to trigger some alarms?*/
                 return;
             }
-            m_head_port+=m_port_inc;
+            inc_port();
             if (m_head_port>=MAX_PORT) {
                 m_head_port = m_min_port;
             }
         }
     }
 
+    inline void inc_port(){
+        if (m_reverse_port) { /* normal */
+            if (((m_head_port&m_reta_mask)+m_port_inc)>m_reta_mask) {
+              /* there are cases that this need to fix  */
+              m_head_port+=m_port_inc;
+              uint8_t rss_thread_id=(m_min_port&m_reta_mask)%m_port_inc; /* calc the rss_thread_id back */
+              m_head_port = rss_align_lsb(m_head_port,rss_thread_id,m_port_inc,m_reta_mask); /* fixup the port */
+            }else{
+              m_head_port+=m_port_inc;
+            }
+        }else{
+            m_head_port+=m_port_inc;
+        }
+    }
 
  public:
     CIpInfo() {
@@ -331,8 +370,9 @@ class CIpInfo : public CIpInfoBase {
         m_min_port = a;
     }
 
-    void set_sport_reverse_lsb(bool enable){
+    void set_sport_reverse_lsb(bool enable,uint8_t reta_mask){
         m_reverse_port=enable?1:0;
+        m_reta_mask=reta_mask;
     }
 
 
@@ -356,7 +396,7 @@ class CIpInfo : public CIpInfoBase {
 
         m_bitmap_port[m_head_port] = PORT_IN_USE;
         r = m_head_port;
-        m_head_port+=m_port_inc;
+        inc_port();
         if (m_head_port>MAX_PORT) {
             m_head_port = m_min_port;
         }
@@ -579,6 +619,7 @@ public:
         m_thread_id=0;
         m_rss_thread_id=0;
         m_rss_thread_max=0;
+        m_reta_mask=0;
         m_rss_astf_mode=false;
 
     }
@@ -615,10 +656,13 @@ public:
     void set_thread_id(uint16_t thread_id){
         m_thread_id = thread_id;
     }
-    void set_rss_thread_id(uint16_t rss_thread_id,uint16_t rss_thread_max){
+    void set_rss_thread_id(uint16_t rss_thread_id,
+                           uint16_t rss_thread_max,
+                           uint8_t reta_mask){
         m_rss_astf_mode=true;
         m_rss_thread_id  = rss_thread_id;
         m_rss_thread_max = rss_thread_max;
+        m_reta_mask = reta_mask;
     }
 
 public: 
@@ -627,6 +671,7 @@ public:
     uint16_t m_thread_id;
     uint16_t m_rss_thread_id;
     uint16_t m_rss_thread_max;
+    uint8_t  m_reta_mask;
     bool     m_rss_astf_mode;
 
 private:
@@ -784,6 +829,7 @@ public:
         m_was_init=false;
         m_rss_thread_id=0;
         m_rss_thread_max =0;
+        m_reta_mask=0;
         m_rss_astf_mode=false;
     }
 
@@ -791,9 +837,12 @@ public:
 
     void Delete();
 
-    void set_astf_rss_mode(uint16_t rss_thread_id,uint16_t rss_thread_max){
+    void set_astf_rss_mode(uint16_t rss_thread_id,
+                           uint16_t rss_thread_max,
+                           uint8_t  reta_mask){
         m_rss_thread_id = rss_thread_id;
         m_rss_thread_max = rss_thread_max;
+        m_reta_mask  = reta_mask;
         m_rss_astf_mode =true;
     }
 
@@ -848,6 +897,7 @@ private:
                                   dual-1 : 0,1,2,3
                                  */
     uint16_t m_rss_thread_max; /* how many threads per RSS port */
+    uint8_t  m_reta_mask;       /* 0xff or 0x7f */
 
     bool     m_rss_astf_mode;        /* true for ASTF mode */
 
