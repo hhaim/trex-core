@@ -465,6 +465,15 @@ void CEmulApp::process_cmd(CEmulAppCmd * cmd){
             next();
         }
         break;
+    case tcTX_MODE:
+        {
+            m_state=te_NONE;
+            bool none_block=(cmd->u.m_tx_mode.m_flags&CEmulAppCmdTxMode::txcmd_BLOCK_MASK?true:false);
+            set_tx_none_blocking(none_block);
+            next();
+        }
+        break;
+
 
     default:
         assert(0);
@@ -530,7 +539,8 @@ void CEmulApp::do_close(){
 int CEmulApp::on_bh_tx_acked(uint32_t tx_bytes){
     set_interrupt(true);
     uint32_t  add_to_queue;
-    bool is_next=m_q.on_bh_tx_acked(tx_bytes,add_to_queue,true);
+    
+    bool is_next=m_q.on_bh_tx_acked(tx_bytes,add_to_queue,get_tx_mode_none_blocking()?false:true);
     if (add_to_queue) {
         m_api->tx_sbappend(m_flow,add_to_queue);
     }
@@ -765,6 +775,10 @@ void CEmulAppCmd::Dump(FILE *fd){
 
     case tcCLOSE_PKT:
         fprintf(fd," tcCLOSE_PKT \n");
+        break;
+
+    case tcTX_MODE:
+        fprintf(fd," tcTX_MODE : flags : %x  \n",u.m_tx_mode.m_flags);
         break;
 
     default:

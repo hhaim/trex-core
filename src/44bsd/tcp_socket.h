@@ -261,6 +261,8 @@ typedef enum { tcTX_BUFFER             =1,   /* send buffer of   CMbufBuffer */
                tcRX_PKT                =11,  /* check # pkts */
                tcKEEPALIVE             =12,  /* set keep alive */
                tcCLOSE_PKT             =13,  /* close connection for udp */ 
+               tcTX_MODE               =14,  /* TCP send mode, block, none block */ 
+
 
                tcNO_CMD                =255  /* explicit reset */
 } tcp_app_cmd_enum_t;
@@ -269,6 +271,14 @@ typedef enum { tcTX_BUFFER             =1,   /* send buffer of   CMbufBuffer */
 
 typedef uint8_t tcp_app_cmd_t;
 
+
+struct CEmulAppCmdTxMode {
+    enum {
+            txcmd_BLOCK_MASK  = 0x1,
+    };
+
+    uint32_t        m_flags;
+};
 
 
 /* CMD == tcTX_BUFFER*/
@@ -340,6 +350,7 @@ struct CEmulAppCmd {
     tcp_app_cmd_t     m_cmd;
 
     union {
+        CEmulAppCmdTxMode    m_tx_mode;
         CEmulAppCmdTxBuffer  m_tx_cmd;
         CEmulAppCmdRxBuffer  m_rx_cmd;
         CEmulAppCmdDelay     m_delay_cmd;
@@ -525,6 +536,7 @@ public:
 
             taDO_RX_CLEAR       = 0x400,
             taLOG_ENABLE        = 0x800,
+            taTX_MODE_NONE_BLOCK     = 0x1000,
 
     };
 
@@ -585,6 +597,18 @@ public:
         }else{
             m_flags&=(~taDO_RX_CLEAR);
         }
+    }
+
+    void set_tx_none_blocking(bool enable){
+        if (enable){
+            m_flags|=taTX_MODE_NONE_BLOCK;
+        }else{
+            m_flags&=(~taTX_MODE_NONE_BLOCK);
+        }
+    }
+
+    bool get_tx_mode_none_blocking(){
+        return ((m_flags &taTX_MODE_NONE_BLOCK)?true:false);
     }
 
     void set_log_enable(bool enable){
