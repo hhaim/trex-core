@@ -462,6 +462,42 @@ typedef enum { te_NONE     =0,
 
 typedef uint8_t tcp_app_state_t;
 
+class CEmulTxQueue {
+public:
+    CEmulTxQueue(){
+        m_tx_offset=0;
+        m_v_cc=0;
+    }
+
+    /* add buffer to the queue */
+    void add_buffer(CMbufBuffer * b){
+        m_q.push_back(b);
+        m_v_cc+=b->len();
+    }
+
+    void subtract_bytes(uint32_t bytes){
+        assert(m_v_cc>=bytes);
+        m_v_cc-=bytes;
+    }
+
+    void get_by_offset(uint32_t offset,CBufMbufRef & res);
+    
+    bool on_bh_tx_acked(uint32_t tx_bytes,
+                        uint32_t & tx_residue,
+                        bool is_zero
+                        );
+
+private:
+
+    void reset();
+
+private:
+    uint32_t                    m_v_cc; /* number of bytes in the app level queue -> me move bytes to TCP queue */
+    uint32_t                    m_tx_offset; /* offset into the vector */
+    std::vector<CMbufBuffer *>  m_q; /* queue of buffers */
+};
+
+
 
 class CEmulApp  {
 public:
@@ -498,14 +534,11 @@ public:
         m_flow = (CTcpFlow *)0;
         m_ctx =(CTcpPerThreadCtx *)0;
         m_api=(CEmulAppApi *)0;
-        m_tx_active =0;
         m_program =(CEmulAppProgram *)0;
         m_flags=0;
         m_state =te_NONE;
         m_debug_id=0;
         m_cmd_index=0;
-        m_tx_offset=0;
-        m_tx_residue =0;
         m_cmd_rx_bytes=0;
         m_cmd_rx_bytes_wm=0;
         m_vars[0]=0; /* unroll*/
@@ -681,8 +714,7 @@ public:
 public:
 
     void get_by_offset(uint32_t offset,CBufMbufRef & res){
-        assert(m_tx_active);
-        m_tx_active->get_by_offset(m_tx_offset+offset,res);
+        m_q.get_by_offset(offset,res);
     }
 
     /* application events */
@@ -769,7 +801,8 @@ private:
     CTcpFlow *              m_flow;
     CTcpPerThreadCtx *      m_ctx;
     CEmulAppApi *           m_api; 
-    CMbufBuffer *           m_tx_active;
+
+    CEmulTxQueue            m_q;
 
     /* cache line 1 */
     CEmulAppProgram       * m_program;
@@ -779,8 +812,6 @@ private:
     uint8_t                m_debug_id;
 
     uint32_t               m_cmd_index; /* the index of current command */
-    uint32_t               m_tx_offset; /* in case of TX tcTX_BUFFER command, offset into the buffer */
-    uint32_t               m_tx_residue; /* how many bytes we can add to the socket queue */
 
     uint32_t               m_cmd_rx_bytes;
     uint32_t               m_cmd_rx_bytes_wm; /* water mark to check */
