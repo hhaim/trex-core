@@ -20,7 +20,9 @@ limitations under the License.
 */
 
 #include "sim_cs_tcp.h"
-#include "astf/astf_db.h"
+#include <astf/astf_db.h>
+#include <astf/astf_template_db.h>
+
 #include "stt_cp.h"
 
 #define CLIENT_SIDE_PORT        1025
@@ -1017,7 +1019,19 @@ int CClientServerTcp::fill_from_file() {
     CTcpFlow *c_flow;
     CEmulApp *app_c;
 
+
+
     CAstfDbRO * ro_db=CAstfDB::instance()->get_db_ro(0);
+
+    CTupleGeneratorSmart g_gen;
+
+
+    CAstfTemplatesRW * rw_db=CAstfDB::instance()->get_db_template_rw(0, &g_gen,0,1,0);
+
+
+    m_c_ctx.update_tuneables(rw_db->get_c_tuneables());
+    m_s_ctx.update_tuneables(rw_db->get_s_tuneables());
+
     uint16_t dst_port = ro_db->get_dport(0);
     uint16_t src_port = CLIENT_SIDE_PORT;
     if (src_port == dst_port) {

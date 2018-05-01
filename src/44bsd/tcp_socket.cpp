@@ -541,6 +541,7 @@ int CEmulApp::on_bh_tx_acked(uint32_t tx_bytes){
     uint32_t  add_to_queue;
     
     bool is_next=m_q.on_bh_tx_acked(tx_bytes,add_to_queue,get_tx_mode_none_blocking()?false:true);
+
     if (add_to_queue) {
         m_api->tx_sbappend(m_flow,add_to_queue);
     }
