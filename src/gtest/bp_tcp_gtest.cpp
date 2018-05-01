@@ -2779,7 +2779,6 @@ TEST_F(gt_tcp, tst80) {
     for (i=1; i<2048; i++) {
         test_tx_queue(2,2048,2050+i,i);
     }
-
-
 }
+
 

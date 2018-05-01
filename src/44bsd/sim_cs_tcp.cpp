@@ -29,6 +29,80 @@ limitations under the License.
 #define DEFAULT_WIN 32768
 #define DEFAULT_MSS 1460
 
+
+bool CTcpSimShaper::Create(uint32_t queue_size,
+                           double rate_bps,
+                           CClientServerTcp *p,
+                           int dir
+                           ){
+    m_state_on=false;
+    m_max_queue_size=queue_size;
+    m_rate = rate_bps;
+    m_cc =0;
+    m_dir = dir;
+    m_p = p;
+    return (true);
+}
+
+void CTcpSimShaper::Delete(){
+}
+
+void CTcpSimShaper::trigger_next(){
+    bool trigger_next=false;
+    
+
+    if (m_q.size()) {
+        trigger_next=true;
+        if (!m_state_on) {
+            m_state_on=true;
+        }    
+     }else{
+         if (m_state_on) {
+             m_state_on=false;
+         }
+     }
+
+    if (trigger_next) {
+        uint32_t pktlen;
+        double ct=m_p->m_sim.get_time();
+        rte_mbuf_t * m_head=m_q[0];
+        pktlen = m_head->pkt_len;
+
+        m_cc-=pktlen;
+        m_q.erase(m_q.begin());
+        //printf(" [%d] queue_size : %dB (%d)\n",m_dir,m_cc,(int)m_q.size());
+
+        ct += (double)(pktlen+20)/(m_rate/8); /* time to get it out */
+        /* start next event */
+        m_p->m_sim.add_event( new CTcpSimEventTxPkt(m_p,m_head,m_dir,ct) );
+    }
+}
+
+
+void CTcpSimShaper::add_packet(rte_mbuf_t *m){
+
+    uint32_t pktlen = m->pkt_len;
+    if ( (m_cc + pktlen) > m_max_queue_size ){
+        rte_pktmbuf_free(m); /* drop the packet */
+        return;
+    }
+
+    m_cc+=pktlen;
+    //printf(" queue add [%d] queue_size : %d \n",m_dir,m_cc);
+    m_q.push_back(m);
+
+    if (!m_state_on) {
+        trigger_next();
+    }
+}
+
+void CTcpSimShaper::next_packet(){
+    trigger_next();
+}
+
+
+
+
 void  CTcpCtxPcapWrt::write_pcap_mbuf(rte_mbuf_t *m,
                                       double time){
 
@@ -184,6 +258,7 @@ bool CClientServerTcp::compare(std::string exp_dir){
 bool CClientServerTcp::Create(std::string out_dir,
                               std::string pcap_file){
 
+    m_shaper_enable =false;
     m_debug=false;
     m_sim_type=csSIM_NONE;
     m_sim_data=0;
@@ -221,6 +296,10 @@ bool CClientServerTcp::Create(std::string out_dir,
     m_s_ctx.tcp_iss=0x21212121; /* for testing start from the same value */
     m_s_ctx.set_cb(&m_io_debug);
 
+    int i;
+    for (i=0; i<2; i++) {
+        m_shapers[i].Create(100*1024*1024,10*1000*1000,this,i);
+    }
     return(true);
 }
 
@@ -232,8 +311,16 @@ void CClientServerTcp::set_assoc_table(uint16_t port, CEmulAppProgram *prog, CTc
 
 void CClientServerTcp::on_tx(int dir,
                              rte_mbuf_t *m){
+    on_tx_shaper(dir,m); /* start shaping */
+}
 
-    m_tx_diff+=1/1000000.0;  /* to make sure there is no out of order */
+
+void CClientServerTcp::on_tx_transmit(int dir,
+                             rte_mbuf_t *m){
+
+    if (!m_shaper_enable){
+        m_tx_diff+=1/1000000.0;  /* to make sure there is no out of order */
+    }
     double t=m_sim.get_time()+m_tx_diff;
 
     /* write TX side */
@@ -364,6 +451,19 @@ void CClientServerTcp::on_tx(int dir,
     }
 }
 
+
+bool CTcpSimEventTxPkt::on_event(CSimEventDriven *sched,
+                                 bool & reschedule){
+
+    m_p->on_tx_transmit(m_dir,m_pkt);
+    m_p->m_shapers[m_dir].next_packet();
+    return(false);
+}
+
+
+
+
+
 bool CTcpSimEventRx::on_event(CSimEventDriven *sched,
                               bool & reschedule){
     reschedule=false;
@@ -379,6 +479,18 @@ bool CTcpSimEventTimers::on_event(CSimEventDriven *sched,
      m_p->m_s_ctx.timer_w_on_tick();
      return(false);
  }
+
+
+
+
+// goes to shaper first 
+void CClientServerTcp::on_tx_shaper(int dir, rte_mbuf_t *m){
+    if (m_shaper_enable){
+        m_shapers[dir].add_packet(m);
+    }else{
+        on_tx_transmit(dir,m);
+    }
+}
 
 
 void CClientServerTcp::on_rx(int dir,
