@@ -478,8 +478,12 @@ public:
     CEmulTxQueue(){
         m_tx_offset=0;
         m_v_cc=0;
+        m_wnd_div_2=0;
     }
 
+    void set_window_size(uint32_t wnd){
+        m_wnd_div_2 = wnd>>1;
+    }
     /* add buffer to the queue */
     void add_buffer(CMbufBuffer * b){
         m_q.push_back(b);
@@ -503,6 +507,7 @@ private:
     void reset();
 
 private:
+    uint32_t                    m_wnd_div_2; /* the TCP Tx window size */
     uint32_t                    m_v_cc; /* number of bytes in the app level queue -> me move bytes to TCP queue */
     uint32_t                    m_tx_offset; /* offset into the vector */
     std::vector<CMbufBuffer *>  m_q; /* queue of buffers */

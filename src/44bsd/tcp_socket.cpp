@@ -517,6 +517,9 @@ void CEmulApp::start(bool interrupt){
     /* there is at least one command */
     set_interrupt(interrupt);
     assert(m_program->get_size()>0);
+    if (!is_udp_flow()) {
+        m_q.set_window_size(m_api->get_tx_max_space(m_flow));
+    }
     CEmulAppCmd * lpcmd=m_program->get_index(m_cmd_index);
     process_cmd(lpcmd);
     set_interrupt(false);
@@ -941,7 +944,14 @@ bool CEmulTxQueue::on_bh_tx_acked(uint32_t tx_bytes,
     if (is_zero) {
         return(residue?false:true);
     }else{
-        return(m_tx_offset>(sum*3/4)?false:true);
+        if ( (residue==0) || ( (m_v_cc>0)&& (m_v_cc<m_wnd_div_2) )) {
+            /*
+            There is no need to go next (add another buffer) if  v_cc==0 (byte in outer queue), in any case pipeline won't happen and BDP would be larger. 
+            For  example, in case that window> buffer_size. Adding next buffer cost CPU% and better to do it only when there is a need for that.
+            */
+            return true;
+        }
+        return(false);
     }
 }
 
