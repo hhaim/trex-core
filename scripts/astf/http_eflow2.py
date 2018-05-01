@@ -1,14 +1,14 @@
-# Example of elephant flow  using loop of send (in the server side)
-# example of command
-#sudo ./t-rex-64 -f astf/http_eflow.py -m 1 --astf -c 1 -l 1000 -d 1000 -t size=9000,loop=9000000 --cfg cfg/kiwi_dummy.yaml
+# Example of elephant flow using loop of send (in the server side)
+# 
 #
-# size: is in KB for download chuck
-# loops : how many chunks
+#sudo ./t-rex-64 --astf -f astf/http_eflow2.py -m 10 -d 1000 -c 1 -l 1000 -t size=800,loop=100000,win=512,pipe=1
 #
-# for testing one big TCP flow 
-# The config file is with dummy ports to get server independent of the client
-# interfaces    : ["03:00.0","dummy","dummy","03:00.1"]  this way one core is client and another is server 
-
+# size  : is in KB for each chuck in the loop
+# loops : how many chunks to download
+# win   : in KB, the maximum window size. make it big for BDP  
+# pipe  : Don't block on each send, make them in the pipeline should be 1 for maximum performance 
+# mss   : the mss of the traffic 
+#######
 
 from trex_astf_lib.api import *
 
@@ -58,12 +58,12 @@ class Prof1():
         prog_s = ASTFProgram()
         prog_s.recv(len(http_req))
         if pipe:
-          prog_s.set_send_blocking (False)
-        prog_s.set_var("var2",loop-1); # set var 0 to 10 
+          prog_s.set_send_blocking (False)   # configure the state machine to continue to the next send when there is the queue has space 
+        prog_s.set_var("var2",loop-1); # set var to loop-1 (there is another blocking send)
         prog_s.set_label("a:");
         prog_s.send(http_response)
         prog_s.jmp_nz("var2","a:") # dec var "var2". in case it is *not* zero jump a: 
-        prog_s.set_send_blocking (True)
+        prog_s.set_send_blocking (True) # back to blocking mode 
         prog_s.send(http_response)
 
 
@@ -102,6 +102,8 @@ class Prof1():
 
         size = kwargs.get('size',1)
         loop = kwargs.get('loop',10)
+        if loop<2:
+            loop=2
         mss = kwargs.get('mss',0)
         win = kwargs.get('win',32)
         pipe= kwargs.get('pipe',0)
