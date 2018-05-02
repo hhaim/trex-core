@@ -1934,5 +1934,36 @@ We plan to add it in the interactive mode with RPC API.
 
 
 
+=== Appendix
+
+==== Blocking vs non-blocking 
+
+Let's simulate a very long  HTTP download session with `astf-sim` to understand the difference betwean blocking and non-blocking
+
+1. rtt= 10msec
+2. shaper rate is 10mbps (simulate egress shaper of the DUT)
+3. write in chucks of 40KB
+4. max-window = 24K
+
+BDP (10msec*10mbps=12.5KB) but in case of blocking we will wait the RTT time in idle, reducing the maximum throughput.
+
+.Send is block
+[source,bash]
+----
+[bash]>./astf-sim -f astf/http_eflow2.py -o ab_np.pcap -r -v -t win=24,size=40,loop=100,pipe=0 --cmd "shaper-rate=10000,rtt=10000" 
+----
+
+In this case the rate is ~7mbps lower than 10mbps due to idle time.
+
+.Simulate is non-blocking 
+[source,bash]
+----
+[bash]>./astf-sim -f astf/http_eflow2.py -o ab_np.pcap -r -v -t win=24,size=40,loop=100,pipe=1 --cmd "shaper-rate=10000,rtt=10000" 
+----
+
+In this case the rate is 10mbps (maximum expected) full-pipeline 
+
+
+ 
 
 

@@ -96,6 +96,12 @@ void CTcpSimShaper::add_packet(rte_mbuf_t *m){
     }
 }
 
+void CTcpSimShaper::update_config(uint32_t size,double rate){
+    m_max_queue_size=size;
+    m_rate = rate;
+}
+
+
 void CTcpSimShaper::next_packet(){
     trigger_next();
 }
@@ -209,13 +215,33 @@ void CClientServerTcp::set_cfg_ext(CClientServerTcpCfgExt * cfg){
 
 void CClientServerTcp::set_drop_rate(double rate){
     assert(rate<0.99);
-    assert(rate>0.01);
+    assert(rate>0.0001);
     m_drop_ratio=rate;
     if (m_drop_rnd) {
         delete m_drop_rnd;
     }
     m_drop_rnd = new KxuNuBinRand(rate);
 }
+
+
+void CClientServerTcp::set_shaper(uint32_t kbps,uint32_t size){
+    int i;
+    if (kbps==0){
+        m_shaper_enable=false;
+        return;
+    }
+    m_shaper_enable=true;
+    for (i=0; i<2; i++) {
+        m_shapers[i].update_config(size,(double)(kbps*1000));
+    }
+}
+
+
+void CClientServerTcp::set_rtt(uint32_t rtt_usec){
+    m_rtt_sec =(double)rtt_usec/(1000000.0);
+}
+
+
 
 bool CClientServerTcp::is_drop(){
     assert(m_drop_rnd);
@@ -594,8 +620,6 @@ int CClientServerTcp::test2(){
 
     m_s_ctx.m_ft.set_tcp_api(&m_tcp_bh_api_impl_s);
     set_assoc_table(80, prog_s, s_tune);
-
-    m_rtt_sec = 0.05;
 
     m_sim.add_event( new CTcpSimEventTimers(this, (((double)(TCP_TIMER_W_TICK)/((double)TCP_TIMER_W_DIV*1000.0)))));
     m_sim.add_event( new CTcpSimEventStop(1000.0) );
@@ -1070,7 +1094,6 @@ int CClientServerTcp::simple_http_generic(method_program_cb_t cb){
 
     set_assoc_table(80, prog_s, s_tune);
 
-    m_rtt_sec = 0.05;
 
     m_sim.add_event( new CTcpSimEventTimers(this, (((double)(TCP_TIMER_W_TICK)/((double)TCP_TIMER_W_DIV*1000.0)))));
     m_sim.add_event( new CTcpSimEventStop(10000.0) );
@@ -1196,7 +1219,6 @@ int CClientServerTcp::fill_from_file() {
     c_flow->set_app(app_c);
 
     m_s_ctx.m_ft.set_tcp_api(&m_tcp_bh_api_impl_s);
-    m_rtt_sec = 0.05;
 
     m_sim.add_event( new CTcpSimEventTimers(this, (((double)(TCP_TIMER_W_TICK)/((double)TCP_TIMER_W_DIV*1000.0)))));
     m_sim.add_event( new CTcpSimEventStop(1000.0) );

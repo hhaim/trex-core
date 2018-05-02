@@ -2713,7 +2713,7 @@ TEST_F(gt_tcp, tst79) {
     res.Dump(stdout);
 
     is_next=q.on_bh_tx_acked(1500,tx_residue,false);
-    EXPECT_EQ(is_next,true);
+    EXPECT_EQ(is_next,false);
     EXPECT_EQ(tx_residue,0);
 
     b1.Delete();

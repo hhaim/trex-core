@@ -142,6 +142,7 @@ public:
 
     void add_packet(rte_mbuf_t *m);
     void next_packet();
+    void update_config(uint32_t size,double rate);
 
 private:
     void trigger_next();
@@ -332,6 +333,11 @@ private:
 
     void dump_counters();
     bool is_drop();
+
+public:
+    void set_shaper(uint32_t kbps,uint32_t size);
+    void set_rtt(uint32_t rtt_usec);
+
 public:
     bool                    m_shaper_enable;
     std::string             m_out_dir;
@@ -340,10 +346,10 @@ public:
 
     CTcpPerThreadCtx        m_c_ctx;  /* context */
     CTcpPerThreadCtx        m_s_ctx;
-    CAstfDbRO                m_tcp_data_ro;
+    CAstfDbRO               m_tcp_data_ro;
 
-    CEmulAppApiImpl          m_tcp_bh_api_impl_c;
-    CEmulAppApiImpl          m_tcp_bh_api_impl_s;
+    CEmulAppApiImpl         m_tcp_bh_api_impl_c;
+    CEmulAppApiImpl         m_tcp_bh_api_impl_s;
 
     CTcpCtxPcapWrt          m_c_pcap; /* capture to file */
     CTcpCtxPcapWrt          m_s_pcap;
