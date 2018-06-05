@@ -1,9 +1,9 @@
 import os
 from stl_basic_tests import compare_caps
-from trex_astf_lib.trex_astf_client import *   # noqa: ignore=F403
-from trex_astf_lib.trex_astf_exceptions import *   # noqa: ignore=F403
-from trex_astf_lib.cap_handling import *   # noqa: ignore=F403
-from trex_astf_lib.sim import main as sim_main
+from trex.astf.trex_astf_profile import *   # noqa: ignore=F403
+from trex.astf.trex_astf_exceptions import *   # noqa: ignore=F403
+from trex.astf.cap_handling import *   # noqa: ignore=F403
+from trex.astf.sim import main as sim_main
 import functional_general_test
 from nose.plugins.attrib import attr
 
@@ -134,7 +134,7 @@ class CAstfPcap_Test(functional_general_test.CGeneralFunctional_Test):
 
     def handle_one_cap(self, cap_file_name):
         profile = """
-from trex_astf_lib.api import ASTFProfile, ASTFCapInfo, ASTFIPGenDist, ASTFIPGen
+from trex.astf.api import ASTFProfile, ASTFCapInfo, ASTFIPGenDist, ASTFIPGen
 class Prof1():
     def __init__(self):
         pass
