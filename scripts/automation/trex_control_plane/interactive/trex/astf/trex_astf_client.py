@@ -155,7 +155,22 @@ class ASTFClient(TRexClient):
 
     @client_api('command', True)
     def hello (self, filename = None,duration=None,tunables=None):
-        print(" arg {0} {1} {2}".format(filename,duration,tunables));
+
+        self.ctx.logger.pre_cmd("Hello {0} {1} {2} ".format(filename,duration,tunables))
+
+        # capture RPC parameters
+        params = {
+                  'duration'     : duration
+                  }
+
+        rc = self._transmit("start_stf", params = params)
+        self.ctx.logger.post_cmd(rc)
+
+        if not rc:
+            raise TRexError(rc)
+
+        print(rc.data());
+
         pass
 
 
