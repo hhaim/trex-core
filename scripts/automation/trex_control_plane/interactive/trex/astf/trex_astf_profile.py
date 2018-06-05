@@ -965,11 +965,11 @@ class ASTFIPGen(object):
 
 
         :parameters:
-                  dist_client  : Client side ASTFIPGenDist  :class:`trex_astf_lib.trex_astf_client.ASTFIPGenDist`
+                  dist_client  : Client side ASTFIPGenDist  :class:`trex.astf.trex_astf_profile.ASTFIPGenDist`
 
-                  dist_server  : Server side ASTFIPGenDist  :class:`trex_astf_lib.trex_astf_client.ASTFIPGenDist`
+                  dist_server  : Server side ASTFIPGenDist  :class:`trex.astf.trex_astf_profile.ASTFIPGenDist`
 
-                  glob :  ASTFIPGenGlobal see :class:`trex_astf_lib.trex_astf_client.ASTFIPGenGlobal`
+                  glob :  ASTFIPGenGlobal see :class:`trex.astf.trex_astf_profile.ASTFIPGenGlobal`
         """
 
         ver_args = {"types":
@@ -1103,7 +1103,7 @@ class ASTFAssociation(object):
         """
 
         :parameters:
-                  rules  : ASTFAssociationRule see :class:`trex_astf_lib.trex_astf_client.ASTFAssociationRule`
+                  rules  : ASTFAssociationRule see :class:`trex.astf.trex_astf_profile.ASTFAssociationRule`
                        rule or rules list
 
         """
@@ -1223,12 +1223,12 @@ class ASTFTCPClientTemplate(_ASTFClientTemplate):
         """
 
         :parameters:
-                  ip_gen  : ASTFIPGen see :class:`trex_astf_lib.trex_astf_client.ASTFIPGen`
+                  ip_gen  : ASTFIPGen see :class:`trex.astf.trex_astf_profile.ASTFIPGen`
                        generator
 
-                  cluster :  ASTFCluster see :class:`trex_astf_lib.trex_astf_client.ASTFCluster`
+                  cluster :  ASTFCluster see :class:`trex.astf.trex_astf_profile.ASTFCluster`
 
-                  program  : ASTFProgram see :class:`trex_astf_lib.trex_astf_client.ASTFProgram`
+                  program  : ASTFProgram see :class:`trex.astf.trex_astf_profile.ASTFProgram`
                         L7 emulation program
 
                   port     : uint16_t
@@ -1240,7 +1240,7 @@ class ASTFTCPClientTemplate(_ASTFClientTemplate):
                   limit    : uint32_t 
                         limit the number of flows. default is None which means zero 
 
-                  glob_info : ASTFGlobalInfoPerTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfoPerTemplate`
+                  glob_info : ASTFGlobalInfoPerTemplate see :class:`trex.astf.trex_astf_profile.ASTFGlobalInfoPerTemplate`
 
         """
 
@@ -1294,12 +1294,12 @@ class ASTFTCPServerTemplate(_ASTFTemplateBase):
 
         :parameters:
 
-                  program  : ASTFProgram see :class:`trex_astf_lib.trex_astf_client.ASTFProgram`
+                  program  : ASTFProgram see :class:`trex.astf.trex_astf_profile.ASTFProgram`
                         L7 emulation program
 
-                  glob_info : ASTFGlobalInfoPerTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfoPerTemplate`
+                  glob_info : ASTFGlobalInfoPerTemplate see :class:`trex.astf.trex_astf_profile.ASTFGlobalInfoPerTemplate`
 
-                  assoc    : ASTFAssociation see :class:`trex_astf_lib.trex_astf_client.ASTFAssociation`
+                  assoc    : ASTFAssociation see :class:`trex.astf.trex_astf_profile.ASTFAssociation`
 
         """
         ver_args = {"types":
@@ -1354,10 +1354,10 @@ class ASTFCapInfo(object):
                   cps  :  float
                        new connection per second rate
 
-                  assoc :  ASTFAssociation see :class:`trex_astf_lib.trex_astf_client.ASTFAssociation`
+                  assoc :  ASTFAssociation see :class:`trex.astf.trex_astf_profile.ASTFAssociation`
                        rule for server association in default take the destination port from pcap file
 
-                  ip_gen  : ASTFIPGen see :class:`trex_astf_lib.trex_astf_client.ASTFIPGen`
+                  ip_gen  : ASTFIPGen see :class:`trex.astf.trex_astf_profile.ASTFIPGen`
                       tuple generator for this template
 
                   port    : uint16_t
@@ -1369,9 +1369,9 @@ class ASTFCapInfo(object):
                   limit     : uint32_t 
                         Limit the number of flows 
 
-                  s_glob_info : ASTFGlobalInfoPerTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfoPerTemplate`
+                  s_glob_info : ASTFGlobalInfoPerTemplate see :class:`trex.astf.trex_astf_profile.ASTFGlobalInfoPerTemplate`
 
-                  c_glob_info : ASTFGlobalInfoPerTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfoPerTemplate`
+                  c_glob_info : ASTFGlobalInfoPerTemplate see :class:`trex.astf.trex_astf_profile.ASTFGlobalInfoPerTemplate`
 
         """
 
@@ -1450,10 +1450,10 @@ class ASTFTemplate(object):
         You should give either templates or cap_list (mutual exclusion).
 
         :parameters:
-                  client_template  : ASTFTCPClientTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFTCPClientTemplate`
+                  client_template  : ASTFTCPClientTemplate see :class:`trex.astf.trex_astf_profile.ASTFTCPClientTemplate`
                        client side template info
 
-                  server_template  :  ASTFTCPServerTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFTCPServerTemplate`
+                  server_template  :  ASTFTCPServerTemplate see :class:`trex.astf.trex_astf_profile.ASTFTCPServerTemplate`
                        server side template info
 
         """
@@ -1514,20 +1514,20 @@ class ASTFProfile(object):
         You should give either templates or cap_list (mutual exclusion).
 
         :parameters:
-                  default_ip_gen  : ASTFIPGen  :class:`trex_astf_lib.trex_astf_client.ASTFIPGen`
+                  default_ip_gen  : ASTFIPGen  :class:`trex.astf.trex_astf_profile.ASTFIPGen`
                        tuple generator object
 
-                  default_c_glob_info  :  ASTFGlobalInfo :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfo`
+                  default_c_glob_info  :  ASTFGlobalInfo :class:`trex.astf.trex_astf_profile.ASTFGlobalInfo`
                        tcp parameters to be used for server side, if cap_list is given. This is optional. If not specified,
                        TCP parameters for each flow will be taken from its cap file.
 
-                  default_s_glob_info  :  ASTFGlobalInfo :class:`trex_astf_lib.trex_astf_client.ASTFGlobalInfo`
+                  default_s_glob_info  :  ASTFGlobalInfo :class:`trex.astf.trex_astf_profile.ASTFGlobalInfo`
                        Same as default_tcp_server_info for client side.
 
-                  templates  :  ASTFTemplate see :class:`trex_astf_lib.trex_astf_client.ASTFTemplate`
+                  templates  :  ASTFTemplate see :class:`trex.astf.trex_astf_profile.ASTFTemplate`
                        define a list of manual templates or one template
 
-                  cap_list  : ASTFCapInfo see :class:`trex_astf_lib.trex_astf_client.ASTFCapInfo`
+                  cap_list  : ASTFCapInfo see :class:`trex.astf.trex_astf_profile.ASTFCapInfo`
                       define a list of pcap files list in case there is no  templates
         """
 
