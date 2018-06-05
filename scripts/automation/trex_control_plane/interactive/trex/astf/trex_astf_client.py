@@ -153,6 +153,11 @@ class ASTFClient(TRexClient):
     def stop (self, ports = None, rx_delay_ms = None):
         pass
 
+    @client_api('command', True)
+    def hello (self, filename = None,duration=None,tunables=None):
+        print(" arg {0} {1} {2}".format(filename,duration,tunables));
+        pass
+
 
     # get stats
     @client_api('getter', True)
@@ -180,6 +185,26 @@ class ASTFClient(TRexClient):
 ############################   console   #############################
 ############################   commands  #############################
 ############################             #############################
+
+    @console_api('hello', 'ASTF', True)
+    def show_hello_line (self, line):
+        '''my first command \n'''
+        parser = parsing_opts.gen_parser(self,
+                                         "hello",
+                                         self.show_hello_line.__doc__,
+                                         parsing_opts.FILE_PATH,
+                                         parsing_opts.DURATION,
+                                         parsing_opts.TUNABLES
+                                         )
+        opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
+
+        if type(opts.tunables) is dict:
+            tunables = opts.tunables
+        else:
+            tunables = {}
+
+        self.hello(opts.file[0],opts.duration,tunables)
+
 
     @console_api('stats', 'common', True)
     def show_stats_line (self, line):
