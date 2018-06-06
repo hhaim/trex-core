@@ -5,8 +5,9 @@ from ..utils import parsing_opts, text_tables
 from ..common.trex_logger import Logger
 from ..common.trex_exceptions import TRexError
 from ..common.trex_client import TRexClient
-from ..common.trex_types import RC_OK, RC_ERR, RC
 from ..common.trex_api_annotators import client_api, console_api
+from ..common.trex_types import *
+
 
 from .trex_astf_port import ASTFPort
 
@@ -153,10 +154,39 @@ class ASTFClient(TRexClient):
     def stop (self, ports = None, rx_delay_ms = None):
         pass
 
+
+    @client_api('command', True)
+    def load_profile(self, filename, **kwargs):
+        """ |  load a profile Supported types are:
+            |  .py
+            |  .json
+
+            :parameters:
+                filename : string
+                    filename (with path) of the profile
+
+                kwargs : dict
+                    forward those key-value pairs to the profile (tunables)
+
+            :returns:
+                0 in case of sucess 
+
+            :raises:
+                + :exc:`TRexError`
+
+        """
+        print("load profile");
+        pass
+            #validate_type('filename', filename, basestring)
+            #profile = STLProfile.load(filename, **kwargs)
+            #return self.add_streams(profile.get_streams(), ports)
+
     @client_api('command', True)
     def hello (self, filename = None,duration=None,tunables=None):
 
         self.ctx.logger.pre_cmd("Hello {0} {1} {2} ".format(filename,duration,tunables))
+
+        #self.load_profile(filename, tunables)
 
         # capture RPC parameters
         params = {
