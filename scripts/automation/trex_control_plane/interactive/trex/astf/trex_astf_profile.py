@@ -8,7 +8,9 @@ from .trex_astf_global_info import ASTFGlobalInfo, ASTFGlobalInfoPerTemplate
 import json
 import base64
 import hashlib
-
+import traceback
+from ..common.trex_exceptions import *
+import imp
 
 
 def listify(x):
@@ -1646,3 +1648,61 @@ class ASTFProfile(object):
             tot_bps += temp_bps
             tot_cps += temp_cps
         print("total for all templates - cps:{0} bps:{1}".format(tot_cps, tot_bps))
+
+    @staticmethod
+    def get_module_tunables(module):
+        # remove self and variables
+        func = module.register().get_profile
+        argc = func.__code__.co_argcount
+        tunables = func.__code__.co_varnames[1:argc]
+
+        # fetch defaults
+        defaults = func.__defaults__
+        if defaults is None:
+            return {}
+        if len(defaults) != (argc - 1):
+            raise TRexError("Module should provide default values for all arguments on get_streams()")
+
+        output = {}
+        for t, d in zip(tunables, defaults):
+            output[t] = d
+
+        return output
+
+    @staticmethod
+    def load_py (python_file, **kwargs):
+        """ Load from ASTF Python profile """
+
+        # check filename
+        if not os.path.isfile(python_file):
+            raise TRexError("File '{0}' does not exist".format(python_file))
+
+        basedir = os.path.dirname(python_file)
+        sys.path.insert(0, basedir)
+
+        try:
+            file    = os.path.basename(python_file).split('.')[0]
+            module = __import__(file, globals(), locals(), [], 0)
+            imp.reload(module) # reload the update 
+
+            t = ASTFProfile.get_module_tunables(module)
+
+            profile = module.register().get_profile(**kwargs)
+
+            profile.meta = {'type': 'python',
+                            'tunables': t}
+
+            return profile
+
+        except Exception as e:
+            a, b, tb = sys.exc_info()
+            x =''.join(traceback.format_list(traceback.extract_tb(tb)[1:])) + a.__name__ + ": " + str(b) + "\n"
+
+            summary = "\nPython Traceback follows:\n\n" + x
+            raise TRexError(summary)
+
+
+        finally:
+            sys.path.remove(basedir)
+
+

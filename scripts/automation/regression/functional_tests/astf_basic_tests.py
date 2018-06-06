@@ -25,7 +25,7 @@ class CAstfPcapFull_Test(functional_general_test.CGeneralFunctional_Test):
 
     def run_astf_gold(self,valgrind):
         files = [
-                  "astf/param_ipv6.py",
+                 "astf/param_ipv6.py",
                  "astf/tcp_param_change.py",
                  "astf/param_tcp_rxbufsize.py",
                  "astf/param_tcp_no_timestamp.py",
@@ -46,7 +46,7 @@ class CAstfPcapFull_Test(functional_general_test.CGeneralFunctional_Test):
                  "astf/http_simple_limit.py",
                  "astf/param_tcp_rxbufsize_pt.py",
                  "astf/param_sch_rampup.py",
-                 "astf/http_manual_commands_pipeline4.py"
+                 "astf/http_manual_commands_pipeline4.py",
                  "astf/udp_pcap.py",
                  "astf/udp_sip.py",
                  "astf/udp1.py",
@@ -67,6 +67,7 @@ class CAstfPcapFull_Test(functional_general_test.CGeneralFunctional_Test):
         ]
         print('')
         for file in files:
+            file="../../"+file;
             base_name = file.split("/")[-1].split(".")[0]
             output = "../../generated/"+base_name + ".generated.pcap"
             golden = "functional_tests/golden/" + base_name + ".cap"
@@ -85,7 +86,7 @@ class CAstfPcapFull_Test(functional_general_test.CGeneralFunctional_Test):
                  "../../astf/cc_http_simple2.yaml"
         ]
 
-        file = "astf/http_simple.py"
+        file = "../../astf/http_simple.py"
 
         for cc_obj in cc:
             base_name = file.split("/")[-1].split(".")[0]
