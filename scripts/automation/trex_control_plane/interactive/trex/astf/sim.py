@@ -252,7 +252,7 @@ def main(args=None):
            sys.exit(100)
 
     if opts.json:
-        print(profile.to_json())
+        print(profile.to_json_str())
         sys.exit(0)
 
     if opts.stat:
@@ -260,7 +260,7 @@ def main(args=None):
         sys.exit(0)
 
     f = open(DEFAULT_OUT_JSON_FILE, 'w')
-    f.write(str(profile.to_json()).replace("'", "\""))
+    f.write(str(profile.to_json_str()).replace("'", "\""))
     f.close()
     
     # if the path is not the same - handle the switch

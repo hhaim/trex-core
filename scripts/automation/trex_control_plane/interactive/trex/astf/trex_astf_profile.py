@@ -1616,6 +1616,11 @@ class ASTFProfile(object):
                 template = ASTFTemplate(client_template=temp_c, server_template=temp_s)
                 self.templates.append(template)
 
+    def to_json_str(self):
+        ret = self.to_json()
+        return json.dumps(ret, indent=4, separators=(',', ': '))
+
+
     def to_json(self):
         ret = {}
         ret['buf_list'] = ASTFProgram.class_to_json()
@@ -1629,7 +1634,7 @@ class ASTFProfile(object):
         for i in range(0, len(self.templates)):
             ret['templates'].append(self.templates[i].to_json())
 
-        return json.dumps(ret, indent=4, separators=(',', ': '))
+        return ret;
 
     def print_stats(self):
         tot_bps = 0
