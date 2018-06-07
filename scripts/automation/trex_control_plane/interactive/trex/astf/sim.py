@@ -243,10 +243,10 @@ def main(args=None):
 
     profile = None
     if opts.dev:
-        profile = ASTFProfile.load_py(opts.input_file,**tun);
+        profile = ASTFProfile.load(opts.input_file,**tun);
     else:
        try:
-           profile = ASTFProfile.load_py(opts.input_file,**tun);
+           profile = ASTFProfile.load(opts.input_file,**tun);
        except Exception as e:
            print(e)
            sys.exit(100)

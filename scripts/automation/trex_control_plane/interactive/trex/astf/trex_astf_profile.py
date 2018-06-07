@@ -1492,6 +1492,24 @@ class _ASTFTCPInfo(object):
     def port(self):
         return self.m_port
 
+class ASTFProfileLight(object):
+    """ ASTF profile light to save the json dict """
+    def __init__(self, json_dict):
+        if not (type(json_dict) is dict):
+            raise TRexError("json_dict should be dict type")
+
+        self.json_dict = json_dict;
+
+    def to_json(self):
+        return (self.json_dict);
+
+    def to_json_str(self):
+        ret = self.to_json()
+        return json.dumps(ret, indent=4, separators=(',', ': '))
+
+    def print_stats(self):
+        print(" NOT supported for this format \n");
+
 
 class ASTFProfile(object):
     """ ASTF profile
@@ -1710,4 +1728,51 @@ class ASTFProfile(object):
         finally:
             sys.path.remove(basedir)
 
+
+
+    @staticmethod
+    def load_json (json_file):
+        """ Load (from JSON file) a profile with a number of streams """
+                # check filename
+        if not os.path.isfile(json_file):
+            raise TRexError("file '{0}' does not exists".format(json_file))
+
+        # read the content
+        with open(json_file) as f:
+            try:
+                data = json.load(f)
+                profile =  ASTFProfileLight(data)
+                
+            except (ValueError, yaml.parser.ParserError):
+                raise TRexError("file '{0}' is not a valid {1} formatted file".format(plain_file, 'JSON'))
+            
+        return profile
+
+
+
+
+    @staticmethod
+    def load (filename, **kwargs):
+        """ Load a profile by its type. Supported types are: 
+           * py
+           * json
+
+           :Parameters:
+              filename  : string as filename 
+              kwargs    : forward those key-value pairs to the profile
+
+        """
+
+        x = os.path.basename(filename).split('.')
+        suffix = x[1] if (len(x) == 2) else None
+
+        if suffix == 'py':
+            profile = ASTFProfile.load_py(filename, **kwargs)
+
+        elif suffix == 'json':
+            profile = ASTFProfile.load_json(filename)
+        else:
+            raise TRexError("unknown profile file type: '{0}'".format(suffix))
+
+        return profile
 
