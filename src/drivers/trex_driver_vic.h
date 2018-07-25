@@ -75,6 +75,7 @@ private:
     virtual int add_del_eth_type_rule(repid_t  repid, enum rte_filter_op op, uint16_t eth_type);
     virtual int configure_rx_filter_rules_statefull(CPhyEthIF * _if);
 
+    CDpdkFilterManager  m_filter_manager;
 };
 
 

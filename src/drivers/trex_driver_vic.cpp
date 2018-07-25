@@ -133,6 +133,8 @@ int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules_statefull(CPhyEthIF * 
 
 
 int CTRexExtendedDriverBaseVIC::set_rcv_all(CPhyEthIF * _if, bool set_on) {
+    return(m_filter_manager.set_rcv_all(_if->get_repid(),set_on));
+#if 0
     repid_t repid=_if->get_repid();
 
     // soft ID 100 tells VIC driver to add rule for all ether types.
@@ -144,7 +146,7 @@ int CTRexExtendedDriverBaseVIC::set_rcv_all(CPhyEthIF * _if, bool set_on) {
     }
 
     return 0;
-
+#endif
 }
 
 void CTRexExtendedDriverBaseVIC::clear_extended_stats(CPhyEthIF * _if){
@@ -187,13 +189,15 @@ int CTRexExtendedDriverBaseVIC::verify_fw_ver(tvpid_t   tvpid) {
 }
 
 int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules(CPhyEthIF * _if) {
-
+    return(m_filter_manager.configure_rx_filter_rules(_if->get_repid()));
+#if 0
     if (get_is_stateless()) {
         /* both stateless and stateful work in the same way, might changed in the future TOS */
         return configure_rx_filter_rules_statefull(_if);
     } else {
         return configure_rx_filter_rules_statefull(_if);
     }
+#endif
 }
 
 void CTRexExtendedDriverBaseVIC::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len) {
