@@ -532,3 +532,22 @@ void split_ips(uint32_t thread_id,
     portion.m_ip_start  = poolinfo.get_ip_start()  + thread_id*chunks + dual_if_mask;
     portion.m_ip_end    = portion.m_ip_start + chunks -1 ;
 }
+
+/* split in seq */
+void split_ips_v2( uint32_t total_threads, 
+                   uint32_t rss_thread_id,
+                   uint32_t rss_max_threads,
+                   uint32_t max_dual_ports, 
+                   uint32_t dual_port_id,
+                   CTupleGenPoolYaml& poolinfo,
+                   CIpPortion & portion){
+
+    uint32_t chunks = poolinfo.getTotalIps()/total_threads;
+
+    assert(chunks>0);
+
+    uint32_t dual_if_mask=(dual_port_id*poolinfo.getDualMask());
+
+    portion.m_ip_start  = poolinfo.get_ip_start()  + (rss_thread_id+rss_max_threads*dual_port_id)*chunks + dual_if_mask;
+    portion.m_ip_end    = portion.m_ip_start + chunks -1 ;
+}

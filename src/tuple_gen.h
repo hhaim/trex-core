@@ -1098,6 +1098,14 @@ void split_ips(uint32_t thread_id,
                    CTupleGenPoolYaml& poolinfo,
                    CIpPortion & portion);
 
+void split_ips_v2( uint32_t total_threads, 
+                   uint32_t rss_thread_id,
+                   uint32_t rss_max_threads,
+                   uint32_t max_dual_ports, 
+                   uint32_t dual_port_id,
+                   CTupleGenPoolYaml& poolinfo,
+                   CIpPortion & portion);
+
 
 
 #endif //TUPLE_GEN_H_

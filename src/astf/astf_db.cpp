@@ -948,7 +948,7 @@ CAstfTemplatesRW *CAstfDB::get_db_template_rw(uint8_t socket_id, CTupleGenerator
         }
         poolinfo.m_dist =  dist;
         poolinfo.m_dual_interface_mask = ip_from_str(ip_gen_list[i]["ip_offset"].asString().c_str());
-        split_ips(thread_id, max_threads, dual_port_id, poolinfo, portion);
+        split_ips_v2(max_threads, rss_thread_id,rss_thread_max, CGlobalInfo::m_options.get_expected_dual_ports(),dual_port_id, poolinfo, portion);
         active_flows_per_core = (portion.m_ip_end - portion.m_ip_start) * 32000;
         if (ip_gen_list[i]["dir"] == "c") {
             gen_idx_trans.push_back(last_c_idx);
