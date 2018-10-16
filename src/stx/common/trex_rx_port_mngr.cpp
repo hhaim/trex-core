@@ -28,6 +28,25 @@
 #include <zmq.h>
 
 
+
+
+
+RxAstfLatency::RxAstfLatency(){
+    m_rx_core=0;
+    m_port_id=255;
+}
+
+void RxAstfLatency::create(CRxCore *rx_core,
+                           uint8_t port_id){
+    m_rx_core = rx_core;
+    m_port_id = port_id;
+}
+
+void RxAstfLatency::handle_pkt(const rte_mbuf_t *m){
+    m_rx_core->handle_astf_latency_pkt(m,m_port_id);
+}
+
+
 /**************************************
  * latency RX feature
  * 
@@ -635,6 +654,7 @@ RXPortManager::create_async(uint32_t port_id,
     
     /* init features */
     m_latency.create(rfc2544, err_cntrs);
+    m_astf_latency.create(m_rx_core,port_id);
 
     m_capwap_proxy.create(&m_feature_api);
     m_capture_port.create(&m_feature_api);
@@ -736,6 +756,10 @@ rx_pkt_action_t RXPortManager::handle_pkt(const rte_mbuf_t *m) {
 
     if (is_feature_set(CAPTURE_PORT)) {
         m_capture_port.handle_pkt(m);
+    }
+
+    if (is_feature_set(ASTF_LATENCY)) { 
+        m_astf_latency.handle_pkt(m);
     }
 
     if (is_feature_set(CAPWAP_PROXY)) { // changes the mbuf, so need to be last.

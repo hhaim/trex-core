@@ -301,6 +301,29 @@ bool CRxCore::tx_pkt(const std::string &pkt, uint8_t tx_port_id) {
 }
 
 
+int CRxCore::_do_start(void){
+
+    while (m_state != STATE_QUIT) {
+
+        switch (m_state) {
+
+        case STATE_HOT:
+            hot_state_loop();
+            break;
+
+        case STATE_COLD:
+            cold_state_loop();
+            break;
+
+        default:
+            assert(0);
+            break;
+        }
+    }
+    return (0);
+}
+
+
 void CRxCore::start() {
     
     /* mark the core as active (used for accessing from other cores) */
@@ -313,30 +336,19 @@ void CRxCore::start() {
     recalculate_next_state();
     
     init_work_stage();
- 
-    while (m_state != STATE_QUIT) {
 
-        switch (m_state) {
-
-        case STATE_HOT:
-            hot_state_loop();
-            break;
-            
-        case STATE_COLD:
-            cold_state_loop();
-            break;
-
-        default:
-            assert(0);
-            break;
-        }
-
-    }
+    (void)_do_start();
 
     m_monitor.disable();
 
     m_is_active = false;
     
+}
+
+void CRxCore::handle_astf_latency_pkt(const rte_mbuf_t *m,
+                                      uint8_t port_id){
+    /* nothing to do */
+
 }
 
 int CRxCore::process_all_pending_pkts(bool flush_rx) {
@@ -441,6 +453,16 @@ CRxCore::enable_latency() {
     
     recalculate_next_state();
 }
+
+void
+CRxCore::enable_astf_latency_fia(bool enable) {
+    for (auto &mngr_pair : m_rx_port_mngr) {
+        mngr_pair.second->enable_astf_latency(enable);
+    }
+    
+    recalculate_next_state();
+}
+
 
 void
 CRxCore::disable_latency() {
