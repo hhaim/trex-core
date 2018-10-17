@@ -70,7 +70,7 @@ CRxAstfCore::CRxAstfCore(void) : CRxCore() {
 
 void CRxAstfCore::do_background(void){
     bool did_something = work_tick();
-    if (likely( did_something )) {
+    if (likely( did_something || m_latency_active )) {
         delay_lowend();
     } else {
         rte_pause_or_delay_lowend();
@@ -112,10 +112,6 @@ int CRxAstfCore::_do_start(void){
             break;
         case CGenNode::FLOW_PKT:
             node->m_time += m_delta_sec;
-            //restart=false;
-            //if (!m_latency_active || !(node->m_pad2==m_epoc)) {
-                //restart=false;
-            //}
             if (!send_pkt_all_ports() && (node->m_pad2==m_epoc) ){
             }else{
                 restart=false;
@@ -127,9 +123,11 @@ int CRxAstfCore::_do_start(void){
             if (m_latency_active && node->m_pad2==m_epoc){
                 update_stats();
                 cnt++;
-                if (cnt%30==0) {
-                   cp_dump(stdout);
-                }
+#ifdef LATENCY_DEBUG
+                ///if (cnt%10==0) {
+                   //cp_dump(stdout);
+                //}
+#endif
             }else{
                 restart=false;
             }
@@ -241,6 +239,16 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
         break;
     }
 
+    double cps= msg->m_cps;
+    if (cps <= 1.0) {
+        m_delta_sec = 1.0;
+    } else {
+        if (cps>MAX_CPS){
+            cps=MAX_CPS;
+        }
+        m_delta_sec =(1.0/cps);
+    }
+
     m_max_ports = msg->m_max_ports;
     assert (m_max_ports <= TREX_MAX_PORTS);
     assert ((m_max_ports%2)==0);
@@ -258,6 +266,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
                           m_l_pkt_mode,
                           0 );
         lp->m_port.set_enable_none_latency_processing(false);
+        lp->m_port.m_hist.set_hot_max_cnt((int(cps)/2));
 
         if ( !CGlobalInfo::m_options.m_dummy_port_map[i] ) {
             m_port_ids.push_back(i);
@@ -266,16 +275,6 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     m_pkt_gen.set_ip(msg->m_client_ip.v4,
                      msg->m_server_ip.v4,
                      msg->m_dual_port_mask);
-
-    double cps= msg->m_cps;
-    if (cps <= 1.0) {
-        m_delta_sec = 1.0;
-    } else {
-        if (cps>MAX_CPS){
-            cps=MAX_CPS;
-        }
-        m_delta_sec =(1.0/cps);
-    }
 
 
     m_active_context =true;
