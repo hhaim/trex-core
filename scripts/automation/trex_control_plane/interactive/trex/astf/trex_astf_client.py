@@ -312,6 +312,33 @@ class ASTFClient(TRexClient):
     def clear_astf_stats(self):
         return self.astf_stats.clear_stats()
 
+    @client_api('command', True)
+    def start_latency(self, mult = 1):
+
+        params = {
+            'handler': self.handler,
+            'mult': mult
+            }
+
+        self.ctx.logger.pre_cmd('Starting latency traffic.')
+        rc = self._transmit("start_latency", params = params)
+        self.ctx.logger.post_cmd(rc)
+        if not rc:
+            raise TRexError(rc.err())
+
+    @client_api('command', True)
+    def stop_latency(self):
+
+        params = {
+            'handler': self.handler
+            }
+
+        self.ctx.logger.pre_cmd('stopping latency traffic.')
+        rc = self._transmit("stop_latency", params = params)
+        self.ctx.logger.post_cmd(rc)
+        if not rc:
+            raise TRexError(rc.err())
+
 
 ############################   console   #############################
 ############################   commands  #############################
@@ -361,6 +388,33 @@ class ASTFClient(TRexClient):
             self.stop_line.__doc__,
             )
         self.stop()
+
+    @console_api('start_latency', 'ASTF', True)
+    def start_latency_line(self, line):
+        '''start latency traffic command'''
+
+        parser = parsing_opts.gen_parser(
+            self,
+            "start_latency",
+            self.start_line.__doc__,
+            parsing_opts.MULTIPLIER_INT,
+            )
+        opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
+        self.start_latency(opts.mult)
+        return True
+
+    @console_api('stop_latency', 'ASTF', True)
+    def stop_latency_line(self, line):
+        '''stop latency traffic command'''
+
+        parser = parsing_opts.gen_parser(
+            self,
+            "stop_latency",
+            self.start_line.__doc__
+            )
+        opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
+        self.stop_latency()
+        return True
 
 
     @console_api('stats', 'common', True)

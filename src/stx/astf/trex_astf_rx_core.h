@@ -127,6 +127,8 @@ private:
 
 private:
     bool                    m_active_context; /* context for latency streams is allocated */
+    bool                    m_latency_active; /* active latency process */
+
     CRxAstfPort             m_io_ports[TREX_MAX_PORTS];
     CMessagingManager *     m_rx_dp;
     pqueue_t                m_p_queue; /* priorty queue */
@@ -139,7 +141,6 @@ private:
     uint32_t                m_port_mask;
     uint32_t                m_max_ports;
     CPortLatencyHWBase *    m_port_io[TREX_MAX_PORTS];
-    bool                    m_stop_latency;
     uint8_t                 m_epoc;
 };
 

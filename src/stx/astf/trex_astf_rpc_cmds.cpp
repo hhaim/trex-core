@@ -85,6 +85,9 @@ TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfProfileFragment, "profile_fragment");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStart, "start");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStop, "stop");
 
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStartLatency, "start_latency");
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStopLatency, "stop_latency");
+
 TREX_RPC_CMD(TrexRpcCmdAstfCountersDesc, "get_counter_desc");
 TREX_RPC_CMD(TrexRpcCmdAstfCountersValues, "get_counter_values");
 
@@ -185,6 +188,34 @@ TrexRpcCmdAstfStop::_run(const Json::Value &params, Json::Value &result) {
     return (TREX_RPC_CMD_OK);
 }
 
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result) {
+    const double mult = parse_double(params, "mult", result);
+
+    try {
+        get_astf_object()->start_transmit_latency(mult);
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+
+    return (TREX_RPC_CMD_OK);
+}
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfStopLatency::_run(const Json::Value &params, Json::Value &result) {
+    bool stopped = true;
+    try {
+        stopped = get_astf_object()->stop_transmit_latency();
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+    result["result"]["stopped"] = stopped;
+
+    return (TREX_RPC_CMD_OK);
+}
+
+
 trex_rpc_cmd_rc_e
 TrexRpcCmdAstfCountersDesc::_run(const Json::Value &params, Json::Value &result) {
     CSTTCp *lpstt = get_platform_api().get_fl()->m_stt_cp;
@@ -221,6 +252,8 @@ TrexRpcCmdsASTF::TrexRpcCmdsASTF() : TrexRpcComponent("ASTF") {
     m_cmds.push_back(new TrexRpcCmdAstfProfileFragment(this));
     m_cmds.push_back(new TrexRpcCmdAstfStart(this));
     m_cmds.push_back(new TrexRpcCmdAstfStop(this));
+    m_cmds.push_back(new TrexRpcCmdAstfStartLatency(this));
+    m_cmds.push_back(new TrexRpcCmdAstfStopLatency(this));
     m_cmds.push_back(new TrexRpcCmdAstfCountersDesc(this));
     m_cmds.push_back(new TrexRpcCmdAstfCountersValues(this));
 }

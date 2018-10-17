@@ -27,6 +27,8 @@ limitations under the License.
 
 
 #define UPDATE_TIME_SEC (0.5)
+#define MAX_CPS         (1000000.0)
+#define ASTF_SYNC_TIME_OUT_SEC (1.0)
 
 int CRxAstfPort::tx(rte_mbuf_t *m){
    return(m_rx->tx_pkt(m, m_port_id)?0:-1);
@@ -40,17 +42,24 @@ bool TrexRxStartLatency::handle(CRxCore *rx_core){
 }
 
 
+bool TrexRxStopLatency::handle(CRxCore *rx_core){
+    CRxAstfCore * lp=(CRxAstfCore *)rx_core;
+    lp->stop_latency();
+    return(true);
+}
+
+
+
 CRxAstfCore::CRxAstfCore(void) : CRxCore() {
     m_active_context =false;
     m_rx_dp = CMsgIns::Ins()->getRxDp();
     m_epoc = 0x17;
-    m_rx_dp = 0;
     m_start_time=0;
     m_delta_sec=0.0;
     m_port_ids.clear();
     m_port_mask=0;
     m_max_ports=0;
-    m_stop_latency=false;
+    m_latency_active =false;
     int i;
     for (i=0; i<TREX_MAX_PORTS; i++) {
         m_io_ports[i].Create(this,(uint8_t)i);
@@ -76,11 +85,12 @@ int CRxAstfCore::_do_start(void){
     node->m_type = CGenNode::FLOW_SYNC;   /* general stuff */
     node->m_time = now_sec()+0.007;
     m_p_queue.push(node);
+    int cnt=0;
 
     while (  !m_p_queue.empty() ) {
         node = m_p_queue.top();
         n_time = node->m_time;
-
+        bool restart=true;
         /* wait for event */
         while ( true ) {
             double dt = now_sec() - n_time ;
@@ -89,38 +99,53 @@ int CRxAstfCore::_do_start(void){
             }
             do_background();
         }
-
         m_cpu_dp_u.start_work1();
+        // re-read it as background might add new nodes 
+        node = m_p_queue.top();
+        n_time = node->m_time;
 
+        m_p_queue.pop();
         switch (node->m_type) {
         case CGenNode::FLOW_SYNC:
             tickle();
-            m_p_queue.pop();
-            node->m_time += SYNC_TIME_OUT;
-            m_p_queue.push(node);
-
+            node->m_time += ASTF_SYNC_TIME_OUT_SEC;
             break;
         case CGenNode::FLOW_PKT:
-            m_p_queue.pop();
             node->m_time += m_delta_sec;
+            //restart=false;
+            //if (!m_latency_active || !(node->m_pad2==m_epoc)) {
+                //restart=false;
+            //}
             if (!send_pkt_all_ports() && (node->m_pad2==m_epoc) ){
-                m_p_queue.push(node);
             }else{
-                delete node;
-            }
+                restart=false;
+            } 
             break;
         case  CGenNode::TW_SYNC:
-            m_p_queue.pop();
+            /* this might affect latency performance, we should keep this very light */
             node->m_time += UPDATE_TIME_SEC;
-            if (node->m_pad2==m_epoc){
+            if (m_latency_active && node->m_pad2==m_epoc){
                 update_stats();
-                m_p_queue.push(node);
+                cnt++;
+                if (cnt%30==0) {
+                   cp_dump(stdout);
+                }
             }else{
-                delete node;
+                restart=false;
             }
-            
             break;
+
+        default:
+            assert(0);
         }
+
+        /* put the node again into the queue */
+        if (restart) {
+            m_p_queue.push(node);
+        }else{
+            delete node;
+        }
+
         m_cpu_dp_u.commit1();
 
         if (m_state == STATE_QUIT){
@@ -140,7 +165,7 @@ int CRxAstfCore::_do_start(void){
 void CRxAstfCore::handle_astf_latency_pkt(const rte_mbuf_t *m,
                                       uint8_t port_id){
     /* nothing to do */
-    if (!m_stop_latency)
+    if (!m_latency_active)
         return;
     CLatencyManagerPerPort * lp_port = &m_ports[port_id];
     handle_rx_pkt(lp_port,(rte_mbuf_t *)m);
@@ -192,7 +217,7 @@ uint32_t CRxAstfCore::handle_rx_one_queue(uint8_t thread_id, CNodeRing *r) {
 void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
 
     /* create a node */
-    assert(m_stop_latency ==false);
+    assert(m_latency_active ==false);
     enable_astf_latency_fia(true);
     m_epoc++;
 
@@ -238,30 +263,34 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
             m_port_ids.push_back(i);
         }
     }
-    
-    double cps= msg->m_cps;
-    if (cps <= 1.0) {
-        m_delta_sec =(1.0/cps);
-    } else {
-        m_delta_sec = 0.0;
-    }
-
     m_pkt_gen.set_ip(msg->m_client_ip.v4,
                      msg->m_server_ip.v4,
                      msg->m_dual_port_mask);
+
+    double cps= msg->m_cps;
+    if (cps <= 1.0) {
+        m_delta_sec = 1.0;
+    } else {
+        if (cps>MAX_CPS){
+            cps=MAX_CPS;
+        }
+        m_delta_sec =(1.0/cps);
+    }
+
 
     m_active_context =true;
 
     CGenNode * node;
     node = new CGenNode();
     node->m_type = CGenNode::FLOW_PKT;   /* general stuff */
-    node->m_time = now_sec();
+    node->m_time = now_sec()+0.01;
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
 
     node = new CGenNode();
+
     node->m_type = CGenNode::TW_SYNC;   /* update stats node, every 0.5 sec */
-    node->m_time = now_sec();
+    node->m_time = now_sec()+0.02;
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
     
@@ -269,6 +298,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     /* make sure we are in NAT mode, this is due to old code that check this variables to work */
     CGlobalInfo::m_options.m_l_pkt_mode = L_PKT_SUBMODE_REPLY;
     CGlobalInfo::is_learn_mode(CParserOption::LEARN_MODE_TCP_ACK);
+    m_latency_active =true;
 }
 
 
@@ -288,8 +318,7 @@ void CRxAstfCore::delete_context(){
 }
 
 void CRxAstfCore::stop_latency(){
-    m_stop_latency = true;
-
+    m_latency_active = false;
 }
 
 
@@ -297,7 +326,8 @@ void CRxAstfCore::handle_rx_pkt(CLatencyManagerPerPort * lp,
                                rte_mbuf_t * m){
     CRx_check_header *rxc = NULL;
 
-#if 0
+#ifdef LATENCY_DEBUG
+    fprintf(stdout,"RX --- \n");
     /****************************************/
     uint8_t *p=rte_pktmbuf_mtod(m, uint8_t*);
     uint16_t pkt_size=rte_pktmbuf_pkt_len(m);
@@ -314,7 +344,7 @@ void CRxAstfCore::handle_rx_pkt(CLatencyManagerPerPort * lp,
 
 
 bool  CRxAstfCore::send_pkt_all_ports(){
-    if (m_stop_latency){
+    if (!m_latency_active){
         return(true);
     }
     m_start_time = os_get_hr_tick_64();
@@ -327,8 +357,7 @@ bool  CRxAstfCore::send_pkt_all_ports(){
                 lp->m_port.update_packet(m, i);
 
 #ifdef LATENCY_DEBUG
-                uint8_t *p = rte_pktmbuf_mtod(m, uint8_t*);
-                c_l_pkt_mode->send_debug_print(p + 34);
+                fprintf(stdout,"TX --- \n");
                 /****************************************/
                 uint8_t *p=rte_pktmbuf_mtod(m, uint8_t*);
                 uint16_t pkt_size=rte_pktmbuf_pkt_len(m);

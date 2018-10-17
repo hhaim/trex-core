@@ -43,6 +43,7 @@ TrexAstf::TrexAstf(const TrexSTXCfg &cfg) : TrexSTX(cfg) {
     /* API core version */
     const int API_VER_MAJOR = 1;
     const int API_VER_MINOR = 0;
+    m_l_state = STATE_L_IDLE;
 
     /* init the RPC table */
     TrexRpcCommandsTable::get_instance().init("ASTF", API_VER_MAJOR, API_VER_MINOR);
@@ -133,6 +134,7 @@ TrexDpCore* TrexAstf::create_dp_core(uint32_t thread_id, CFlowGenListPerThread *
 }
 
 void TrexAstf::publish_async_data(void) {
+
 }
 
 void TrexAstf::set_barrier(double timeout_sec) {
@@ -259,6 +261,37 @@ bool TrexAstf::stop_transmit(void) {
     }
 
     return true;
+}
+
+void TrexAstf::start_transmit_latency(double mult){
+    check_whitelist_states({STATE_IDLE});
+
+    if (m_l_state != STATE_L_IDLE){
+        string err = "latency state is not idle, should stop latency thread first ";
+        throw TrexException(err);
+    }
+    m_l_state = STATE_L_WORK;
+
+    TrexRxStartLatency *msg = new TrexRxStartLatency();
+    msg->m_cps = mult;
+    msg->m_pkt_type=3;
+    msg->m_max_ports=get_port_count();
+    msg->m_client_ip.v4 = 0x10000001;
+    msg->m_server_ip.v4 = 0x30000001;
+    msg->m_dual_port_mask = 0x01000000;
+    send_msg_to_rx(msg);
+}
+
+bool TrexAstf::stop_transmit_latency(void){
+
+    if (m_l_state != STATE_L_WORK){
+        string err = "latency thread is not active, can't stop it";
+        throw TrexException(err);
+    }
+    TrexRxStopLatency *msg = new TrexRxStopLatency();
+    send_msg_to_rx(msg);
+    m_l_state = STATE_L_IDLE;
+    return (true);
 }
 
 

@@ -43,6 +43,13 @@ public:
         STATE_WORK,
         AMOUNT_OF_STATES,
     };
+
+    enum state_latency_e {
+        STATE_L_IDLE,
+        STATE_L_WORK,
+        AMOUNT_OF_L_STATES,
+    };
+
     typedef std::vector<state_e> states_t;
 
     /** 
@@ -126,6 +133,17 @@ public:
      */
     bool stop_transmit(void);
 
+
+    /**
+     * Start transmit latency streams only 
+     */
+    void start_transmit_latency(double mult);
+
+    /**
+     * Stop transmit latency streams only 
+     */
+    bool stop_transmit_latency(void);
+
     TrexOwner& get_owner(void) {
         return m_owner;
     }
@@ -141,9 +159,10 @@ protected:
     void check_whitelist_states(const states_t &whitelist);
     //void check_blacklist_states(const states_t &blacklist);
 
-    TrexOwner m_owner;
-    uint8_t m_cur_state;
-    int16_t m_active_cores;
+    state_latency_e m_l_state;
+    TrexOwner       m_owner;
+    uint8_t         m_cur_state;
+    int16_t         m_active_cores;
     std::vector<std::string> states_names;
     std::string m_profile_buffer;
     CSyncBarrier *m_sync_b;
