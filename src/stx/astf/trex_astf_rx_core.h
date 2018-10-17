@@ -35,6 +35,7 @@ public:
         m_client_ip.v4=0;
         m_server_ip.v4=0;
         m_dual_port_mask=0;
+        m_active_ports_mask=0xffffffff;
     }
 
     virtual bool handle(CRxCore *rx_core);
@@ -43,6 +44,7 @@ public:
     double    m_cps;
     uint8_t   m_pkt_type; 
     uint8_t   m_max_ports;
+    uint32_t  m_active_ports_mask;
     ipaddr_t  m_client_ip;
     ipaddr_t  m_server_ip;
     uint32_t  m_dual_port_mask;

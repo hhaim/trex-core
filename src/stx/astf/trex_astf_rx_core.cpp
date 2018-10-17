@@ -31,6 +31,10 @@ limitations under the License.
 #define ASTF_SYNC_TIME_OUT_SEC (1.0)
 
 int CRxAstfPort::tx(rte_mbuf_t *m){
+    uint16_t vlan = CGlobalInfo::m_options.m_ip_cfg[m_port_id].get_vlan();
+    if (vlan){
+        add_vlan(m,vlan);
+    }
    return(m_rx->tx_pkt(m, m_port_id)?0:-1);
 }
 
@@ -230,12 +234,12 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     switch (pkt_type) {
     default:
     case 0:
-        m_l_pkt_mode = (CLatencyPktModeSCTP *) new CLatencyPktModeSCTP(CGlobalInfo::m_options.get_l_pkt_mode());
+        m_l_pkt_mode = (CLatencyPktModeSCTP *) new CLatencyPktModeSCTP(L_PKT_SUBMODE_REPLY);
         break;
     case 1:
     case 2:
     case 3:
-        m_l_pkt_mode =  (CLatencyPktModeICMP *) new CLatencyPktModeICMP(CGlobalInfo::m_options.get_l_pkt_mode());
+        m_l_pkt_mode =  (CLatencyPktModeICMP *) new CLatencyPktModeICMP(L_PKT_SUBMODE_REPLY);
         break;
     }
 
@@ -252,7 +256,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     m_max_ports = msg->m_max_ports;
     assert (m_max_ports <= TREX_MAX_PORTS);
     assert ((m_max_ports%2)==0);
-    m_port_mask =0xffffffff;
+    m_port_mask =msg->m_active_ports_mask;
     m_pkt_gen.Create(m_l_pkt_mode);
     for (int i=0; i<m_max_ports; i++) {
         CLatencyManagerPerPort * lp=&m_ports[i];
