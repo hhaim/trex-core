@@ -63,14 +63,14 @@ bool TrexRxUpdateLatency::handle(CRxCore *rx_core){
 
 
 
-CRxAstfCore::CRxAstfCore(uint32_t max_ports) : CRxCore() {
+CRxAstfCore::CRxAstfCore() : CRxCore() {
     m_rx_dp = CMsgIns::Ins()->getRxDp();
     m_epoc = 0x17;
     m_start_time=0;
     m_delta_sec=0.0;
     m_port_ids.clear();
     m_port_mask=0;
-    m_max_ports=max_ports;
+    m_max_ports=0;
     m_latency_active =false;
     int i;
     for (i=0; i<TREX_MAX_PORTS; i++) {
@@ -100,6 +100,14 @@ int CRxAstfCore::_do_start(void){
     int cnt=0;
 
     create_latency_context();
+
+    /* set max ports */
+    for (auto &mngr_pair : m_rx_port_mngr) {
+        if (m_max_ports<mngr_pair.first){
+            m_max_ports = mngr_pair.first;
+        }
+    }
+    m_max_ports+=1;
 
     while (  !m_p_queue.empty() ) {
         node = m_p_queue.top();

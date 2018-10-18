@@ -11,6 +11,7 @@ from ..common.trex_types import *
 from .trex_astf_port import ASTFPort
 from .trex_astf_profile import ASTFProfile
 from .trex_astf_stats import CAstfStats
+from ..utils.common import  is_valid_ipv4, is_valid_ipv6
 import hashlib
 import sys
 
@@ -313,11 +314,32 @@ class ASTFClient(TRexClient):
         return self.astf_stats.clear_stats()
 
     @client_api('command', True)
-    def start_latency(self, mult = 1):
+    def start_latency(self, mult = 1,src_ipv4="16.0.0.1", dst_ipv4="48.0.0.1",ports_mask=0xffffffff):
+        """
+            low level start ICMP latency streams 
+
+            :parameters:
+                 ports      - mask of ports
+                 src_ipv4  - IPv4 source address for the port
+                 dst_ipv4  - IPv4 destination address
+
+             note: vlan will be taken from interface configuration
+            :raises:
+                + :exc:`TRexError`
+        """
+        if not is_valid_ipv4(src_ipv4):
+            raise TRexError("src_ipv4 is not a valid IPv4 address: '{0}'".format(src_ipv4))
+
+        if not is_valid_ipv4(dst_ipv4):
+            raise TRexError("dst_ipv4 is not a valid IPv4 address: '{0}'".format(dst_ipv4))
+
 
         params = {
             'handler': self.handler,
-            'mult': mult
+            'mult': mult,
+            'src_addr' :      src_ipv4,
+            'dst_addr' :      dst_ipv4,
+            'ports' : ports_mask
             }
 
         self.ctx.logger.pre_cmd('Starting latency traffic.')
@@ -417,6 +439,13 @@ class ASTFClient(TRexClient):
             )
         self.stop()
 
+    def calc_latency_port_mask (self,ports):
+        mask =0
+        for p in ports:
+            mask += (1<<p)
+        print (mask);
+
+
     @console_api('start_latency', 'ASTF', True)
     def start_latency_line(self, line):
         '''start latency traffic command'''
@@ -426,9 +455,17 @@ class ASTFClient(TRexClient):
             "start_latency",
             self.start_latency_line.__doc__,
             parsing_opts.MULTIPLIER_INT,
+            parsing_opts.SRC_IPV4,
+            parsing_opts.DST_IPV4,
+            parsing_opts.PORT_LIST
             )
+
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
-        self.start_latency(opts.mult)
+        ports_mask = self.calc_latency_port_mask(opts.ports)
+        self.start_latency(mult = opts.mult, 
+                           src_ipv4= opts.src_ipv4, 
+                           dst_ipv4= opts.dst_ipv4, 
+                           ports_mask= ports_mask)
         return True
 
     @console_api('stop_latency', 'ASTF', True)

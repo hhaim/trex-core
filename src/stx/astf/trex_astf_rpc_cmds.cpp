@@ -88,7 +88,7 @@ TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStop, "stop");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStartLatency, "start_latency");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStopLatency, "stop_latency");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfGetLatencyStats, "get_latency_stats");
-TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdateLatencyStats, "upate_latency");
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdateLatency, "upate_latency");
 
 TREX_RPC_CMD(TrexRpcCmdAstfCountersDesc, "get_counter_desc");
 TREX_RPC_CMD(TrexRpcCmdAstfCountersValues, "get_counter_values");
@@ -195,6 +195,30 @@ trex_rpc_cmd_rc_e
 TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result) {
     const double mult = parse_double(params, "mult", result);
 
+    const string src_ipv4_str  = parse_string(params, "src_addr", result);
+    const string dst_ipv4_str  = parse_string(params, "dst_addr", result);
+
+    char buf[4];
+
+    if ( inet_pton(AF_INET, src_ipv4_str.c_str(), buf) != 1 ) {
+        stringstream ss;
+        ss << "invalid source IPv4 address: '" << src_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+    string ip4_buf(buf, 4);
+
+    if ( inet_pton(AF_INET, dst_ipv4_str.c_str(), buf) != 1 ) {
+        stringstream ss;
+        ss << "invalid destination IPv4 address: '" << dst_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+    string gw4_buf(buf, 4);
+
+    printf(" %x %x %x %x \n",buf[3],buf[2],buf[1],buf[0]);
+    //msg->m_client_ip.v4 = 0x10000001;
+    //msg->m_server_ip.v4 = 0x30000001;
+
+
     try {
         get_astf_object()->start_transmit_latency(mult);
     } catch (const TrexException &ex) {
@@ -230,7 +254,7 @@ TrexRpcCmdAstfGetLatencyStats::_run(const Json::Value &params, Json::Value &resu
 
 
 trex_rpc_cmd_rc_e
-TrexRpcCmdAstfUpdateLatencyStats::_run(const Json::Value &params, Json::Value &result) {
+TrexRpcCmdAstfUpdateLatency::_run(const Json::Value &params, Json::Value &result) {
 
     const double mult = parse_double(params, "mult", result);
 
@@ -284,7 +308,7 @@ TrexRpcCmdsASTF::TrexRpcCmdsASTF() : TrexRpcComponent("ASTF") {
     m_cmds.push_back(new TrexRpcCmdAstfStopLatency(this));
 
     m_cmds.push_back(new TrexRpcCmdAstfGetLatencyStats(this));
-    m_cmds.push_back(new TrexRpcCmdAstfUpdateLatencyStats(this));
+    m_cmds.push_back(new TrexRpcCmdAstfUpdateLatency(this));
 
     m_cmds.push_back(new TrexRpcCmdAstfCountersDesc(this));
     m_cmds.push_back(new TrexRpcCmdAstfCountersValues(this));

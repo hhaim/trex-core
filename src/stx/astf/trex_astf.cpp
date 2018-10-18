@@ -68,7 +68,7 @@ TrexAstf::TrexAstf(const TrexSTXCfg &cfg) : TrexSTX(cfg) {
     m_active_cores = 0;
 
     /* create RX core */
-    CRxCore *rx = (CRxCore*) new CRxAstfCore(get_port_count());
+    CRxCore *rx = (CRxCore*) new CRxAstfCore();
     rx->create(cfg.m_rx_cfg);
     m_sync_b = api.get_sync_barrier();
     m_fl = api.get_fl();
@@ -274,8 +274,6 @@ void TrexAstf::start_transmit_latency(double mult){
 
     TrexRxStartLatency *msg = new TrexRxStartLatency();
     msg->m_cps = mult;
-    msg->m_pkt_type=3;
-    msg->m_max_ports=get_port_count();
     msg->m_client_ip.v4 = 0x10000001;
     msg->m_server_ip.v4 = 0x30000001;
     msg->m_dual_port_mask = 0x01000000;

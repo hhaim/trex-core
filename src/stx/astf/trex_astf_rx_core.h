@@ -30,8 +30,6 @@ class TrexRxStartLatency : public TrexCpToRxMsgBase {
 public:
     TrexRxStartLatency() {
         m_cps=0.0;
-        m_pkt_type=0;
-        m_max_ports=0;
         m_client_ip.v4=0;
         m_server_ip.v4=0;
         m_dual_port_mask=0;
@@ -42,8 +40,6 @@ public:
 
 public:
     double    m_cps;
-    uint8_t   m_pkt_type; 
-    uint8_t   m_max_ports;
     uint32_t  m_active_ports_mask;
     ipaddr_t  m_client_ip;
     ipaddr_t  m_server_ip;
@@ -116,7 +112,7 @@ public:
  */
 class CRxAstfCore : public CRxCore {
 public:
-    CRxAstfCore(uint32_t max_ports);
+    CRxAstfCore();
 
 public:
     /* commands */ 
