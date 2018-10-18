@@ -28,7 +28,7 @@ limitations under the License.
 
 class TrexAstfPort;
 class CSyncBarrier;
-
+class CRxAstfCore;
 typedef std::unordered_map<uint8_t, TrexAstfPort*> astf_port_map_t;
 
 /**
@@ -144,11 +144,27 @@ public:
      */
     bool stop_transmit_latency(void);
 
+
+    /**
+     * Get latency stats
+     */
+    void get_latency_stats(Json::Value & obj);
+
+    /**
+     * update latency stats command
+     */
+    void update_latency_stats(double mult);
+
     TrexOwner& get_owner(void) {
         return m_owner;
     }
     CSyncBarrier* get_barrier(void) {
         return m_sync_b;
+    }
+
+    CRxAstfCore * get_rx(){
+        assert(m_rx);
+        return((CRxAstfCore *)m_rx);
     }
 
 protected:

@@ -68,7 +68,7 @@ TrexAstf::TrexAstf(const TrexSTXCfg &cfg) : TrexSTX(cfg) {
     m_active_cores = 0;
 
     /* create RX core */
-    CRxCore *rx = (CRxCore*) new CRxAstfCore();
+    CRxCore *rx = (CRxCore*) new CRxAstfCore(get_port_count());
     rx->create(cfg.m_rx_cfg);
     m_sync_b = api.get_sync_barrier();
     m_fl = api.get_fl();
@@ -293,6 +293,28 @@ bool TrexAstf::stop_transmit_latency(void){
     m_l_state = STATE_L_IDLE;
     return (true);
 }
+
+void TrexAstf::get_latency_stats(Json::Value & obj){
+    CRxAstfCore * rx= get_rx();
+    std::string  json_str;
+    /* to do covert this function  to native object */
+    rx->cp_get_json(json_str);
+    Json::Reader reader;
+    bool parsingSuccessful = reader.parse(json_str,obj);
+    assert(parsingSuccessful==true);
+}
+
+
+void TrexAstf::update_latency_stats(double mult){
+    if (m_l_state != STATE_L_WORK){
+        string err = "latency thread is not active, can't stop it";
+        throw TrexException(err);
+    }
+    TrexRxUpdateLatency *msg = new TrexRxUpdateLatency();
+    msg->m_cps =mult;
+    send_msg_to_rx(msg);
+}
+
 
 
 void TrexAstf::send_message_to_all_dp(TrexCpToDpMsgBase *msg) {

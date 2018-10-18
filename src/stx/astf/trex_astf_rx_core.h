@@ -61,6 +61,20 @@ public:
 private:
 };
 
+
+class TrexRxUpdateLatency : public TrexCpToRxMsgBase {
+public:
+    TrexRxUpdateLatency() {
+        m_cps=0.0;
+    }
+
+    virtual bool handle(CRxCore *rx_core);
+
+public:
+    double    m_cps;
+};
+
+
 class CRxAstfCore;
 
 class CRxAstfPort : public CPortLatencyHWBase {
@@ -102,12 +116,14 @@ public:
  */
 class CRxAstfCore : public CRxCore {
 public:
-    CRxAstfCore(void);
+    CRxAstfCore(uint32_t max_ports);
 
 public:
     /* commands */ 
     void start_latency(TrexRxStartLatency * msg);
     void stop_latency();
+    void update_latency(TrexRxUpdateLatency * msg);
+
     void cp_dump(FILE *fd);
     void cp_get_json(std::string & json);
 
@@ -125,7 +141,8 @@ protected:
 
 private:
     void update_stats();
-    void delete_context();
+    void create_latency_context();
+    void delete_latency_context();
 
 private:
     bool                    m_active_context; /* context for latency streams is allocated */

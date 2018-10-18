@@ -54,15 +54,23 @@ bool TrexRxStopLatency::handle(CRxCore *rx_core){
 
 
 
-CRxAstfCore::CRxAstfCore(void) : CRxCore() {
-    m_active_context =false;
+bool TrexRxUpdateLatency::handle(CRxCore *rx_core){
+    CRxAstfCore * lp=(CRxAstfCore *)rx_core;
+    lp->stop_latency();
+    return(true);
+}
+
+
+
+
+CRxAstfCore::CRxAstfCore(uint32_t max_ports) : CRxCore() {
     m_rx_dp = CMsgIns::Ins()->getRxDp();
     m_epoc = 0x17;
     m_start_time=0;
     m_delta_sec=0.0;
     m_port_ids.clear();
     m_port_mask=0;
-    m_max_ports=0;
+    m_max_ports=max_ports;
     m_latency_active =false;
     int i;
     for (i=0; i<TREX_MAX_PORTS; i++) {
@@ -90,6 +98,8 @@ int CRxAstfCore::_do_start(void){
     node->m_time = now_sec()+0.007;
     m_p_queue.push(node);
     int cnt=0;
+
+    create_latency_context();
 
     while (  !m_p_queue.empty() ) {
         node = m_p_queue.top();
@@ -161,6 +171,7 @@ int CRxAstfCore::_do_start(void){
         m_p_queue.pop();
         delete node;
     }
+    delete_latency_context();
     return (0);
 }
 
@@ -215,21 +226,9 @@ uint32_t CRxAstfCore::handle_rx_one_queue(uint8_t thread_id, CNodeRing *r) {
     return got_pkts;
 }
 
+void CRxAstfCore::create_latency_context(){
 
-void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
-
-    /* create a node */
-    assert(m_latency_active ==false);
-    enable_astf_latency_fia(true);
-    m_epoc++;
-
-    if (m_active_context) {
-        /* lazy delete, so we would be able to read the stats*/
-        delete_context();
-        m_active_context=false;
-    }
-
-    uint8_t pkt_type = msg->m_pkt_type;
+    uint8_t pkt_type = 3;
 
     switch (pkt_type) {
     default:
@@ -243,20 +242,9 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
         break;
     }
 
-    double cps= msg->m_cps;
-    if (cps <= 1.0) {
-        m_delta_sec = 1.0;
-    } else {
-        if (cps>MAX_CPS){
-            cps=MAX_CPS;
-        }
-        m_delta_sec =(1.0/cps);
-    }
-
-    m_max_ports = msg->m_max_ports;
     assert (m_max_ports <= TREX_MAX_PORTS);
     assert ((m_max_ports%2)==0);
-    m_port_mask =msg->m_active_ports_mask;
+    m_port_mask =0xffffffff;
     m_pkt_gen.Create(m_l_pkt_mode);
     for (int i=0; i<m_max_ports; i++) {
         CLatencyManagerPerPort * lp=&m_ports[i];
@@ -270,18 +258,59 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
                           m_l_pkt_mode,
                           0 );
         lp->m_port.set_enable_none_latency_processing(false);
-        lp->m_port.m_hist.set_hot_max_cnt((int(cps)/2));
-
         if ( !CGlobalInfo::m_options.m_dummy_port_map[i] ) {
             m_port_ids.push_back(i);
         }
     }
+
+    CGlobalInfo::m_options.m_l_pkt_mode = L_PKT_SUBMODE_REPLY;
+    CGlobalInfo::is_learn_mode(CParserOption::LEARN_MODE_TCP_ACK);
+}
+
+void CRxAstfCore::delete_latency_context(){
+
+    m_pkt_gen.Delete();
+
+    for (int i=0; i<m_max_ports; i++) {
+        CLatencyManagerPerPort * lp=&m_ports[i];
+        lp->m_port.Delete();
+    }
+    m_port_ids.clear();
+    if (m_l_pkt_mode) {
+        delete m_l_pkt_mode;
+        m_l_pkt_mode =0;
+    }
+}
+
+static double _get_d_from_cps(double cps){
+    double delta_sec;
+    if (cps <= 1.0) {
+        delta_sec = 1.0;
+    } else {
+        if (cps>MAX_CPS){
+            cps=MAX_CPS;
+        }
+        delta_sec =(1.0/cps);
+    }
+    return (delta_sec);
+}
+
+void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
+
+    /* create a node */
+    assert(m_latency_active ==false);
+    enable_astf_latency_fia(true);
+    m_epoc++;
+
+    m_delta_sec = _get_d_from_cps(msg->m_cps);
+    for (int i=0; i<m_max_ports; i++) {
+        CLatencyManagerPerPort * lp=&m_ports[i];
+        lp->m_port.m_hist.set_hot_max_cnt((int(msg->m_cps)/2));
+    }
+
     m_pkt_gen.set_ip(msg->m_client_ip.v4,
                      msg->m_server_ip.v4,
                      msg->m_dual_port_mask);
-
-
-    m_active_context =true;
 
     CGenNode * node;
     node = new CGenNode();
@@ -298,30 +327,18 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     m_p_queue.push(node);
     
 
-    /* make sure we are in NAT mode, this is due to old code that check this variables to work */
-    CGlobalInfo::m_options.m_l_pkt_mode = L_PKT_SUBMODE_REPLY;
-    CGlobalInfo::is_learn_mode(CParserOption::LEARN_MODE_TCP_ACK);
     m_latency_active =true;
 }
 
 
-void CRxAstfCore::delete_context(){
-        
-    m_pkt_gen.Delete();
-
-    for (int i=0; i<m_max_ports; i++) {
-        CLatencyManagerPerPort * lp=&m_ports[i];
-        lp->m_port.Delete();
-    }
-    m_port_ids.clear();
-    if (m_l_pkt_mode) {
-        delete m_l_pkt_mode;
-        m_l_pkt_mode =0;
-    }
-}
-
 void CRxAstfCore::stop_latency(){
     m_latency_active = false;
+}
+
+
+void CRxAstfCore::update_latency(TrexRxUpdateLatency * msg){
+    assert(m_latency_active==true);
+    m_delta_sec = _get_d_from_cps(msg->m_cps);
 }
 
 
@@ -386,11 +403,6 @@ bool  CRxAstfCore::send_pkt_all_ports(){
 void CRxAstfCore::cp_dump(FILE *fd){
 
     fprintf(fd," Cpu Utilization : %2.1f %%  \n",m_cpu_cp_u.GetVal());
-    if (!m_active_context) {
-        fprintf(fd," no active context  \n");
-        return;
-    }
-
     CCPortLatency::DumpShortHeader(fd);
     for (auto &i: m_port_ids) {
         fprintf(fd," %d | ",i);
@@ -401,7 +413,6 @@ void CRxAstfCore::cp_dump(FILE *fd){
 }
 
 void CRxAstfCore::update_stats(){
-    assert(m_active_context);
     for (auto &i: m_port_ids) {
         CLatencyManagerPerPort * lp=&m_ports[i];
         lp->m_port.m_hist.update();
@@ -411,9 +422,6 @@ void CRxAstfCore::update_stats(){
 void CRxAstfCore::cp_get_json(std::string & json){
     json="{\"name\":\"trex-latecny-v2\",\"type\":0,\"data\":{";
     json+=add_json("cpu_util",m_cpu_cp_u.GetVal());
-    if (!m_active_context) {
-        return;
-    }
 
     for (auto &i: m_port_ids) {
         CLatencyManagerPerPort * lp=&m_ports[i];

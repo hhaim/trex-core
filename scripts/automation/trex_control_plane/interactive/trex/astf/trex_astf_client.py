@@ -340,6 +340,34 @@ class ASTFClient(TRexClient):
             raise TRexError(rc.err())
 
 
+    @client_api('getter', True)
+    def get_latency_stats(self):
+
+        params = {
+            'handler': self.handler
+            }
+
+        rc = self._transmit('get_latency_stats',params = params)
+        if not rc:
+            raise TRexError(rc.err())
+        data = rc.data()['data']
+        print(data);
+        return(data)
+
+    @client_api('command', True)
+    def clear_latency_stats(self):
+        params = {
+            'handler': self.handler
+            }
+
+        self.ctx.logger.pre_cmd('clear latency stats')
+        rc = self._transmit("clear_latency_stats", params = params)
+        if not rc:
+            raise TRexError(rc.err())
+
+
+        return self.astf_stats.clear_stats()
+
 ############################   console   #############################
 ############################   commands  #############################
 ############################             #############################
@@ -414,6 +442,20 @@ class ASTFClient(TRexClient):
             )
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
         self.stop_latency()
+        return True
+
+    #need to remove this command and integrate it with  show_stats_line
+    @console_api('show_latency_stats', 'ASTF', True)
+    def show_latency_line(self, line):
+        '''start latency traffic command'''
+
+        parser = parsing_opts.gen_parser(
+            self,
+            "show_latency_stats",
+            self.start_line.__doc__
+            )
+        opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
+        data=self.get_latency_stats()
         return True
 
 
