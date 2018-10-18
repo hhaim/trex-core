@@ -116,6 +116,9 @@ public:
                 );
     void Delete();
     void reset();
+    void set_epoc(uint8_t epoc){
+        m_epoc = epoc;
+    }
 
     void set_enable_none_latency_processing(bool enable){
         m_handle_none_latency =enable;
@@ -183,12 +186,12 @@ public:
     uint16_t get_icmp_rx_seq() {return m_icmp_rx_seq;}
 
     // Check if packet contains latency data
-    static inline bool IsLatencyPkt(uint8_t *p) {
+    static inline bool IsLatencyPkt(uint8_t *p,uint8_t epoc) {
         if (! p)
             return false;
 
         latency_header * h=(latency_header *)(p);
-        if ( (h->magic & 0xffffff00) != LATENCY_MAGIC ){
+        if ( (h->magic & 0xffffff00) != LATENCY_MAGIC+(epoc<<8) ){
             return false;
         }
 
@@ -223,6 +226,7 @@ private:
      uint16_t m_icmp_rx_seq;
      uint16_t pad1[1];
      bool     m_handle_none_latency;
+     uint8_t  m_epoc;
 
 public:
      uint64_t m_tx_pkt_ok;

@@ -302,10 +302,13 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     enable_astf_latency_fia(true);
     m_epoc++;
 
+
     m_delta_sec = _get_d_from_cps(msg->m_cps);
     for (int i=0; i<m_max_ports; i++) {
         CLatencyManagerPerPort * lp=&m_ports[i];
+        lp->m_port.reset();
         lp->m_port.m_hist.set_hot_max_cnt((int(msg->m_cps)/2));
+        lp->m_port.set_epoc(m_epoc);
     }
 
     m_pkt_gen.set_ip(msg->m_client_ip.v4,

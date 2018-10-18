@@ -256,7 +256,7 @@ bool CCPortLatency::Create(uint8_t id,
                            CLatencyPktMode * pkt_mode,
                            CNatRxManager *   nat_manager
                            ){
-
+    m_epoc =0;
     m_pkt_mode =pkt_mode;
     assert(m_pkt_mode);
     m_nat_manager =nat_manager;
@@ -295,7 +295,7 @@ void CCPortLatency::update_packet(rte_mbuf_t * m, int port_id){
     memcpy(p,CGlobalInfo::m_options.get_dst_src_mac_addr(m_id),12);
 
     latency_header * h=(latency_header *)(p+m_payload_offset);
-    h->magic = LATENCY_MAGIC | m_id ;
+    h->magic = (LATENCY_MAGIC | m_id)+ (m_epoc<<8);
     h->time_stamp = os_get_hr_tick_64();
     h->seq = m_tx_seq;
     m_tx_seq++;
@@ -474,7 +474,7 @@ bool CCPortLatency::check_packet(rte_mbuf_t * m,CRx_check_header * & rx_p) {
 
     rx_p = (CRx_check_header *)0;
 
-    bool is_lateancy_pkt =  c_l_pkt_mode->IsLatencyPkt(parser.m_ipv4) & IsLatencyPkt(parser.m_l4 + c_l_pkt_mode->l4_header_len());
+    bool is_lateancy_pkt =  c_l_pkt_mode->IsLatencyPkt(parser.m_ipv4) & IsLatencyPkt(parser.m_l4 + c_l_pkt_mode->l4_header_len(),m_epoc);
 
     if ( ! is_lateancy_pkt && (m_handle_none_latency) ) {
 
