@@ -424,7 +424,7 @@ class ASTFClient(TRexClient):
         parser = parsing_opts.gen_parser(
             self,
             "start_latency",
-            self.start_line.__doc__,
+            self.start_latency_line.__doc__,
             parsing_opts.MULTIPLIER_INT,
             )
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
@@ -438,7 +438,7 @@ class ASTFClient(TRexClient):
         parser = parsing_opts.gen_parser(
             self,
             "stop_latency",
-            self.start_line.__doc__
+            self.stop_latency_line.__doc__
             )
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
         self.stop_latency()
