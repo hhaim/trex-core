@@ -476,7 +476,11 @@ bool CCPortLatency::check_packet(rte_mbuf_t * m,CRx_check_header * & rx_p) {
 
     bool is_lateancy_pkt =  c_l_pkt_mode->IsLatencyPkt(parser.m_ipv4) & IsLatencyPkt(parser.m_l4 + c_l_pkt_mode->l4_header_len(),m_epoc);
 
-    if ( ! is_lateancy_pkt && (m_handle_none_latency) ) {
+    if (!is_lateancy_pkt) {
+        if (!m_handle_none_latency) {
+            /* nothing todo */
+            return true;
+        }
 
 #ifdef NAT_TRACE_
         printf(" %.3f RX : got packet !!! \n",now_sec() );
