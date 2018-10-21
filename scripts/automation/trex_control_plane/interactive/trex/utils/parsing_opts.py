@@ -81,6 +81,7 @@ RX_PORT_LIST
 
 SRC_IPV4
 DST_IPV4
+DUAL_IPV4
 
 CAPTURE_ID
 
@@ -535,6 +536,13 @@ OPTIONS_DB = {
         ['--dst'],
         {'help': 'Configure destination IPv4 address',
          'dest': 'dst_ipv4',
+         'required': True,
+         'type': check_ipv4_addr}),
+
+    DUAL_IPV4: ArgumentPack(
+        ['--dual_ip_mask'],
+        {'help': 'Dual mask IPv4 address',
+         'dest': 'dual_ip_mask',
          'required': True,
          'type': check_ipv4_addr}),
 

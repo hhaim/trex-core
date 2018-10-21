@@ -99,7 +99,6 @@ int CRxAstfCore::_do_start(void){
     m_p_queue.push(node);
     int cnt=0;
 
-    create_latency_context();
 
     /* set max ports */
     for (auto &mngr_pair : m_rx_port_mngr) {
@@ -108,6 +107,9 @@ int CRxAstfCore::_do_start(void){
         }
     }
     m_max_ports+=1;
+
+    create_latency_context();
+
 
     while (  !m_p_queue.empty() ) {
         node = m_p_queue.top();
@@ -146,9 +148,9 @@ int CRxAstfCore::_do_start(void){
                 update_stats();
                 cnt++;
 #ifdef LATENCY_DEBUG
-                ///if (cnt%10==0) {
-                   //cp_dump(stdout);
-                //}
+                if (cnt%10==0) {
+                  cp_dump(stdout);
+                }
 #endif
             }else{
                 restart=false;
@@ -312,12 +314,20 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
 
 
     m_delta_sec = _get_d_from_cps(msg->m_cps);
+    m_port_ids.clear();
     for (int i=0; i<m_max_ports; i++) {
         CLatencyManagerPerPort * lp=&m_ports[i];
         lp->m_port.reset();
         lp->m_port.m_hist.set_hot_max_cnt((int(msg->m_cps)/2));
         lp->m_port.set_epoc(m_epoc);
+
+        if (msg->m_active_ports_mask & (1<<i)){
+            if ( !CGlobalInfo::m_options.m_dummy_port_map[i] ) {
+                m_port_ids.push_back(i);
+            }
+        }
     }
+
 
     m_pkt_gen.set_ip(msg->m_client_ip.v4,
                      msg->m_server_ip.v4,

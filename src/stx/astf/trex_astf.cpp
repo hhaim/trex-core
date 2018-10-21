@@ -263,7 +263,7 @@ bool TrexAstf::stop_transmit(void) {
     return true;
 }
 
-void TrexAstf::start_transmit_latency(double mult){
+void TrexAstf::start_transmit_latency(TrexRxStartLatency *msg){
     check_whitelist_states({STATE_IDLE});
 
     if (m_l_state != STATE_L_IDLE){
@@ -272,11 +272,6 @@ void TrexAstf::start_transmit_latency(double mult){
     }
     m_l_state = STATE_L_WORK;
 
-    TrexRxStartLatency *msg = new TrexRxStartLatency();
-    msg->m_cps = mult;
-    msg->m_client_ip.v4 = 0x10000001;
-    msg->m_server_ip.v4 = 0x30000001;
-    msg->m_dual_port_mask = 0x01000000;
     send_msg_to_rx(msg);
 }
 

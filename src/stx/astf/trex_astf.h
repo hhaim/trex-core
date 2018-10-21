@@ -29,6 +29,7 @@ limitations under the License.
 class TrexAstfPort;
 class CSyncBarrier;
 class CRxAstfCore;
+class TrexRxStartLatency;
 typedef std::unordered_map<uint8_t, TrexAstfPort*> astf_port_map_t;
 
 /**
@@ -137,7 +138,7 @@ public:
     /**
      * Start transmit latency streams only 
      */
-    void start_transmit_latency(double mult);
+    void start_transmit_latency(TrexRxStartLatency *msg);
 
     /**
      * Stop transmit latency streams only 

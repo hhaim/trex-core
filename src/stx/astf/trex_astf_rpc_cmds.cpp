@@ -26,6 +26,7 @@ limitations under the License.
 #include "trex_astf.h"
 #include "trex_astf_port.h"
 #include "trex_astf_rpc_cmds.h"
+#include "trex_astf_rx_core.h"
 #include "stt_cp.h"
 #include <set>
 
@@ -197,30 +198,44 @@ TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result)
 
     const string src_ipv4_str  = parse_string(params, "src_addr", result);
     const string dst_ipv4_str  = parse_string(params, "dst_addr", result);
+    const string dual_ipv4_str  = parse_string(params, "dual_port_addr", result);
+    const uint32_t mask  = parse_int(params, "mask", result);
 
-    char buf[4];
 
-    if ( inet_pton(AF_INET, src_ipv4_str.c_str(), buf) != 1 ) {
+
+    uint32_t src_ip;
+    uint32_t dst_ip;
+    uint32_t dual_ip;
+    if (!utl_ipv4_to_uint32(src_ipv4_str.c_str(), src_ip)){
         stringstream ss;
         ss << "invalid source IPv4 address: '" << src_ipv4_str << "'";
         generate_parse_err(result, ss.str());
     }
-    string ip4_buf(buf, 4);
 
-    if ( inet_pton(AF_INET, dst_ipv4_str.c_str(), buf) != 1 ) {
+    if (!utl_ipv4_to_uint32(dst_ipv4_str.c_str(), dst_ip)){
         stringstream ss;
         ss << "invalid destination IPv4 address: '" << dst_ipv4_str << "'";
         generate_parse_err(result, ss.str());
     }
-    string gw4_buf(buf, 4);
 
-    printf(" %x %x %x %x \n",buf[3],buf[2],buf[1],buf[0]);
-    //msg->m_client_ip.v4 = 0x10000001;
-    //msg->m_server_ip.v4 = 0x30000001;
+    if (!utl_ipv4_to_uint32(dual_ipv4_str.c_str(), dual_ip)){
+        stringstream ss;
+        ss << "invalid dual port ip IPv4 address: '" << dual_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+
+
+    TrexRxStartLatency *msg = new TrexRxStartLatency();
+
+    msg->m_client_ip.v4 = src_ip;
+    msg->m_server_ip.v4 = dst_ip;
+    msg->m_dual_port_mask = dual_ip;
+    msg->m_active_ports_mask = mask;
+    msg->m_cps=mult;
 
 
     try {
-        get_astf_object()->start_transmit_latency(mult);
+        get_astf_object()->start_transmit_latency(msg);
     } catch (const TrexException &ex) {
         generate_execute_err(result, ex.what());
     }

@@ -314,14 +314,15 @@ class ASTFClient(TRexClient):
         return self.astf_stats.clear_stats()
 
     @client_api('command', True)
-    def start_latency(self, mult = 1,src_ipv4="16.0.0.1", dst_ipv4="48.0.0.1",ports_mask=0xffffffff):
+    def start_latency(self, mult = 1,src_ipv4="16.0.0.1", dst_ipv4="48.0.0.1",ports_mask=0xffffffff,dual_ipv4 = "0.0.0.0"):
         """
             low level start ICMP latency streams 
 
             :parameters:
-                 ports      - mask of ports
-                 src_ipv4  - IPv4 source address for the port
-                 dst_ipv4  - IPv4 destination address
+                 ports_mask - mask of ports
+                 src_ipv4   - IPv4 source address for the port
+                 dst_ipv4   - IPv4 destination address
+                 dual_ipv4  - IPv4 mask per dual ports 
 
              note: vlan will be taken from interface configuration
             :raises:
@@ -333,13 +334,17 @@ class ASTFClient(TRexClient):
         if not is_valid_ipv4(dst_ipv4):
             raise TRexError("dst_ipv4 is not a valid IPv4 address: '{0}'".format(dst_ipv4))
 
+        if not is_valid_ipv4(dual_ipv4):
+            raise TRexError("dual_ipv4 is not a valid IPv4 address: '{0}'".format(dual_ipv4))
+        print(src_ipv4,dst_ipv4,dual_ipv4,mult,ports_mask)
 
         params = {
             'handler': self.handler,
             'mult': mult,
             'src_addr' :      src_ipv4,
             'dst_addr' :      dst_ipv4,
-            'ports' : ports_mask
+            'dual_port_addr' : dual_ipv4,
+            'mask' : ports_mask
             }
 
         self.ctx.logger.pre_cmd('Starting latency traffic.')
@@ -443,7 +448,7 @@ class ASTFClient(TRexClient):
         mask =0
         for p in ports:
             mask += (1<<p)
-        print (mask);
+        return(mask);
 
 
     @console_api('start_latency', 'ASTF', True)
@@ -457,7 +462,8 @@ class ASTFClient(TRexClient):
             parsing_opts.MULTIPLIER_INT,
             parsing_opts.SRC_IPV4,
             parsing_opts.DST_IPV4,
-            parsing_opts.PORT_LIST
+            parsing_opts.PORT_LIST_WITH_ALL,
+            parsing_opts.DUAL_IPV4
             )
 
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
@@ -465,6 +471,7 @@ class ASTFClient(TRexClient):
         self.start_latency(mult = opts.mult, 
                            src_ipv4= opts.src_ipv4, 
                            dst_ipv4= opts.dst_ipv4, 
+                           dual_ipv4 =opts.dual_ip_mask, 
                            ports_mask= ports_mask)
         return True
 
