@@ -10,7 +10,8 @@ from ..common.trex_types import *
 
 from .trex_astf_port import ASTFPort
 from .trex_astf_profile import ASTFProfile
-from .trex_astf_stats import CAstfStats
+from .stats.traffic import CAstfTrafficStats
+from .stats.latency import CAstfLatencyStats
 from ..utils.common import  is_valid_ipv4, is_valid_ipv6
 import hashlib
 import sys
@@ -58,7 +59,8 @@ class ASTFClient(TRexClient):
                             verbose_level,
                             logger)
         self.handler = ''
-        self.astf_stats = CAstfStats(self.conn.rpc)
+        self.traffic_stats = CAstfTrafficStats(self.conn.rpc)
+        self.latency_stats = CAstfLatencyStats(self.conn.rpc)
 
 
 
@@ -83,9 +85,10 @@ class ASTFClient(TRexClient):
         return RC_OK()
 
     def _on_connect_clear_stats(self):
-        self.astf_stats.reset()
+        self.traffic_stats.reset()
+        self.latency_stats.reset()
         with self.ctx.logger.suppress(verbose = "warning"):
-            self.clear_stats(ports = self.get_all_ports(), clear_xstats = False, clear_astf = False)
+            self.clear_stats(ports = self.get_all_ports(), clear_xstats = False, clear_traffic = False, clear_latency = False)
         return RC_OK()
 
 ############################     helper     #############################
@@ -284,34 +287,51 @@ class ASTFClient(TRexClient):
 
     # get stats
     @client_api('getter', True)
-    def get_stats (self, ports = None, sync_now = True):
+    def get_stats(self, ports = None, sync_now = True):
 
-        ext_stats = {'astf': self.get_astf_stats()}
+        stats = self._get_stats_common(ports, sync_now)
+        stats['traffic'] = self.get_traffic_stats()
+        stats['latency'] = self.get_latency_stats()
 
-        return self._get_stats_common(ports, sync_now, ext_stats = ext_stats)
+        return stats
 
 
     # clear stats
     @client_api('getter', True)
-    def clear_stats (self,
-                     ports = None,
-                     clear_global = True,
-                     clear_xstats = True,
-                     clear_astf = True):
+    def clear_stats(self,
+                    ports = None,
+                    clear_global = True,
+                    clear_xstats = True,
+                    clear_traffic = True,
+                    clear_latency = True):
 
-        if clear_astf:
-            self.clear_astf_stats()
+        if clear_traffic:
+            self.clear_traffic_stats()
+
+        if clear_latency:
+            self.clear_latency_stats()
 
         return self._clear_stats_common(ports, clear_global, clear_xstats)
 
 
     @client_api('getter', True)
-    def get_astf_stats(self):
-        return self.astf_stats.get_stats()
+    def get_traffic_stats(self):
+        return self.traffic_stats.get_stats()
+
 
     @client_api('getter', True)
-    def clear_astf_stats(self):
-        return self.astf_stats.clear_stats()
+    def clear_traffic_stats(self):
+        return self.traffic_stats.clear_stats()
+
+
+    @client_api('getter', True)
+    def get_latency_stats(self):
+        return self.latency_stats.get_stats()
+
+
+    @client_api('getter', True)
+    def clear_latency_stats(self):
+        return self.latency_stats.clear_stats()
 
 
     @client_api('command', True)
@@ -407,25 +427,6 @@ class ASTFClient(TRexClient):
         if not rc:
             raise TRexError(rc.err())
 
-
-    @client_api('getter', True)
-    def get_latency_stats(self):
-        rc = self._transmit('get_latency_stats')
-        if not rc:
-            raise TRexError(rc.err())
-        return rc.data()['data']
-
-
-    @client_api('command', True)
-    def clear_latency_stats(self):
-        params = {
-            'handler': self.handler
-            }
-
-        self.ctx.logger.pre_cmd('clear latency stats')
-        rc = self._transmit("clear_latency_stats", params = params)
-        if not rc:
-            raise TRexError(rc.err())
 
 
 ############################   console   #############################
@@ -550,10 +551,10 @@ class ASTFClient(TRexClient):
             self.update_latency(mult = opts.mult)
 
         elif opts.command == 'show':
-            print(self.get_latency_stats())
+            self._show_latency_stats()
 
         elif opts.command == 'hist':
-            print(self.get_latency_stats())
+            self._show_latency_histogram()
 
         else:
             raise TRexError('Unhandled command %s' % opts.command)
@@ -604,20 +605,34 @@ class ASTFClient(TRexClient):
             self._show_mbuf_util()
 
         elif opts.stats == 'astf':
-            self._show_astf_stats(False)
+            self._show_traffic_stats(False)
 
         elif opts.stats == 'astf_inc_zero':
-            self._show_astf_stats(True)
+            self._show_traffic_stats(True)
 
         elif opts.stats == 'latency':
-            print(self.get_latency_stats())
+            self._show_latency_stats()
+
+        elif opts.stats == 'latency_histogram':
+            self._show_latency_histogram()
 
         else:
             raise TRexError('Unhandled stat: %s' % opts.stats)
 
 
-    def _show_astf_stats(self, include_zero_lines, buffer = sys.stdout):
-        table = self.astf_stats.to_table(include_zero_lines)
+    def _show_traffic_stats(self, include_zero_lines, buffer = sys.stdout):
+        table = self.traffic_stats.to_table(include_zero_lines)
         text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
+
+
+    def _show_latency_stats(self, buffer = sys.stdout):
+        table = self.latency_stats.to_table()
+        text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
+
+
+    def _show_latency_histogram(self, buffer = sys.stdout):
+        raise TRexError('Not implemented')
+        #table = self.latency_stats.to_table()
+        #text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
 
 

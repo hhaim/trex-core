@@ -258,10 +258,10 @@ class TrexTUILatencyStats(TrexTUIPanel):
          self.client.pgid_stats.clear_stats()
          return ""
 
-# streams stats
-class TrexTUIAstfStats(TrexTUIPanel):
+
+class TrexTUIAstfTrafficStats(TrexTUIPanel):
     def __init__(self, mng):
-        super(TrexTUIAstfStats, self).__init__(mng, "astats")
+        super(TrexTUIAstfTrafficStats, self).__init__(mng, "astats")
         self.start_row = 0
         self.max_lines = TrexTUI.MIN_ROWS - 16 # 16 is size of panels below and above
         self.num_lines = 0
@@ -277,7 +277,7 @@ class TrexTUIAstfStats(TrexTUIPanel):
         self.client._show_global_stats(buffer = buffer)
 
         buf = StringIO()
-        self.client._show_astf_stats(False, buffer = buf)
+        self.client._show_traffic_stats(False, buffer = buf)
         buf.seek(0)
         out_lines = buf.readlines()
         self.num_lines = len(out_lines)
@@ -302,6 +302,39 @@ class TrexTUIAstfStats(TrexTUIPanel):
     def action_down(self):
         if self.start_row < self.num_lines - self.max_lines:
             self.start_row += 1
+
+
+# ASTF latency stats
+class TrexTUIAstfLatencyStats(TrexTUIPanel):
+    def __init__ (self, mng):
+        super(TrexTUIAstfLatencyStats, self).__init__(mng, 'lstats')
+        self.key_actions = OrderedDict()
+        self.key_actions['c'] = {'action': self.action_clear, 'legend': 'clear', 'show': True}
+        self.key_actions['h'] = {'action': self.action_toggle_histogram, 'legend': 'histogram toggle', 'show': True}
+        self.is_histogram = False
+
+
+    def show (self, buffer):
+        self.client._show_global_stats(buffer = buffer)
+
+        if self.is_histogram:
+            self.client._show_latency_histogram(buffer = buffer)
+        else:
+            self.client._show_latency_stats(buffer = buffer)
+
+
+    def get_key_actions (self):
+        return self.key_actions 
+
+
+    def action_toggle_histogram (self):
+        self.is_histogram = not self.is_histogram
+        return ""
+
+
+    def action_clear (self):
+         self.client.clear_latency_stats()
+         return ""
 
 
 # utilization stats
@@ -384,8 +417,10 @@ class TrexTUIPanelManager():
             self.key_actions['l'] = {'action': self.action_show_lstats, 'legend': 'latency', 'show': True}
 
         elif self.client.get_mode() == "ASTF":
-            self.panels['astats'] = TrexTUIAstfStats(self)
+            self.panels['astats'] = TrexTUIAstfTrafficStats(self)
+            self.panels['lstats'] = TrexTUIAstfLatencyStats(self)
             self.key_actions['s'] = {'action': self.action_show_astats, 'legend': 'astf', 'show': True}
+            self.key_actions['l'] = {'action': self.action_show_lstats, 'legend': 'latency', 'show': True}
 
         # start with dashboard
         self.main_panel = self.panels['dashboard']

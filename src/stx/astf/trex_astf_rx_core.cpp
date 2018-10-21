@@ -442,7 +442,8 @@ void CRxAstfCore::update_stats(){
 
 void CRxAstfCore::cp_get_json(std::string & json){
     json="{\"name\":\"trex-latecny-v2\",\"type\":0,\"data\":{";
-    json+=add_json("cpu_util",m_cpu_cp_u.GetVal());
+    json+=add_json("cpu_util", m_cpu_cp_u.GetVal());
+    json+=add_json("epoch", m_epoc);
 
     for (auto &i: m_port_ids) {
         CLatencyManagerPerPort * lp=&m_ports[i];
