@@ -540,10 +540,9 @@ OPTIONS_DB = {
          'type': check_ipv4_addr}),
 
     DUAL_IPV4: ArgumentPack(
-        ['--dual_ip_mask'],
-        {'help': 'Dual mask IPv4 address',
-         'dest': 'dual_ip_mask',
-         'required': True,
+        ['--dual-ip-mask'],
+        {'help': 'IP address to be added for each pair of ports (starting from second pair)',
+         'default': '1.0.0.0',
          'type': check_ipv4_addr}),
 
     DST_MAC: ArgumentPack(
@@ -1042,6 +1041,8 @@ OPTIONS_DB = {
             GLOBAL_STATS,
             PORT_STATS,
             PORT_STATUS,
+            LATENCY_STATS,
+            LATENCY_HISTOGRAM,
             CPU_STATS,
             MBUF_STATS,
             EXTENDED_STATS,
