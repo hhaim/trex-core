@@ -255,13 +255,14 @@ class ASTFClient(TRexClient):
 
 
     @client_api('command', True)
-    def start(self, mult = 1, duration = -1,nc=False):
+    def start(self, mult = 1, duration = -1,nc=False,latency_pps = 0):
 
         params = {
             'handler': self.handler,
             'mult': mult,
             'nc':nc,
             'duration': duration,
+            'latency_pps' :latency_pps
             }
 
         self.ctx.logger.pre_cmd('Starting traffic.')
@@ -425,12 +426,13 @@ class ASTFClient(TRexClient):
             parsing_opts.MULTIPLIER_INT,
             parsing_opts.DURATION,
             parsing_opts.TUNABLES,
-            parsing_opts.ASTF_NC
+            parsing_opts.ASTF_NC,
+            parsing_opts.ASTF_LATENCY
             )
         opts = parser.parse_args(line.split(), default_ports = self.get_acquired_ports(), verify_acquired = True)
         tunables = opts.tunables or {}
         self.load_profile(opts.file[0], tunables)
-        self.start(opts.mult, duration = opts.duration, nc = opts.nc)
+        self.start(opts.mult, duration = opts.duration, nc = opts.nc, latency_pps = opts.latency_pps)
         return True
 
     @console_api('stop', 'ASTF', True)

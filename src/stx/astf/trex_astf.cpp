@@ -44,6 +44,7 @@ TrexAstf::TrexAstf(const TrexSTXCfg &cfg) : TrexSTX(cfg) {
     const int API_VER_MAJOR = 1;
     const int API_VER_MINOR = 0;
     m_l_state = STATE_L_IDLE;
+    m_last_start_state =  STATE_L_IDLE;
 
     /* init the RPC table */
     TrexRpcCommandsTable::get_instance().init("ASTF", API_VER_MAJOR, API_VER_MINOR);
@@ -224,7 +225,7 @@ void TrexAstf::profile_load(void) {
     }
 }
 
-void TrexAstf::start_transmit(double duration, double mult,bool nc) {
+void TrexAstf::start_transmit(double duration, double mult,bool nc,int latency_pps) {
     if ( unlikely(!m_wd) ) {
         m_wd = TrexWatchDog::getInstance().get_current_monitor();
     }
@@ -232,6 +233,22 @@ void TrexAstf::start_transmit(double duration, double mult,bool nc) {
     check_whitelist_states({STATE_IDLE});
 
     CGlobalInfo::m_options.m_factor = mult;
+
+    if (latency_pps>0){
+        CAstfDB *db = CAstfDB::instance();
+
+        TrexRxStartLatency *msg = new TrexRxStartLatency();
+        if (!db->get_latency_info_info(msg->m_client_ip.v4,
+                                  msg->m_server_ip.v4,
+                                  msg->m_dual_port_mask)){
+            
+            throw TrexException("no valid ip range for latency");
+        }
+        msg->m_cps = latency_pps;
+        msg->m_active_ports_mask = 0xffffffff;
+        start_transmit_latency(msg); 
+        m_last_start_state =STATE_L_WORK; /* was started from start command */
+    }
 
     m_fl->m_stt_cp->clear_counters();
 
@@ -253,6 +270,11 @@ bool TrexAstf::stop_transmit(void) {
         return true;
     }
 
+    if ((m_last_start_state==STATE_L_WORK) && (m_l_state==STATE_L_WORK)) {
+        m_last_start_state=STATE_L_IDLE;
+        stop_transmit_latency();
+    }
+
     set_barrier(0.5);
     TrexCpToDpMsgBase *msg = new TrexAstfDpStop();
     send_message_to_all_dp(msg);
@@ -264,7 +286,6 @@ bool TrexAstf::stop_transmit(void) {
 }
 
 void TrexAstf::start_transmit_latency(TrexRxStartLatency *msg){
-    check_whitelist_states({STATE_IDLE});
 
     if (m_l_state != STATE_L_IDLE){
         string err = "latency state is not idle, should stop latency thread first ";

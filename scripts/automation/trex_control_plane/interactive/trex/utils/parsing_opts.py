@@ -64,6 +64,7 @@ OUTPUT_FILENAME
 LIMIT
 PORT_RESTART
 ASTF_NC
+ASTF_LATENCY
 
 RETRIES
 
@@ -573,6 +574,15 @@ OPTIONS_DB = {
          'dest': 'nc',
          'default': False,
          'action': 'store_true'}),
+
+    ASTF_LATENCY: ArgumentPack(
+        ['-l'],
+        {
+         'dest': 'latency_pps',
+         'default':  0,
+         'type': int,
+         'help': "start latency streams"}),
+
 
     PORT_RESTART: ArgumentPack(
         ['-r', '--restart'],

@@ -119,6 +119,8 @@ public:
     void start_latency(TrexRxStartLatency * msg);
     void stop_latency();
     void update_latency(TrexRxUpdateLatency * msg);
+    void cp_update_stats();
+
 
     void cp_dump(FILE *fd);
     void cp_get_json(std::string & json);
@@ -136,13 +138,14 @@ protected:
                                  uint8_t port_id);
 
 private:
-    void update_stats();
     void create_latency_context();
     void delete_latency_context();
 
 private:
     bool                    m_active_context; /* context for latency streams is allocated */
     bool                    m_latency_active; /* active latency process */
+    volatile uint32_t       m_cp_ports_mask_cache; /* cache for CP for active ports */
+
 
     CRxAstfPort             m_io_ports[TREX_MAX_PORTS];
     CMessagingManager *     m_rx_dp;

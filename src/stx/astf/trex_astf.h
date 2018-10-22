@@ -127,7 +127,7 @@ public:
     /**
      * Start transmit
      */
-    void start_transmit(double duration, double mult,bool nc);
+    void start_transmit(double duration, double mult,bool nc,int latency_pps);
 
     /**
      * Stop transmit
@@ -177,6 +177,7 @@ protected:
     //void check_blacklist_states(const states_t &blacklist);
 
     state_latency_e m_l_state;
+    state_latency_e m_last_start_state;
     TrexOwner       m_owner;
     uint8_t         m_cur_state;
     int16_t         m_active_cores;
