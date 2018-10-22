@@ -116,6 +116,7 @@ public:
                 );
     void Delete();
     void reset();
+    void reset_seq();
     void set_epoc(uint8_t epoc){
         m_epoc = epoc;
     }

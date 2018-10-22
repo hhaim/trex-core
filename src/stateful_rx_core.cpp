@@ -222,6 +222,12 @@ void CLatencyPktInfo::Delete(){
     }
 }
 
+
+void CCPortLatency::reset_seq(){
+    m_tx_seq=0;
+    m_rx_seq=0;
+}
+
 void CCPortLatency::reset(){
     m_rx_seq    =m_tx_seq;
     m_pad       = 0;

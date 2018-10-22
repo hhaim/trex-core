@@ -80,6 +80,8 @@ CRxAstfCore::CRxAstfCore() : CRxCore() {
     }
     m_l_pkt_mode = 0;
     m_cp_ports_mask_cache =0;
+    m_cp_disable_update=false;
+    m_cp_update=false;
 }
 
 
@@ -315,6 +317,17 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     enable_astf_latency_fia(true);
     m_epoc++;
 
+    /* make sure update is not called while we are reseting the counters */
+    rte_mb();
+    while (true) {
+        if (m_cp_update==false) {
+            break;
+        }
+    }
+    m_cp_disable_update=true;
+    rte_mb();
+    /*----- */
+
 
     m_delta_sec = _get_d_from_cps(msg->m_cps);
     m_port_ids.clear();
@@ -323,6 +336,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     for (int i=0; i<m_max_ports; i++) {
         CLatencyManagerPerPort * lp=&m_ports[i];
         lp->m_port.reset();
+        lp->m_port.reset_seq();
         lp->m_port.m_hist.set_hot_max_cnt((int(msg->m_cps)/2));
         lp->m_port.set_epoc(m_epoc);
 
@@ -357,6 +371,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     
 
     m_cp_ports_mask_cache = cp_mask;
+    m_cp_disable_update=false;
     rte_mb();
 
     m_latency_active =true;
@@ -436,16 +451,24 @@ void CRxAstfCore::cp_dump(FILE *fd){
 
     fprintf(fd," Cpu Utilization : %2.1f %%  \n",m_cpu_cp_u.GetVal());
     CCPortLatency::DumpShortHeader(fd);
-    for (auto &i: m_port_ids) {
-        fprintf(fd," %d | ",i);
-        CLatencyManagerPerPort * lp=&m_ports[i];
-        lp->m_port.DumpShort(fd);
-        fprintf(fd,"\n");
+    int i;
+    for (i=0; i<TREX_MAX_PORTS; i++) {
+        if ((1<<i) & m_cp_ports_mask_cache) {
+            fprintf(fd," %d | ",i);
+            CLatencyManagerPerPort * lp=&m_ports[i];
+            lp->m_port.DumpShort(fd);
+            fprintf(fd,"\n");
+        }
     }
 }
 
 void CRxAstfCore::cp_update_stats(){
 
+    if (m_cp_disable_update) {
+        return;
+    }
+    m_cp_update=true;
+    rte_mb();
     int i;
     for (i=0; i<TREX_MAX_PORTS; i++) {
         if ((1<<i) & m_cp_ports_mask_cache) {
@@ -454,6 +477,9 @@ void CRxAstfCore::cp_update_stats(){
         }
     }
 
+    cp_dump(stdout);
+    m_cp_update=false;
+    rte_mb();
 }
 
 void CRxAstfCore::cp_get_json(std::string & json){

@@ -145,7 +145,8 @@ private:
     bool                    m_active_context; /* context for latency streams is allocated */
     bool                    m_latency_active; /* active latency process */
     volatile uint32_t       m_cp_ports_mask_cache; /* cache for CP for active ports */
-
+    volatile bool           m_cp_disable_update;
+    volatile bool           m_cp_update;
 
     CRxAstfPort             m_io_ports[TREX_MAX_PORTS];
     CMessagingManager *     m_rx_dp;
