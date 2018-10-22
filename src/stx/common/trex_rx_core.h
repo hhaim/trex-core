@@ -106,8 +106,9 @@ class CRxCoreErrCntrs {
  * 
  */
 class CRxCore : public TrexRxCore {
-    
-    /**
+
+protected:
+        /**
      * core states 
      *  
      * STATE_COLD - will sleep until a packet arrives 
@@ -122,7 +123,9 @@ class CRxCore : public TrexRxCore {
         STATE_QUIT
     };
 
+
  public:
+
      
     CRxCore() {
         m_is_active = false;
@@ -162,6 +165,9 @@ class CRxCore : public TrexRxCore {
      */
     bool start_capwap_proxy(uint8_t port_id, uint8_t pair_port_id, bool is_wireless_side, Json::Value capwap_map, uint32_t wlc_ip);
     void stop_capwap_proxy(uint8_t port_id);
+
+    /* enable/disable astf fia */
+    void enable_astf_latency_fia(bool enable);
 
     /**
      * enable latency feature for RX packets
@@ -208,6 +214,9 @@ class CRxCore : public TrexRxCore {
         return m_is_active;
     }
 
+    virtual void handle_astf_latency_pkt(const rte_mbuf_t *m,
+                                         uint8_t port_id);
+
  protected:
     void handle_cp_msg(TrexCpToRxMsgBase *msg);
 
@@ -215,6 +224,7 @@ class CRxCore : public TrexRxCore {
 
     void tickle();
 
+    virtual int _do_start(void);
     /* states */
     void hot_state_loop();
     void cold_state_loop();

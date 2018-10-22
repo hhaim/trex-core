@@ -49,6 +49,7 @@ void CTimeHistogram::Reset() {
 bool CTimeHistogram::Create() {
     Reset();
     m_min_delta =10.0/1000000.0;
+    m_hot_max=10;
     return (true);
 }
 
@@ -60,7 +61,9 @@ bool CTimeHistogram::Add(dsec_t dt) {
 
     period_elem.inc_cnt();
     period_elem.update_sum(dt);
-    period_elem.update_max(dt);
+    if (m_total_cnt>m_hot_max){
+        period_elem.update_max(dt);
+    }
 
     // values smaller then certain threshold do not get into the histogram
     if (dt < m_min_delta) {

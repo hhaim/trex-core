@@ -22,6 +22,7 @@ MUTEX, NON_MUTEX = range(2)
 
 
 
+
 def check_negative(value):
     ivalue = int(value)
     if ivalue < 0:
@@ -417,7 +418,13 @@ class OPTIONS_DB_ARGS:
          'required': True,
          'type': check_ipv4_addr})
 
-    DST_MAC = ArgumentPack(
+    DUAL_IPV4= ArgumentPack(
+        ['--dual-ip-mask'],
+        {'help': 'IP address to be added for each pair of ports (starting from second pair)',
+         'default': '1.0.0.0',
+         'type': check_ipv4_addr})
+
+    DST_MAC= ArgumentPack(
         ['--dst'],
         {'help': 'Configure destination MAC address',
          'dest': 'dst_mac',
@@ -445,7 +452,16 @@ class OPTIONS_DB_ARGS:
          'default': False,
          'action': 'store_true'})
 
-    PORT_RESTART = ArgumentPack(
+    ASTF_LATENCY= ArgumentPack(
+        ['-l'],
+        {
+         'dest': 'latency_pps',
+         'default':  0,
+         'type': int,
+         'help': "start latency streams"})
+
+
+    PORT_RESTART= ArgumentPack(
         ['-r', '--restart'],
         {'help': 'hard restart port(s)',
          'dest': 'restart',
@@ -921,6 +937,8 @@ class OPTIONS_DB_GROUPS:
             GLOBAL_STATS,
             PORT_STATS,
             PORT_STATUS,
+            LATENCY_STATS,
+            LATENCY_HISTOGRAM,
             CPU_STATS,
             MBUF_STATS,
             EXTENDED_STATS,

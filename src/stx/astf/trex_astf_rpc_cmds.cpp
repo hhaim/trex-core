@@ -26,6 +26,7 @@ limitations under the License.
 #include "trex_astf.h"
 #include "trex_astf_port.h"
 #include "trex_astf_rpc_cmds.h"
+#include "trex_astf_rx_core.h"
 #include "stt_cp.h"
 #include <set>
 
@@ -87,8 +88,13 @@ TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStart, "start");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStop, "stop");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdate, "update");
 
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStartLatency, "start_latency");
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStopLatency, "stop_latency");
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdateLatency, "update_latency");
+
 TREX_RPC_CMD(TrexRpcCmdAstfCountersDesc, "get_counter_desc");
 TREX_RPC_CMD(TrexRpcCmdAstfCountersValues, "get_counter_values");
+TREX_RPC_CMD(TrexRpcCmdAstfGetLatencyStats, "get_latency_stats");
 
 /****************************** commands implementation ******************************/
 
@@ -175,9 +181,10 @@ TrexRpcCmdAstfStart::_run(const Json::Value &params, Json::Value &result) {
     const double duration = parse_double(params, "duration", result);
     const double mult = parse_double(params, "mult", result);
     const bool nc = parse_bool(params, "nc", result);
+    const int  latency_pps = parse_int(params, "latency_pps", result,0);
 
     try {
-        get_astf_object()->start_transmit(duration, mult, nc);
+        get_astf_object()->start_transmit(duration, mult,nc,latency_pps);
     } catch (const TrexException &ex) {
         generate_execute_err(result, ex.what());
     }
@@ -197,6 +204,98 @@ TrexRpcCmdAstfStop::_run(const Json::Value &params, Json::Value &result) {
 
     return (TREX_RPC_CMD_OK);
 }
+
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result) {
+    const double mult = parse_double(params, "mult", result);
+
+    const string src_ipv4_str  = parse_string(params, "src_addr", result);
+    const string dst_ipv4_str  = parse_string(params, "dst_addr", result);
+    const string dual_ipv4_str  = parse_string(params, "dual_port_addr", result);
+    const uint32_t mask  = parse_int(params, "mask", result);
+
+
+
+    uint32_t src_ip;
+    uint32_t dst_ip;
+    uint32_t dual_ip;
+    if (!utl_ipv4_to_uint32(src_ipv4_str.c_str(), src_ip)){
+        stringstream ss;
+        ss << "invalid source IPv4 address: '" << src_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+
+    if (!utl_ipv4_to_uint32(dst_ipv4_str.c_str(), dst_ip)){
+        stringstream ss;
+        ss << "invalid destination IPv4 address: '" << dst_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+
+    if (!utl_ipv4_to_uint32(dual_ipv4_str.c_str(), dual_ip)){
+        stringstream ss;
+        ss << "invalid dual port ip IPv4 address: '" << dual_ipv4_str << "'";
+        generate_parse_err(result, ss.str());
+    }
+
+
+    TrexRxStartLatency *msg = new TrexRxStartLatency();
+
+    msg->m_client_ip.v4 = src_ip;
+    msg->m_server_ip.v4 = dst_ip;
+    msg->m_dual_port_mask = dual_ip;
+    msg->m_active_ports_mask = mask;
+    msg->m_cps=mult;
+
+
+    try {
+        get_astf_object()->start_transmit_latency(msg);
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+
+    return (TREX_RPC_CMD_OK);
+}
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfStopLatency::_run(const Json::Value &params, Json::Value &result) {
+    bool stopped = true;
+    try {
+        stopped = get_astf_object()->stop_transmit_latency();
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+    result["result"]["stopped"] = stopped;
+
+    return (TREX_RPC_CMD_OK);
+}
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfGetLatencyStats::_run(const Json::Value &params, Json::Value &result) {
+    try {
+        get_astf_object()->get_latency_stats(result["result"]);
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+    return (TREX_RPC_CMD_OK);
+}
+
+
+
+trex_rpc_cmd_rc_e
+TrexRpcCmdAstfUpdateLatency::_run(const Json::Value &params, Json::Value &result) {
+
+    const double mult = parse_double(params, "mult", result);
+
+    try {
+        get_astf_object()->update_latency_stats(mult);
+    } catch (const TrexException &ex) {
+        generate_execute_err(result, ex.what());
+    }
+    return (TREX_RPC_CMD_OK);
+}
+
+
 
 trex_rpc_cmd_rc_e
 TrexRpcCmdAstfUpdate::_run(const Json::Value &params, Json::Value &result) {
@@ -249,6 +348,10 @@ TrexRpcCmdsASTF::TrexRpcCmdsASTF() : TrexRpcComponent("ASTF") {
     m_cmds.push_back(new TrexRpcCmdAstfStart(this));
     m_cmds.push_back(new TrexRpcCmdAstfStop(this));
     m_cmds.push_back(new TrexRpcCmdAstfUpdate(this));
+    m_cmds.push_back(new TrexRpcCmdAstfStartLatency(this));
+    m_cmds.push_back(new TrexRpcCmdAstfStopLatency(this));
+    m_cmds.push_back(new TrexRpcCmdAstfGetLatencyStats(this));
+    m_cmds.push_back(new TrexRpcCmdAstfUpdateLatency(this));
     m_cmds.push_back(new TrexRpcCmdAstfCountersDesc(this));
     m_cmds.push_back(new TrexRpcCmdAstfCountersValues(this));
 }

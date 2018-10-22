@@ -43,6 +43,8 @@ TrexAstf::TrexAstf(const TrexSTXCfg &cfg) : TrexSTX(cfg) {
     /* API core version */
     const int API_VER_MAJOR = 1;
     const int API_VER_MINOR = 0;
+    m_l_state = STATE_L_IDLE;
+    m_last_start_state =  STATE_L_IDLE;
 
     TrexRpcCommandsTable &rpc_table = TrexRpcCommandsTable::get_instance();
 
@@ -245,7 +247,9 @@ TrexDpCore* TrexAstf::create_dp_core(uint32_t thread_id, CFlowGenListPerThread *
     return new TrexAstfDpCore(thread_id, core);
 }
 
-void TrexAstf::publish_async_data() {
+void TrexAstf::publish_async_data(void) {
+    CRxAstfCore * rx= get_rx();
+    rx->cp_update_stats();
 }
 
 void TrexAstf::set_barrier(double timeout_sec) {
@@ -324,12 +328,26 @@ void TrexAstf::profile_set_loaded() {
     m_profile_hash = md5(m_profile_buffer);
 }
 
-void TrexAstf::start_transmit(double duration, double mult, bool nc) {
-    check_whitelist_states({STATE_LOADED});
-
+void TrexAstf::start_transmit(double duration, double mult,bool nc,int latency_pps) {
     m_opts->m_factor   = mult;
     m_opts->m_duration = duration;
     m_opts->preview.setNoCleanFlowClose(nc);
+
+    if (latency_pps>0){
+        CAstfDB *db = CAstfDB::instance();
+
+        TrexRxStartLatency *msg = new TrexRxStartLatency();
+        if (!db->get_latency_info_info(msg->m_client_ip.v4,
+                                  msg->m_server_ip.v4,
+                                  msg->m_dual_port_mask)){
+            
+            throw TrexException("no valid ip range for latency");
+        }
+        msg->m_cps = latency_pps;
+        msg->m_active_ports_mask = 0xffffffff;
+        start_transmit_latency(msg); 
+        m_last_start_state =STATE_L_WORK; /* was started from start command */
+    }
 
     m_fl->m_stt_cp->clear_counters();
 
@@ -346,6 +364,12 @@ bool TrexAstf::stop_transmit() {
     }
 
     m_opts->preview.setNoCleanFlowClose(true);
+    if ((m_last_start_state==STATE_L_WORK) && (m_l_state==STATE_L_WORK)) {
+        m_last_start_state=STATE_L_IDLE;
+        stop_transmit_latency();
+    }
+
+    set_barrier(0.5);
     TrexCpToDpMsgBase *msg = new TrexAstfDpStop();
     send_message_to_all_dp(msg);
     return false;
@@ -366,14 +390,53 @@ void TrexAstf::update_rate(double mult) {
     send_message_to_all_dp(msg);
 }
 
-void TrexAstf::send_message_to_dp(uint8_t core_id, TrexCpToDpMsgBase *msg, bool clone) {
-    CNodeRing *ring = CMsgIns::Ins()->getCpDp()->getRingCpToDp(core_id);
-    if ( clone ) {
-        ring->Enqueue((CGenNode *)msg->clone());
-    } else {
-        ring->Enqueue((CGenNode *)msg);
+
+void TrexAstf::start_transmit_latency(TrexRxStartLatency *msg){
+
+    if (m_l_state != STATE_L_IDLE){
+        string err = "Latency state is not idle, should stop latency first";
+        throw TrexException(err);
     }
+
+    m_l_state = STATE_L_WORK;
+    send_msg_to_rx(msg);
 }
+
+bool TrexAstf::stop_transmit_latency(void){
+
+    if (m_l_state != STATE_L_WORK){
+        return true;
+    }
+
+    TrexRxStopLatency *msg = new TrexRxStopLatency();
+    send_msg_to_rx(msg);
+    m_l_state = STATE_L_IDLE;
+    return (true);
+}
+
+void TrexAstf::get_latency_stats(Json::Value & obj){
+    CRxAstfCore * rx= get_rx();
+    std::string  json_str;
+    /* to do covert this function  to native object */
+    rx->cp_get_json(json_str);
+    Json::Reader reader;
+    bool parsingSuccessful = reader.parse(json_str,obj);
+    assert(parsingSuccessful==true);
+}
+
+
+void TrexAstf::update_latency_stats(double mult){
+
+    if (m_l_state != STATE_L_WORK){
+        string err = "Latency is not active, can't update rate";
+        throw TrexException(err);
+    }
+
+    TrexRxUpdateLatency *msg = new TrexRxUpdateLatency();
+    msg->m_cps =mult;
+    send_msg_to_rx(msg);
+}
+
 
 void TrexAstf::send_message_to_all_dp(TrexCpToDpMsgBase *msg) {
     for ( uint8_t core_id = 0; core_id < m_dp_core_count; core_id++ ) {
@@ -383,4 +446,12 @@ void TrexAstf::send_message_to_all_dp(TrexCpToDpMsgBase *msg) {
     msg = nullptr;
 }
 
+void TrexAstf::send_message_to_dp(uint8_t core_id, TrexCpToDpMsgBase *msg, bool clone) {
+    CNodeRing *ring = CMsgIns::Ins()->getCpDp()->getRingCpToDp(core_id);
+    if ( clone ) {
+        ring->Enqueue((CGenNode *)msg->clone());
+    } else {
+        ring->Enqueue((CGenNode *)msg);
+    }
+}
 
