@@ -135,7 +135,8 @@ TrexDpCore* TrexAstf::create_dp_core(uint32_t thread_id, CFlowGenListPerThread *
 }
 
 void TrexAstf::publish_async_data(void) {
-
+    CRxAstfCore * rx= get_rx();
+    rx->cp_update_stats();
 }
 
 void TrexAstf::set_barrier(double timeout_sec) {
@@ -288,20 +289,20 @@ bool TrexAstf::stop_transmit(void) {
 void TrexAstf::start_transmit_latency(TrexRxStartLatency *msg){
 
     if (m_l_state != STATE_L_IDLE){
-        string err = "latency state is not idle, should stop latency thread first ";
+        string err = "Latency state is not idle, should stop latency first";
         throw TrexException(err);
     }
-    m_l_state = STATE_L_WORK;
 
+    m_l_state = STATE_L_WORK;
     send_msg_to_rx(msg);
 }
 
 bool TrexAstf::stop_transmit_latency(void){
 
     if (m_l_state != STATE_L_WORK){
-        string err = "latency thread is not active, can't stop it";
-        throw TrexException(err);
+        return true;
     }
+
     TrexRxStopLatency *msg = new TrexRxStopLatency();
     send_msg_to_rx(msg);
     m_l_state = STATE_L_IDLE;
@@ -320,10 +321,12 @@ void TrexAstf::get_latency_stats(Json::Value & obj){
 
 
 void TrexAstf::update_latency_stats(double mult){
+
     if (m_l_state != STATE_L_WORK){
-        string err = "latency thread is not active, can't stop it";
+        string err = "Latency is not active, can't update rate";
         throw TrexException(err);
     }
+
     TrexRxUpdateLatency *msg = new TrexRxUpdateLatency();
     msg->m_cps =mult;
     send_msg_to_rx(msg);

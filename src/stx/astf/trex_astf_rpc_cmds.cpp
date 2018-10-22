@@ -88,11 +88,11 @@ TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStop, "stop");
 
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStartLatency, "start_latency");
 TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfStopLatency, "stop_latency");
-TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfGetLatencyStats, "get_latency_stats");
-TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdateLatency, "upate_latency");
+TREX_RPC_CMD_ASTF_OWNED(TrexRpcCmdAstfUpdateLatency, "update_latency");
 
 TREX_RPC_CMD(TrexRpcCmdAstfCountersDesc, "get_counter_desc");
 TREX_RPC_CMD(TrexRpcCmdAstfCountersValues, "get_counter_values");
+TREX_RPC_CMD(TrexRpcCmdAstfGetLatencyStats, "get_latency_stats");
 
 /****************************** commands implementation ******************************/
 

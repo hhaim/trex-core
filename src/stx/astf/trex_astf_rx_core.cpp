@@ -346,12 +346,14 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
 
+#if 0
     node = new CGenNode();
 
     node->m_type = CGenNode::TW_SYNC;   /* update stats node, every 0.5 sec */
     node->m_time = now_sec()+0.02;
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
+#endif
     
 
     m_cp_ports_mask_cache = cp_mask;
@@ -456,7 +458,8 @@ void CRxAstfCore::cp_update_stats(){
 
 void CRxAstfCore::cp_get_json(std::string & json){
     json="{\"name\":\"trex-latecny-v2\",\"type\":0,\"data\":{";
-    json+=add_json("cpu_util",m_cpu_cp_u.GetVal());
+    json+=add_json("cpu_util", m_cpu_cp_u.GetVal());
+    json+=add_json("epoch", m_epoc);
 
     int i;
     for (i=0; i<TREX_MAX_PORTS; i++) {
