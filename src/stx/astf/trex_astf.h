@@ -129,7 +129,7 @@ public:
     /**
      * Start transmit
      */
-    void start_transmit(double duration, double mult,bool nc,int latency_pps);
+    void start_transmit(double duration, double mult, bool nc, uint32_t latency_pps);
 
     /**
      * Stop transmit
@@ -208,7 +208,7 @@ protected:
     void ports_report_state(state_e state);
 
     state_latency_e m_l_state;
-    state_latency_e m_last_start_state;
+    uint32_t        m_latency_pps;
 
     TrexOwner       m_owner;
     state_e         m_state;

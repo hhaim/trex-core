@@ -181,10 +181,10 @@ TrexRpcCmdAstfStart::_run(const Json::Value &params, Json::Value &result) {
     const double duration = parse_double(params, "duration", result);
     const double mult = parse_double(params, "mult", result);
     const bool nc = parse_bool(params, "nc", result);
-    const int  latency_pps = parse_int(params, "latency_pps", result,0);
+    const uint32_t latency_pps = parse_uint32(params, "latency_pps", result, 0);
 
     try {
-        get_astf_object()->start_transmit(duration, mult,nc,latency_pps);
+        get_astf_object()->start_transmit(duration, mult, nc, latency_pps);
     } catch (const TrexException &ex) {
         generate_execute_err(result, ex.what());
     }

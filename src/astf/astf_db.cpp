@@ -893,9 +893,9 @@ ClientCfgDB  *CAstfDB::get_client_db() {
 }
 
 
-bool CAstfDB::get_latency_info_info(uint32_t & src_ipv4,
-                                    uint32_t & dst_ipv4,
-                                    uint32_t & dual_port_mask){
+bool CAstfDB::get_latency_info(uint32_t & src_ipv4,
+                               uint32_t & dst_ipv4,
+                               uint32_t & dual_port_mask){
 
     Json::Value ip_gen_list = m_val["ip_gen_dist_list"];
 

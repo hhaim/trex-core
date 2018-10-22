@@ -439,9 +439,9 @@ class CAstfDB  : public CTRexDummyCommand  {
 
     /* Update for client cluster mode. Should be deprecated */
     void get_tuple_info(CTupleGenYamlInfo & tuple_info);
-    bool get_latency_info_info(uint32_t & src_ipv4,
-                              uint32_t & dst_ipv4,
-                              uint32_t & dual_port_mask);
+    bool get_latency_info(uint32_t & src_ipv4,
+                          uint32_t & dst_ipv4,
+                          uint32_t & dual_port_mask);
 
 
 private:
