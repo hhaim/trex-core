@@ -479,8 +479,7 @@ void CRxAstfCore::cp_update_stats(){
             lp->m_port.m_hist.update();
         }
     }
-
-    cp_dump(stdout);
+    //cp_dump(stdout); for debug
     m_cp_update=false;
     rte_mb();
 }
