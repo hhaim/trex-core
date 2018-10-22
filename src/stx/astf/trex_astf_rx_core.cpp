@@ -102,7 +102,9 @@ int CRxAstfCore::_do_start(void){
     node->m_type = CGenNode::FLOW_SYNC;   /* general stuff */
     node->m_time = now_sec()+0.007;
     m_p_queue.push(node);
+#ifdef LATENCY_UPDATE_NODE
     int cnt=0;
+#endif
 
 
     /* set max ports */

@@ -340,11 +340,15 @@ void TrexAstf::start_transmit(double duration, double mult,bool nc,int latency_p
         if (!db->get_latency_info_info(msg->m_client_ip.v4,
                                   msg->m_server_ip.v4,
                                   msg->m_dual_port_mask)){
-            
-            throw TrexException("no valid ip range for latency");
+            m_error = "no valid ip range for latency";
+            return;
         }
         msg->m_cps = latency_pps;
         msg->m_active_ports_mask = 0xffffffff;
+        if (m_l_state != STATE_L_IDLE){
+            m_error = "Latency state is not idle, should stop latency first";
+            return;
+        }
         start_transmit_latency(msg); 
         m_last_start_state =STATE_L_WORK; /* was started from start command */
     }
