@@ -216,7 +216,6 @@ TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result)
     const uint32_t mask  = parse_int(params, "mask", result);
 
 
-
     uint32_t src_ip;
     uint32_t dst_ip;
     uint32_t dual_ip;
@@ -238,6 +237,33 @@ TrexRpcCmdAstfStartLatency::_run(const Json::Value &params, Json::Value &result)
         generate_parse_err(result, ss.str());
     }
 
+    /* check that the dest IP (+dual_ip) of latency is not equal to src IP of any TRex interface */
+    uint8_t max_port_id = 0;
+    for (auto &port : get_astf_object()->get_port_map()) {
+        max_port_id = max(max_port_id, port.first);
+    }
+
+    CNodeBase port_node;
+    char ip_str[INET_ADDRSTRLEN];
+    for (auto &port : get_astf_object()->get_port_map()) {
+        try {
+            port.second->get_port_node(port_node);
+        } catch (const TrexException &ex) {
+            generate_execute_err(result, ex.what());
+        }
+
+        string ip4_buf = port_node.get_src_ip4();
+        inet_ntop(AF_INET, ip4_buf.c_str(), ip_str, INET_ADDRSTRLEN);
+        uint32_t port_ip_num;
+        utl_ipv4_to_uint32(ip_str, port_ip_num);
+
+        for ( uint8_t dual_port_id=0; dual_port_id<=(max_port_id/2); dual_port_id++ ) {
+            if ( port_ip_num == dst_ip + dual_port_id*dual_ip ) {
+                string err = "Latency dst IP and dual_port might reach port " + to_string(port.first) + " with IP " + ip_str;
+                generate_execute_err(result, err);
+            }
+        }
+    }
 
     TrexRxStartLatency *msg = new TrexRxStartLatency();
 

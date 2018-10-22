@@ -309,32 +309,33 @@ class TrexTUIAstfLatencyStats(TrexTUIPanel):
     def __init__ (self, mng):
         super(TrexTUIAstfLatencyStats, self).__init__(mng, 'lstats')
         self.key_actions = OrderedDict()
-        self.key_actions['c'] = {'action': self.action_clear, 'legend': 'clear', 'show': True}
-        self.key_actions['h'] = {'action': self.action_toggle_histogram, 'legend': 'histogram toggle', 'show': True}
-        self.is_histogram = False
+        self.key_actions['v'] = {'action': self.action_toggle_view, 'legend': self.get_next_view, 'show': True}
+        self.views = [
+            {'name': 'main latency', 'func': self.client._show_latency_stats},
+            {'name': 'histogram', 'func': self.client._show_latency_histogram},
+            {'name': 'counters', 'func': self.client._show_latency_counters},
+            ]
+        self.view_index = 0
+        self.next_view_index = 1
 
 
-    def show (self, buffer):
+    def get_next_view(self):
+        return "view toggle to '%s'" % self.views[self.next_view_index]['name']
+
+
+    def show(self, buffer):
         self.client._show_global_stats(buffer = buffer)
-
-        if self.is_histogram:
-            self.client._show_latency_histogram(buffer = buffer)
-        else:
-            self.client._show_latency_stats(buffer = buffer)
+        self.views[self.view_index]['func'](buffer = buffer)
 
 
     def get_key_actions (self):
-        return self.key_actions 
+        return self.key_actions
 
 
-    def action_toggle_histogram (self):
-        self.is_histogram = not self.is_histogram
+    def action_toggle_view(self):
+        self.view_index = self.next_view_index
+        self.next_view_index = (1 + self.next_view_index) % len(self.views)
         return ""
-
-
-    def action_clear (self):
-         self.client.clear_latency_stats()
-         return ""
 
 
 # utilization stats
@@ -421,6 +422,7 @@ class TrexTUIPanelManager():
             self.panels['lstats'] = TrexTUIAstfLatencyStats(self)
             self.key_actions['s'] = {'action': self.action_show_astats, 'legend': 'astf', 'show': True}
             self.key_actions['l'] = {'action': self.action_show_lstats, 'legend': 'latency', 'show': True}
+
         # start with dashboard
         self.main_panel = self.panels['dashboard']
 
@@ -434,13 +436,17 @@ class TrexTUIPanelManager():
         self.show_log = False
 
         
-    def generate_legend (self):
+    def generate_legend(self):
 
         self.legend = "\n{:<12}".format("browse:")
 
         for k, v in self.key_actions.items():
             if v['show']:
-                x = "'{0}' - {1}, ".format(k, v['legend'])
+                try:
+                    legend = v['legend']()
+                except TypeError:
+                    legend = v['legend']
+                x = "'{0}' - {1}, ".format(k, legend)
                 if v.get('color'):
                     self.legend += "{:}".format(format_text(x, v.get('color')))
                 else:
@@ -451,7 +457,11 @@ class TrexTUIPanelManager():
 
         for k, v in self.main_panel.get_key_actions().items():
             if v['show']:
-                x = "'{0}' - {1}, ".format(k, v['legend'])
+                try:
+                    legend = v['legend']()
+                except TypeError:
+                    legend = v['legend']
+                x = "'{0}' - {1}, ".format(k, legend)
 
                 if v.get('color'):
                     self.legend += "{:}".format(format_text(x, v.get('color')))
@@ -644,6 +654,7 @@ class TrexTUI():
     STATE_LOST_CONT  = 1
     STATE_RECONNECT  = 2
     is_graph = False
+    _ref_cnt = 0
 
     MIN_ROWS = 45
     MIN_COLS = 111
@@ -665,6 +676,14 @@ class TrexTUI():
         self.tui_global_lock = threading.Lock()
         self.pm = TrexTUIPanelManager(self)
         self.sb = ScreenBuffer(self.redraw_handler)
+        TrexTUI._ref_cnt += 1
+
+    def __del__(self):
+        TrexTUI._ref_cnt -= 1
+
+    @classmethod
+    def has_instance(cls):
+        return cls._ref_cnt > 0
 
     def redraw_handler (self, buffer):
         # this is executed by the screen buffer - should be protected against TUI commands

@@ -90,7 +90,7 @@ class ASTFClient(TRexClient):
         self.traffic_stats.reset()
         self.latency_stats.reset()
         with self.ctx.logger.suppress(verbose = "warning"):
-            self.clear_stats(ports = self.get_all_ports(), clear_xstats = False, clear_traffic = False, clear_latency = False)
+            self.clear_stats(ports = self.get_all_ports(), clear_xstats = False, clear_traffic = False)
         return RC_OK()
 
     def _on_astf_state_chg(self, ctx_state, error):
@@ -444,14 +444,10 @@ class ASTFClient(TRexClient):
                     ports = None,
                     clear_global = True,
                     clear_xstats = True,
-                    clear_traffic = True,
-                    clear_latency = True):
+                    clear_traffic = True):
 
         if clear_traffic:
             self.clear_traffic_stats()
-
-        if clear_latency:
-            self.clear_latency_stats()
 
         return self._clear_stats_common(ports, clear_global, clear_xstats)
 
@@ -469,12 +465,6 @@ class ASTFClient(TRexClient):
     @client_api('getter', True)
     def get_latency_stats(self):
         return self.latency_stats.get_stats()
-
-
-
-    @client_api('getter', True)
-    def clear_latency_stats(self):
-        return self.latency_stats.clear_stats()
 
 
     @client_api('command', True)
@@ -708,7 +698,7 @@ class ASTFClient(TRexClient):
         elif opts.command == 'update':
             self.update_latency(mult = opts.mult)
 
-        elif opts.command == 'show':
+        elif opts.command == 'show' or not opts.command:
             self._show_latency_stats()
 
         elif opts.command == 'hist':
@@ -785,13 +775,17 @@ class ASTFClient(TRexClient):
 
 
     def _show_latency_stats(self, buffer = sys.stdout):
-        table = self.latency_stats.to_table()
+        table = self.latency_stats.to_table_main()
         text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
 
 
     def _show_latency_histogram(self, buffer = sys.stdout):
-        raise TRexError('Not implemented')
-        #table = self.latency_stats.to_table()
-        #text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
+        table = self.latency_stats.histogram_to_table()
+        text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
+
+
+    def _show_latency_counters(self, buffer = sys.stdout):
+        table = self.latency_stats.counters_to_table()
+        text_tables.print_table_with_header(table, untouched_header = table.title, buffer = buffer)
 
 

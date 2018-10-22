@@ -200,6 +200,7 @@ void CTimeHistogram::dump_json(std::string name,std::string & json ) {
     json += add_json("high_cnt", m_total_cnt_high);
     json += add_json("cnt", m_total_cnt);
     json+=add_json("s_avg", get_average_latency());
+    json+=add_json("s_max", get_max_latency_last_update());
     int i;
     int j;
     uint32_t base=10;
