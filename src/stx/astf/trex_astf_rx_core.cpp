@@ -146,21 +146,23 @@ int CRxAstfCore::_do_start(void){
                 restart=false;
             } 
             break;
+#ifdef LATENCY_UPDATE_NODE
         case  CGenNode::TW_SYNC:
-            /* this might affect latency performance, we should keep this very light */
+            /* not used anymore */
             node->m_time += UPDATE_TIME_SEC;
             if (m_latency_active && node->m_pad2==m_epoc){
                 cp_update_stats();
                 cnt++;
-//#ifdef LATENCY_DEBUG
+#ifdef LATENCY_DEBUG
                 if (cnt%2==0) {
                   cp_dump(stdout);
                 }
-//#endif
+#endif
             }else{
                 restart=false;
             }
             break;
+#endif
 
         default:
             assert(0);
@@ -360,7 +362,7 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
 
-#if 0
+#ifdef LATENCY_UPDATE_NODE
     node = new CGenNode();
 
     node->m_type = CGenNode::TW_SYNC;   /* update stats node, every 0.5 sec */
@@ -368,7 +370,6 @@ void CRxAstfCore::start_latency(TrexRxStartLatency * msg){
     node->m_pad2 = m_epoc;
     m_p_queue.push(node);
 #endif
-    
 
     m_cp_ports_mask_cache = cp_mask;
     m_cp_disable_update=false;
