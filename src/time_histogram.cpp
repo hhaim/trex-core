@@ -61,7 +61,7 @@ bool CTimeHistogram::Add(dsec_t dt) {
 
     period_elem.inc_cnt();
     period_elem.update_sum(dt);
-    if (m_total_cnt>m_hot_max){
+    if ((m_hot_max==0) || (m_total_cnt>m_hot_max)){
         period_elem.update_max(dt);
     }
 

@@ -2564,6 +2564,7 @@ protected:
   virtual void SetUp() {
       trexTest::SetUp();
       m_hist.Create();
+      m_hist.set_hot_max_cnt(0);
   }
 
   virtual void TearDown() {
