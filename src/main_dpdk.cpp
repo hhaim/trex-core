@@ -1119,7 +1119,6 @@ void CPhyEthIF::configure(uint16_t nb_rx_queue,
                           uint16_t nb_tx_queue,
                           const struct rte_eth_conf *eth_conf){
     int ret;
-    printf(" rx queue : %d , %d \n",nb_rx_queue,nb_tx_queue);
     ret = rte_eth_dev_configure(m_repid,
                                 nb_rx_queue,
                                 nb_tx_queue,
