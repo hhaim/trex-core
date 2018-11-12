@@ -521,7 +521,8 @@ public:
         TCP_TX_FIF              =14, /* TCP FIF */
         TCP_TW                  =15,  /* TCP TW -- need to consolidate */
 
-        RX_MSG                  =16  /* message to Rx core */
+        RX_MSG                  =16,  /* message to Rx core */
+        STL_RX_FLUSH            =17, /* STL RX Flush  */
     };
 
     /* flags MASKS*/
@@ -3097,6 +3098,12 @@ public:
     void handle_tx_fif(CGenNode * node,bool on_terminate);
     void handle_tw(CGenNode * node,bool on_terminate);
     uint16_t handle_rx_pkts(bool is_idle);
+
+public:
+    /* STL action code */
+    void handle_stl_rx(CGenNode * node,bool on_terminate);
+    uint16_t handle_stl_pkts(bool is_idle);
+
 
 private:
     uint8_t                 m_cacheline_pad[RTE_CACHE_LINE_SIZE][19]; // improve prefech

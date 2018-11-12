@@ -1119,6 +1119,7 @@ void CPhyEthIF::configure(uint16_t nb_rx_queue,
                           uint16_t nb_tx_queue,
                           const struct rte_eth_conf *eth_conf){
     int ret;
+    printf(" rx queue : %d , %d \n",nb_rx_queue,nb_tx_queue);
     ret = rte_eth_dev_configure(m_repid,
                                 nb_rx_queue,
                                 nb_tx_queue,
@@ -1189,10 +1190,11 @@ void CPhyEthIF::stop_rx_drop_queue() {
         return;
     }
     if ( CGlobalInfo::m_options.is_rx_enabled() ) {
-        if ( (!get_ex_drv()->is_hardware_support_drop_queue())  ) {
+        return;
+        /*if ( (!get_ex_drv()->is_hardware_support_drop_queue())  ) {
             printf(" ERROR latency feature is not supported with current hardware  \n");
             exit(1);
-        }
+        }*/
     }
     // OK to only stop MAIN_DPDK_DROP_Q here. The only driver in which there are
     // more than 1 drop q is Mellanox. stop_queue does not work in this case anyway.
@@ -1544,6 +1546,11 @@ public:
     virtual int send_node_flow_stat(rte_mbuf *m, CGenNodeStateless * node_sl, CCorePerPort *  lp_port
                                     , CVirtualIFPerSideStats  * lp_stats, bool is_const);
 
+    /* works in sw multi core only, need to verify it */
+    virtual uint16_t rx_burst(pkt_dir_t dir,
+                              struct rte_mbuf **rx_pkts,
+                              uint16_t nb_pkts);
+
     /**
      * fast path version
      */
@@ -1564,6 +1571,16 @@ protected:
                                 CVirtualIFPerSideStats *lp_stats)   __attribute__ ((always_inline));
 
     rte_mbuf_t * generate_slow_path_node_pkt(CGenNodeStateless *node_sl);
+
+public:
+    void set_rx_queue_id(uint16_t client_qid,
+                         uint16_t server_qid){
+        m_rx_queue_id[CLIENT_SIDE]=client_qid;
+        m_rx_queue_id[SERVER_SIDE]=server_qid;
+    }
+public:
+    uint16_t     m_rx_queue_id[CS_NUM]; 
+
 };
 
 class CCoreEthIFTcp : public CCoreEthIF {
@@ -1882,6 +1899,13 @@ CCoreEthIFStateless::send_node_packet(CGenNodeStateless      *node_sl,
     } else {
         return send_pkt(lp_port, m, lp_stats);
     }
+}
+
+uint16_t CCoreEthIFStateless::rx_burst(pkt_dir_t dir,
+                                 struct rte_mbuf **rx_pkts,
+                                 uint16_t nb_pkts){
+    uint16_t res = m_ports[dir].m_port->rx_burst(m_rx_queue_id[dir],rx_pkts,nb_pkts);
+    return (res);
 }
 
 int CCoreEthIFStateless::send_node(CGenNode *node) {
@@ -3352,14 +3376,15 @@ void CGlobalTRex::rx_batch_conf(void) {
 
 void CGlobalTRex::rx_interactive_conf(void) {
     
-    if (CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_ONE_QUEUE) {
+    if (true /*CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_ONE_QUEUE*/) {
+        printf(" SW mode .. \n");
         /* vm mode, indirect queues  */
         for (int i=0; i < m_max_ports; i++) {
             CPhyEthIF * _if = m_ports[i];
             CMessagingManager * rx_dp = CMsgIns::Ins()->getRxDp();
             uint8_t thread_id = (i >> 1);
             CNodeRing * r = rx_dp->getRingCpToDp(thread_id);
-            bool disable_rx_read = get_is_tcp_mode();
+            bool disable_rx_read = true; /* change this */
             m_latency_vm_vports[i].Create(i, r, &m_mg, _if, disable_rx_read);
         }
     } else {
@@ -3576,7 +3601,8 @@ CGlobalTRex::get_stx_cfg() {
                                   global_platform_cfg_info.m_zmq_rpc_port,
                                   &m_cp_lock);
     
-    bool vm_cfg = (CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_ONE_QUEUE);
+    bool vm_cfg =true; /* change this .. sw mode */
+         //(CGlobalInfo::get_queues_mode() == CGlobalInfo::Q_MODE_ONE_QUEUE);
     std::unordered_map<uint8_t, CPortLatencyHWBase*> ports;
     
     for (int i = 0; i < m_max_ports; i++) {
@@ -3604,6 +3630,9 @@ void CGlobalTRex::init_stl() {
     
     for (int i = 0; i < get_cores_tx(); i++) {
         m_cores_vif[i + 1] = &m_cores_vif_stl[i + 1];
+        /* this is in case of software mode */
+        int rx_qid =(i/get_base_num_cores());   /* 0,1,2,3..*/
+        m_cores_vif_stl[i + 1].set_rx_queue_id(rx_qid,rx_qid);
     }
     
     init_vif_cores();
@@ -5214,6 +5243,7 @@ void CPhyEthIF::configure_rss_astf(bool is_client,
 
 void CPhyEthIF::conf_rx_queues_general_mode() {
 
+    printf(" configure conf_rx_queues_general_mode \n");
     CTrexDpdkParams dpdk_p;
     socket_id_t socket_id = CGlobalInfo::m_socket.port_to_socket((port_id_t)m_tvpid);
 
@@ -5340,7 +5370,6 @@ void CPhyEthIF::conf_queues() {
         for (uint16_t qid = 0; qid < num_tx_q; qid++) {
             tx_queue_setup(qid, dpdk_p.tx_desc_num , socket_id, &g_trex.m_port_cfg.m_tx_conf);
         }
-        rte_mempool_t * drop_p=0;
         return(conf_rx_queues_general_mode());
     }
 

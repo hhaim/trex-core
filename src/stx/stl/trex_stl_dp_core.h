@@ -212,6 +212,10 @@ public:
      */
     void set_service_mode(uint8_t port_id, bool enabled);
 
+    void rx_handle_packet(int dir,
+                          rte_mbuf_t * m,
+                          bool is_idle);
+
 private:
 
     /**

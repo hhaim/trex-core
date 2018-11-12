@@ -830,6 +830,13 @@ TrexStatelessDpCore::start_scheduler() {
 
     m_core->m_node_gen.add_node(node_sync);
 
+    // add rx node if needed 
+    CGenNode * node_rx = m_core->create_node() ;
+    node_rx->m_type = CGenNode::STL_RX_FLUSH;
+    node_rx->m_time = m_core->m_cur_time_sec + SYNC_TIME_OUT;
+    m_core->m_node_gen.add_node(node_rx);
+
+
     double old_offset = 0.0;
     m_core->m_node_gen.flush_file(-1, 0.0, false, m_core, old_offset);
     /* bail out in case of terminate */
@@ -1315,6 +1322,42 @@ TrexStatelessDpCore::stop_traffic(uint8_t  port_id,
 }
 
 
+
+void TrexStatelessDpCore::rx_handle_packet(int dir,
+                                           rte_mbuf_t * m,
+                                           bool is_idle){
+    /* parse the packet, if it has TOS=1, formward it */
+    bool drop=true;
+
+    CSimplePacketParser parser(m);
+
+    if (!parser.Parse()){
+        drop=false;
+        return;
+    }
+
+    uint8_t tos;
+
+    /* check for TOS&0x01=0x01*/
+    if (parser.m_ipv4) {
+        IPHeader *   ipv4= parser.m_ipv4;
+        tos = ipv4->getTOS();
+    }else{
+        IPv6Header *   ipv6= parser.m_ipv6;
+        tos = ipv6->getTrafficClass();
+    }
+
+    if ( (tos&0x01)==0x01 && (is_idle==false)){
+        drop=false;
+    }
+
+    if (drop) {
+        rte_pktmbuf_free(m);
+    }else{
+        /* redirect to rx core */
+        m_core->m_node_gen.m_v_if->redirect_to_rx_core(dir, m);
+    }
+}
 
 void
 TrexStatelessDpCore::set_service_mode(uint8_t port_id, bool enabled) {

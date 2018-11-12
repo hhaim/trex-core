@@ -42,12 +42,12 @@ class STLS1(object):
         pkt = STLPktBuilder(pkt = base_pkt/pad,
                             vm = vm)
         stream = [STLStream(packet = pkt,
-                            mode = STLTXCont(pps=1)),
+                            mode = STLTXCont(pps=100)),
 
 
                   # latency stream   
                   STLStream(packet = STLPktBuilder(pkt = base_pkt/pad_latency),
-                            mode = STLTXCont(pps=1000),
+                            mode = STLTXCont(pps=100),
                             flow_stats = STLFlowLatencyStats(pg_id = 12+port_id))
   
         ]

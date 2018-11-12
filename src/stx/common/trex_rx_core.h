@@ -220,6 +220,10 @@ protected:
                                          uint8_t port_id);
 
  protected:
+
+    uint32_t handle_msg_packets(void);
+    uint32_t handle_rx_one_queue(uint8_t thread_id, CNodeRing *r);
+
     void handle_cp_msg(TrexCpToRxMsgBase *msg);
 
     bool periodic_check_for_cp_messages();
@@ -273,7 +277,7 @@ protected:
     CPPSMeasure      m_rx_pps;
     
     TXQueue          m_tx_queue;
-    
+    CMessagingManager *     m_rx_dp;
     /* accessed from control core */
     volatile bool    m_is_active;
 };

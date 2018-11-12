@@ -66,6 +66,7 @@ limitations under the License.
 #define BUCKET_TIME_SEC_LEVEL1 (CGlobalInfo::m_options.get_tw_bucket_level1_time_in_sec())
 #define TCP_RX_FLUSH_ACCURATE_SEC  (2.0/1000000.0)
 #define TCP_RX_FLUSH_SEC  (20.0/1000000.0)
+#define STL_RX_FLUSH_SEC  (20.0/1000000.0)
 
 #define LOWEND_LIMIT_FLOWNODES (1 << 16)
 #define LOWEND_LIMIT_ACTIVEFLOWS (LOWEND_LIMIT_FLOWNODES / 2)

@@ -208,6 +208,8 @@ class CPhyEthIF  {
 
 private:
     void conf_rx_queues_astf_multi_core();
+    void conf_rx_queues_general_mode();
+
 
     void configure_rss_astf(bool is_client,
                            uint16_t numer_of_queues,
