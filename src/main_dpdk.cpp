@@ -5162,6 +5162,8 @@ const static uint8_t client_rss_key[] = {
 void CPhyEthIF::configure_rss_astf(bool is_client,
                                    uint16_t numer_of_queues,
                                    uint16_t skip_queue){ 
+    printf(" SKIP RSS extended cofiguration \n");
+    return;
 
     struct rte_eth_dev_info dev_info;
 
@@ -5210,6 +5212,35 @@ void CPhyEthIF::configure_rss_astf(bool is_client,
     #endif
 }
 
+void CPhyEthIF::conf_rx_queues_general_mode() {
+
+    CTrexDpdkParams dpdk_p;
+    socket_id_t socket_id = CGlobalInfo::m_socket.port_to_socket((port_id_t)m_tvpid);
+
+    get_ex_drv()->get_dpdk_drv_params(dpdk_p);
+
+    /* the driver support multi-core ASTF */
+    if (is_dummy()){
+        return;
+    }
+    uint16_t rx_q_n = dpdk_p.rx_data_q_num +
+                      dpdk_p.rx_drop_q_num;
+
+    g_trex.m_rx_core_tx_q_id = g_trex.get_rx_core_tx_queue_id();
+
+    /* configure all the rx queues, all are the same in this case  */
+    int i;
+    for (i=0; i<rx_q_n; i++) {
+        struct rte_mempool * p = get_ex_drv()->get_rx_mem_pool(socket_id);
+        rx_queue_setup(i,
+                       dpdk_p.rx_desc_num_data_q,
+                       socket_id,
+                       &g_trex.m_port_cfg.m_rx_conf,
+                       p);
+    }
+
+}
+
 
 /* configure RSS for multi-core ASTF */
 void CPhyEthIF::conf_rx_queues_astf_multi_core() {
@@ -5217,6 +5248,7 @@ void CPhyEthIF::conf_rx_queues_astf_multi_core() {
     socket_id_t socket_id = CGlobalInfo::m_socket.port_to_socket((port_id_t)m_tvpid);
 
     get_ex_drv()->get_dpdk_drv_params(dpdk_p);
+
     if ( !get_ex_drv()->is_capable_astf_multi_core() ){
         printf("ERROR driver does not support ASTF multi cores  \n");
         printf("You must add the flag --software to CLI \n");
@@ -5269,8 +5301,51 @@ void CPhyEthIF::conf_queues() {
         1 : g_trex.m_max_queues_per_port;
     socket_id_t socket_id = CGlobalInfo::m_socket.port_to_socket((port_id_t)m_tvpid);
     assert(CGlobalInfo::m_mem_pool[socket_id].m_mbuf_pool_2048);
-
     const struct rte_eth_dev_info *dev_info = m_port_attr->get_dev_info();
+
+    /* general sw multi-queue dist */
+    if ( dpdk_p.rx_sw_dist ) {
+        /* SW mode -- try RX RSS, virtio does not support but does not fail */
+        g_trex.m_port_cfg.m_port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+
+        if (dev_info->flow_type_rss_offloads){
+            struct rte_eth_rss_conf *lp_rss =&g_trex.m_port_cfg.m_port_conf.rx_adv_conf.rss_conf;
+            lp_rss->rss_hf = ETH_RSS_NONFRAG_IPV4_TCP |
+                             ETH_RSS_NONFRAG_IPV4_UDP |
+                             ETH_RSS_NONFRAG_IPV6_TCP |
+                             ETH_RSS_NONFRAG_IPV6_UDP;
+            lp_rss->rss_key =  (uint8_t*)&server_rss_key[0];
+        }
+
+        uint64_t &tx_offloads = g_trex.m_port_cfg.m_port_conf.txmode.offloads;
+
+        tx_offloads = g_trex.m_port_cfg.tx_offloads.common_best_effort;
+        if ( get_is_tcp_mode() ) {
+            tx_offloads |= g_trex.m_port_cfg.tx_offloads.astf_best_effort;
+        }
+        // disable non-supported best-effort offloads
+        tx_offloads &= dev_info->tx_offload_capa;
+
+        tx_offloads |= g_trex.m_port_cfg.tx_offloads.common_required;
+
+        if ( CGlobalInfo::m_options.preview.getTsoOffloadDisable() ) {
+            tx_offloads &= ~(
+                DEV_TX_OFFLOAD_TCP_TSO | 
+                DEV_TX_OFFLOAD_UDP_TSO);
+        }
+
+        check_offloads(dev_info, &g_trex.m_port_cfg.m_port_conf);
+        configure(dpdk_p.rx_drop_q_num + dpdk_p.rx_data_q_num, num_tx_q, &g_trex.m_port_cfg.m_port_conf);
+
+        for (uint16_t qid = 0; qid < num_tx_q; qid++) {
+            tx_queue_setup(qid, dpdk_p.tx_desc_num , socket_id, &g_trex.m_port_cfg.m_tx_conf);
+        }
+        rte_mempool_t * drop_p=0;
+        return(conf_rx_queues_general_mode());
+    }
+
+
+
     if ( get_is_tcp_mode_multi_core() ){
         uint8_t hash_key_size;
         #ifdef RSS_DEBUG
@@ -5284,6 +5359,7 @@ void CPhyEthIF::conf_queues() {
             hash_key_size = dev_info->hash_key_size;
         }
 
+#if 0
         if (!rte_eth_dev_filter_supported(m_repid, RTE_ETH_FILTER_HASH)) {
             // Setup HW to use the TOEPLITZ hash function as an RSS hash function
             struct rte_eth_hash_filter_info info = {};
@@ -5295,6 +5371,7 @@ void CPhyEthIF::conf_queues() {
                 exit(1);
             }
         }
+
         /* set reta_mask, for now it is ok to set one value to all ports */
         uint8_t reta_mask=(uint8_t)(min(dev_info->reta_size,(uint16_t)256)-1);
         if (CGlobalInfo::m_options.m_reta_mask==0){
@@ -5305,19 +5382,26 @@ void CPhyEthIF::conf_queues() {
                 exit(1);
             }
         }
+#endif
         g_trex.m_port_cfg.m_port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
         struct rte_eth_rss_conf *lp_rss =&g_trex.m_port_cfg.m_port_conf.rx_adv_conf.rss_conf;
-        lp_rss->rss_hf = ETH_RSS_NONFRAG_IPV4_TCP |
+        lp_rss->rss_hf =0;
+        #if 0
+             ETH_RSS_NONFRAG_IPV4_TCP |
                          ETH_RSS_NONFRAG_IPV4_UDP |
                          ETH_RSS_NONFRAG_IPV6_TCP |
                          ETH_RSS_NONFRAG_IPV6_UDP;
+        #endif     
 
+        #if 0
         bool is_client_side = ((get_tvpid()%2==0)?true:false);
         if (is_client_side) {
             lp_rss->rss_key =  (uint8_t*)&client_rss_key[0];
         }else{
             lp_rss->rss_key =  (uint8_t*)&server_rss_key[0];
         }
+        #endif
+        lp_rss->rss_key =  (uint8_t*)&server_rss_key[0];
         lp_rss->rss_key_len = hash_key_size;
     }
 
@@ -5345,6 +5429,7 @@ void CPhyEthIF::conf_queues() {
         tx_queue_setup(qid, dpdk_p.tx_desc_num , socket_id, &g_trex.m_port_cfg.m_tx_conf);
     }
     rte_mempool_t * drop_p=0;
+
 
     if ( get_is_tcp_mode_multi_core() ){
         return(conf_rx_queues_astf_multi_core());

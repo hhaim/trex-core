@@ -39,10 +39,11 @@ int CTRexExtendedDriverVirtBase::get_min_sample_rate(void){
 }
 
 void CTRexExtendedDriverVirtBase::get_dpdk_drv_params(CTrexDpdkParams &p) {
+    p.rx_sw_dist = true;
     p.rx_data_q_num = 1;
     p.rx_drop_q_num = 0;
     p.rx_desc_num_data_q = RX_DESC_NUM_DATA_Q_VM;
-    p.rx_desc_num_drop_q = RX_DESC_NUM_DROP_Q;
+    p.rx_desc_num_drop_q = -1; /* not relevant */
     p.tx_desc_num = TX_DESC_NUM;
     p.rx_mbuf_type = MBUF_2048;
 }
@@ -96,8 +97,9 @@ void CTRexExtendedDriverMlnx4::update_configuration(port_cfg_t * cfg) {
 }
 
 CTRexExtendedDriverVirtio::CTRexExtendedDriverVirtio() {
-    CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_ONE_QUEUE);
-    m_cap = /*TREX_DRV_CAP_DROP_Q  | TREX_DRV_CAP_MAC_ADDR_CHG */ 0;
+    //CGlobalInfo::set_queues_mode(CGlobalInfo::Q_MODE_ONE_QUEUE);
+    //m_cap = /*TREX_DRV_CAP_DROP_Q  | TREX_DRV_CAP_MAC_ADDR_CHG */ 0;
+    m_cap = TREX_DRV_DEFAULT_ASTF_MULTI_CORE;
 }
 
 void CTRexExtendedDriverVirtio::update_configuration(port_cfg_t * cfg) {
@@ -109,6 +111,19 @@ void CTRexExtendedDriverVirtio::update_configuration(port_cfg_t * cfg) {
     }
 }
 
+
+
+void CTRexExtendedDriverVirtio::get_dpdk_drv_params(CTrexDpdkParams &p){
+    //CTRexExtendedDriverBase::get_dpdk_drv_params(p);
+
+    p.rx_sw_dist = true;
+    p.rx_data_q_num = CGlobalInfo::m_options.preview.getCores();
+    p.rx_drop_q_num = 0;
+    p.rx_desc_num_data_q = RX_DESC_NUM_DATA_Q;
+    p.rx_desc_num_drop_q = 0;
+    p.tx_desc_num = TX_DESC_NUM;
+    p.rx_mbuf_type = MBUF_2048;
+}
 
 bool CTRexExtendedDriverVirtio::get_extended_stats(CPhyEthIF * _if,CPhyEthIFStats *stats) {
     return get_extended_stats_fixed(_if, stats, 4, 4);

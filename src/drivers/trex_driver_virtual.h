@@ -54,6 +54,7 @@ public:
         return ( new CTRexExtendedDriverVirtio() );
     }
     virtual bool get_extended_stats(CPhyEthIF * _if,CPhyEthIFStats *stats);
+    virtual void get_dpdk_drv_params(CTrexDpdkParams &p);
 
     virtual void update_configuration(port_cfg_t * cfg);
 

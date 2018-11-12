@@ -35,6 +35,7 @@ class CTrexDpdkParams {
     uint16_t rx_desc_num_drop_q;
     uint16_t tx_desc_num;
     uint16_t rx_mbuf_type;
+    bool     rx_sw_dist; /* rx dist */
 };
 
 // These are statistics for packets we send, and do not expect to get back (Like ARP)

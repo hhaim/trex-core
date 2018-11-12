@@ -65,7 +65,6 @@ protected:
         /* ASTF multi-core is supported */
         TREX_DRV_DEFAULT_ASTF_MULTI_CORE = 0x10
 
-
     } trex_drv_cap;
 
 public:

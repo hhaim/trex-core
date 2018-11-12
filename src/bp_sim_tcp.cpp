@@ -166,6 +166,14 @@ uint16_t CFlowGenListPerThread::handle_rx_pkts(bool is_idle) {
     uint16_t sum_both_dir = 0;
     get_port_ids(ports_id[0], ports_id[1]);
 
+    uint64_t sum_rx_pkt=0;
+    for (dir=0; dir<CS_NUM; dir++) {
+        CTcpPerThreadCtx  * ctx=mctx_dir[dir];
+        sum_rx_pkt+=ctx->m_tcpstat.m_sts.tcps_sndtotal;
+    }
+    //fprintf(stdout,"RX %d (tid:%d) \n",(int)sum_rx_pkt,(int)m_thread_id);
+
+
     for (dir=0; dir<CS_NUM; dir++) {
         CTcpPerThreadCtx  * ctx=mctx_dir[dir];
         sum=0;
@@ -177,10 +185,11 @@ uint16_t CFlowGenListPerThread::handle_rx_pkts(bool is_idle) {
             int i;
             for (i=0; i<(int)cnt;i++) {
                 rte_mbuf_t * m=rx_pkts[i];
+                
 
 #ifdef _DEBUG
                 if ( CGlobalInfo::m_options.preview.getVMode() ==7 ){
-                    fprintf(stdout,"RX---> dir %d \n",dir);
+                    fprintf(stdout,"RX---> dir %d (tid:%d) \n",dir,(int)m_thread_id);
                     utl_rte_pktmbuf_dump_k12(stdout,m);
 
                     #ifdef RSS_DEBUG

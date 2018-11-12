@@ -131,7 +131,6 @@ void check_offloads(const struct rte_eth_dev_info *dev_info, const struct rte_et
 
     success &= _check_offloads(dev_info->flow_type_rss_offloads, m_port_conf->rx_adv_conf.rss_conf.rss_hf, offload_names, "RSS");
 
-
     if ( !success ) {
         exit(1);
     }
