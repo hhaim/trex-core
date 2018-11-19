@@ -1567,6 +1567,10 @@ public:
     virtual int send_node_flow_stat(rte_mbuf *m, CGenNodeStateless * node_sl, CCorePerPort *  lp_port
                                     , CVirtualIFPerSideStats  * lp_stats, bool is_const);
 
+     /* works in sw multi core only, need to verify it */
+    virtual uint16_t rx_burst(pkt_dir_t dir,
+                              struct rte_mbuf **rx_pkts,
+                              uint16_t nb_pkts);
     /**
      * fast path version
      */
@@ -1587,6 +1591,15 @@ protected:
                                 CVirtualIFPerSideStats *lp_stats)   __attribute__ ((always_inline));
 
     rte_mbuf_t * generate_slow_path_node_pkt(CGenNodeStateless *node_sl);
+
+public:
+    void set_rx_queue_id(uint16_t client_qid,
+                         uint16_t server_qid){
+        m_rx_queue_id[CLIENT_SIDE]=client_qid;
+        m_rx_queue_id[SERVER_SIDE]=server_qid;
+    }
+public:
+    uint16_t     m_rx_queue_id[CS_NUM]; 
 };
 
 class CCoreEthIFTcp : public CCoreEthIF {
@@ -1906,6 +1919,14 @@ CCoreEthIFStateless::send_node_packet(CGenNodeStateless      *node_sl,
         return send_pkt(lp_port, m, lp_stats);
     }
 }
+
+uint16_t CCoreEthIFStateless::rx_burst(pkt_dir_t dir,
+                                 struct rte_mbuf **rx_pkts,
+                                 uint16_t nb_pkts){
+    uint16_t res = m_ports[dir].m_port->rx_burst(m_rx_queue_id[dir],rx_pkts,nb_pkts);
+    return (res);
+}
+
 
 int CCoreEthIFStateless::send_node(CGenNode *node) {
     return send_node_common<false>(node);
@@ -5283,6 +5304,33 @@ void CPhyEthIF::configure_rss(){
     }
 }
 
+void CPhyEthIF::conf_multi_rx() {
+    const struct rte_eth_dev_info *dev_info = m_port_attr->get_dev_info();
+    uint8_t hash_key_size;
+
+     if ( dev_info->hash_key_size==0 ) {
+          hash_key_size = 40; /* for mlx5 */
+        } else {
+          hash_key_size = dev_info->hash_key_size;
+     }
+
+    g_trex.m_port_cfg.m_port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+
+    struct rte_eth_rss_conf *lp_rss = 
+        &g_trex.m_port_cfg.m_port_conf.rx_adv_conf.rss_conf;
+
+    if (dev_info->flow_type_rss_offloads){
+        lp_rss->rss_hf = (dev_info->flow_type_rss_offloads & (ETH_RSS_NONFRAG_IPV4_TCP |
+                         ETH_RSS_NONFRAG_IPV4_UDP |
+                         ETH_RSS_NONFRAG_IPV6_TCP |
+                         ETH_RSS_NONFRAG_IPV6_UDP));
+        lp_rss->rss_key =  (uint8_t*)&server_rss_key[0];
+    }else{                 
+        lp_rss->rss_key =0;
+    }
+    lp_rss->rss_key_len = hash_key_size;
+}
+
 void CPhyEthIF::conf_hardware_astf_rss() {
 
     const struct rte_eth_dev_info *dev_info = m_port_attr->get_dev_info();
@@ -5357,7 +5405,7 @@ void CPhyEthIF::_conf_queues(uint16_t tx_qs,
         conf_hardware_astf_rss();
         break;
     case ddRX_DIST_BEST_EFFORT:
-        assert(0);
+        conf_multi_rx();
         break;
     case ddRX_DIST_FLOW_BASED:
         assert(0);

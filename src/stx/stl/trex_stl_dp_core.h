@@ -26,6 +26,7 @@ limitations under the License.
 
 #include "msg_manager.h"
 #include "pal_utl.h"
+#include "mbuf.h"
 
 #include "trex_dp_core.h"
 
@@ -212,6 +213,9 @@ public:
      */
     void set_service_mode(uint8_t port_id, bool enabled);
 
+    void rx_handle_packet(int dir,
+                          rte_mbuf_t * m,
+                          bool is_idle);
 private:
 
     /**
