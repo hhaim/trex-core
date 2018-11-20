@@ -26,8 +26,9 @@ limitations under the License.
 #include "trex_stl_stream.h"
 #include "trex_stl_streams_compiler.h"
 #include "trex_stl_messaging.h"
-
+#include "flow_stat_parser.h"
 #include "mbuf.h"
+#include "utl_mbuf.h"
 
 
 
@@ -754,11 +755,12 @@ TrexStatelessDpCore::TrexStatelessDpCore(uint8_t thread_id, CFlowGenListPerThrea
     for (i=0; i<NUM_PORTS_PER_CORE; i++) {
         m_ports[i].create(core);
     }
-    
+    m_parser = new CFlowStatParser(CFlowStatParser::FLOW_STAT_PARSER_MODE_SW);
 }
 
 TrexStatelessDpCore::~TrexStatelessDpCore() {
     delete m_wrapper;
+    delete m_parser;
 }
 
 
@@ -848,33 +850,36 @@ TrexStatelessDpCore::start_scheduler() {
 }
 
 
-void TrexStatelessDpCore::rx_handle_packet(int dir,
+void TrexStatelessDpCore::_rx_handle_packet(int dir,
                                            rte_mbuf_t * m,
-                                           bool is_idle){
+                                           bool is_idle,
+                                           bool &drop){
     /* parse the packet, if it has TOS=1, formward it */
-    bool drop=true;
+    drop=true;
+    //utl_rte_pktmbuf_dump_k12(stdout,m);
 
-    CSimplePacketParser parser(m);
+    uint8_t *p = rte_pktmbuf_mtod(m, uint8_t*);
+    uint16_t pkt_size= rte_pktmbuf_data_len(m);
+    CFlowStatParser_err_t res=m_parser->parse(p,pkt_size);
 
-    if (!parser.Parse()){
+    if (res != FSTAT_PARSER_E_OK){
         drop=false;
         return;
     }
 
-    uint8_t tos;
+    bool is_lat = m_parser->get_is_latency();
 
-    /* check for TOS&0x01=0x01*/
-    if (parser.m_ipv4) {
-        IPHeader *   ipv4= parser.m_ipv4;
-        tos = ipv4->getTOS();
-    }else{
-        IPv6Header *   ipv6= parser.m_ipv6;
-        tos = ipv6->getTrafficClass();
-    }
-
-    if ( (tos&0x01)==0x01 && (is_idle==false)){
+    if ( is_lat && (is_idle==false)){
         drop=false;
     }
+
+}
+
+void TrexStatelessDpCore::rx_handle_packet(int dir,
+                                           rte_mbuf_t * m,
+                                           bool is_idle){
+    bool drop;
+    _rx_handle_packet(dir,m,is_idle,drop);
 
     if (drop) {
         rte_pktmbuf_free(m);
@@ -883,7 +888,6 @@ void TrexStatelessDpCore::rx_handle_packet(int dir,
         m_core->m_node_gen.m_v_if->redirect_to_rx_core(dir, m);
     }
 }
-
 
 
 /* add per port exit */

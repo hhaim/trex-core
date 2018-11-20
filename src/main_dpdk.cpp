@@ -1442,7 +1442,7 @@ void CPhyEthIF::set_ignore_stats_base(CPreTestStats &pre_stats) {
     m_ignore_stats.m_tx_arp = pre_stats.m_tx_arp;
     m_ignore_stats.m_rx_arp = pre_stats.m_rx_arp;
 
-    if (CGlobalInfo::m_options.preview.getVMode() >= 3) {
+    if (isVerbose(2)) {
         fprintf(stdout, "Pre test statistics for port %d\n", m_tvpid);
         m_ignore_stats.dump(stdout);
     }
@@ -3051,7 +3051,7 @@ void CGlobalTRex::pre_test() {
 
             delete *it;
         }
-        if ( CGlobalInfo::m_options.preview.getVMode() > 1) {
+        if ( isVerbose(1)) {
             fprintf(stdout, "*******Pretest for client cfg********\n");
             pretest.dump(stdout);
             }
@@ -3101,7 +3101,7 @@ void CGlobalTRex::pre_test() {
         resolve_failed = true;
     }
 
-    if ( CGlobalInfo::m_options.preview.getVMode() > 1) {
+    if ( isVerbose(1) ) {
         fprintf(stdout, "*******Pretest after resolving ********\n");
         pretest.dump(stdout);
     }
@@ -3120,7 +3120,7 @@ void CGlobalTRex::pre_test() {
             exit(1);
         }
         m_fl.set_client_config_resolved_macs(pretest_result);
-        if ( CGlobalInfo::m_options.preview.getVMode() > 1) {
+        if ( isVerbose(1) ) {
             m_fl.dump_client_config(stdout);
         }
 
@@ -3575,8 +3575,9 @@ bool CGlobalTRex::Create(){
     CTrexDpdkParams dpdk_p;
     get_dpdk_drv_params(dpdk_p);
 
-    dpdk_p.dump(stdout);
-
+    if (isVerbose(0)) {
+        dpdk_p.dump(stdout);
+    }
 
     bool use_hugepages = !CGlobalInfo::m_options.m_is_vdev;
     CGlobalInfo::init_pools( m_max_ports * dpdk_p.get_total_rx_desc(),
@@ -3654,8 +3655,18 @@ void CGlobalTRex::init_stl() {
     for (int i = 0; i < get_cores_tx(); i++) {
         m_cores_vif[i + 1] = &m_cores_vif_stl[i + 1];
     }
-    
+
+    if (get_dpdk_mode()->dp_rx_queues() ){
+        /* multi-queue mode */
+        for (int i = 0; i < get_cores_tx(); i++) {
+           int qid =(i/get_base_num_cores());   
+           int rx_qid=get_dpdk_mode()->get_dp_rx_queues(qid); /* 0,1,2,3*/
+           m_cores_vif_stl[i+1].set_rx_queue_id(rx_qid,rx_qid);
+       }
+    }
+
     init_vif_cores();
+
     rx_interactive_conf();
     
     m_stx = new TrexStateless(get_stx_cfg());
@@ -3667,10 +3678,8 @@ void CGlobalTRex::init_stl() {
 
 void CGlobalTRex::init_astf_vif_rx_queues(){
     for (int i = 0; i < get_cores_tx(); i++) {
-        int rx_qid =(i/get_base_num_cores());   /* 0,2,3,..*/
-        if (rx_qid >= MAIN_DPDK_RX_Q) {
-            rx_qid++;
-        }
+        int qid =(i/get_base_num_cores());   /* 0,2,3,..*/
+        int rx_qid = get_dpdk_mode()->get_dp_rx_queues(qid);
         m_cores_vif_tcp[i+1].set_rx_queue_id(rx_qid,rx_qid);
     }
 }
@@ -3711,7 +3720,7 @@ void CGlobalTRex::init_stf() {
     CFlowsYamlInfo  pre_yaml_info;
     
     pre_yaml_info.load_from_yaml_file(CGlobalInfo::m_options.cfg_file);
-    if ( CGlobalInfo::m_options.preview.getVMode() > 0){
+    if ( isVerbose(0) ){
         CGlobalInfo::m_options.dump(stdout);
         CGlobalInfo::m_memory_cfg.Dump(stdout);
     }
@@ -5178,7 +5187,7 @@ int CGlobalTRex::start_master_statefull() {
     }
 
 
-    if (  CGlobalInfo::m_options.preview.getVMode() >0 ) {
+    if (  isVerbose(0) ) {
         m_fl.DumpCsv(stdout);
         for (i=0; i<100; i++) {
             fprintf(stdout,"\n");
@@ -5446,7 +5455,9 @@ void CPhyEthIF::_conf_queues(uint16_t tx_qs,
     }
 
     for (uint16_t qid = 0; qid < rx_qs; qid++) {
-        printf(" rx_qid: %d (%d) \n", qid,rx_qs_descs[qid]);
+        if (isVerbose(0)) {
+           printf(" rx_qid: %d (%d) \n", qid,rx_qs_descs[qid]);
+        }
         rx_queue_setup(qid, rx_qs_descs[qid], 
                        socket_id, 
                        &cfg.m_rx_conf,
@@ -6004,7 +6015,7 @@ int  update_dpdk_args(void){
         return (-1);
     }
 
-    if ( CGlobalInfo::m_options.preview.getVMode() > 0  ) {
+    if ( isVerbose(0)  ) {
         lpsock->dump(stdout);
     }
 
@@ -6607,7 +6618,7 @@ void reorder_dpdk_ports() {
     /* update MAP */
     lp->set(cnt, res_map);
 
-    if ( CGlobalInfo::m_options.preview.getVMode() > 0){
+    if ( isVerbose(0) ){
         port_map.dump(stdout);
         lp->Dump(stdout);
     }

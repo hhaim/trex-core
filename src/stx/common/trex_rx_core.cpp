@@ -305,7 +305,7 @@ bool CRxCore::work_tick() {
     
     bool did_something = false;
     int pkt_cnt;
-    int limit = 10;
+    int limit = 30;
 
     /* TODO: add a scheduler - will solve all problems here */
     
@@ -314,7 +314,7 @@ bool CRxCore::work_tick() {
         pkt_cnt = process_all_pending_pkts();
         m_rx_pkts += pkt_cnt;
         limit--;
-        did_something = pkt_cnt > 0;
+        did_something |= (pkt_cnt > 0);
     } while ( pkt_cnt && limit );
     
     dsec_t now = now_sec();

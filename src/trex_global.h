@@ -1008,5 +1008,9 @@ static inline uint16_t get_rx_check_hops() {
 }
 
 
+static inline bool isVerbose(int val){ 
+    return ((CGlobalInfo::m_options.preview.getVMode() > val) ?true:false);
+}
+
 
 #endif

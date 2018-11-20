@@ -38,6 +38,7 @@ class TrexStreamsCompiledObj;
 class TrexStream;
 class CGenNodePCAP;
 class ServiceModeWrapper;
+class CFlowStatParser;
 
 class CDpOneStream  {
 public:
@@ -218,6 +219,12 @@ public:
                           bool is_idle);
 private:
 
+    void _rx_handle_packet(int dir,
+                           rte_mbuf_t * m,
+                           bool is_idle,
+                           bool &drop);
+
+
     /**
      * real job is done when scheduler is launched
      * 
@@ -253,6 +260,7 @@ private:
     
     ServiceModeWrapper        *m_wrapper;
     bool                       m_is_service_mode;
+    CFlowStatParser *          m_parser;
 };
 
 #endif /* __TREX_STL_DP_CORE_H__ */
