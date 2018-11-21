@@ -4097,7 +4097,7 @@ uint16_t CFlowGenListPerThread::handle_stl_pkts(bool is_idle) {
                     utl_rte_pktmbuf_dump_k12(stdout,m);
                 }
 #endif
-                m_dp_core->rx_handle_packet(dir,m,is_idle);
+                m_dp_core->rx_handle_packet(dir,m,is_idle,ports_id[dir]);
             }
             sum+=cnt;
             if (sum>127) {

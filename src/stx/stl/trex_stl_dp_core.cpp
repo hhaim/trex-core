@@ -90,6 +90,19 @@ public:
         return m_wrapped->get_stats();
     }
 
+    virtual uint16_t rx_burst(pkt_dir_t dir,
+                              struct rte_mbuf **rx_pkts,
+                              uint16_t nb_pkts){
+        return m_wrapped->rx_burst(dir,rx_pkts,nb_pkts);
+    }
+
+
+    bool redirect_to_rx_core(pkt_dir_t   dir,
+                             rte_mbuf_t * m){
+        return m_wrapped->redirect_to_rx_core(dir,m);
+    }
+
+
 private:
     CVirtualIF *m_wrapped;
 };
@@ -748,6 +761,7 @@ TrexStatelessDpCore::TrexStatelessDpCore(uint8_t thread_id, CFlowGenListPerThrea
     m_duration        = -1;
     m_is_service_mode = NULL;
     m_wrapper         = new ServiceModeWrapper();
+    m_need_to_rx = false;
     
     m_local_port_offset = 2 * core->getDualPortId();
 
@@ -855,8 +869,12 @@ void TrexStatelessDpCore::_rx_handle_packet(int dir,
                                            bool is_idle,
                                            bool &drop){
     /* parse the packet, if it has TOS=1, formward it */
-    drop=true;
     //utl_rte_pktmbuf_dump_k12(stdout,m);
+    if (m_is_service_mode){
+        drop=false;
+        return;
+    }
+    drop=true;
 
     uint8_t *p = rte_pktmbuf_mtod(m, uint8_t*);
     uint16_t pkt_size= rte_pktmbuf_data_len(m);
@@ -875,13 +893,28 @@ void TrexStatelessDpCore::_rx_handle_packet(int dir,
 
 }
 
+void TrexStatelessDpCore::set_need_to_rx(bool enable){
+    m_need_to_rx = enable;
+}
+
+
+bool TrexStatelessDpCore::rx_for_idle(void){
+    if (m_need_to_rx){
+        return (m_core->handle_stl_pkts(true) > 0?true:false);
+    }else{
+        return(false);
+    }
+}
+
 void TrexStatelessDpCore::rx_handle_packet(int dir,
                                            rte_mbuf_t * m,
-                                           bool is_idle){
+                                           bool is_idle,
+                                           tvpid_t port_id){
     bool drop;
     _rx_handle_packet(dir,m,is_idle,drop);
 
     if (drop) {
+        //TrexCaptureMngr::getInstance().handle_pkt_rx_dp(m, port_id);
         rte_pktmbuf_free(m);
     }else{
         /* redirect to rx core */
@@ -1489,4 +1522,7 @@ void CGenNodePCAP::destroy() {
 
     m_state = PCAP_INVALID;
 }
+
+
+
 

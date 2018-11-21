@@ -889,7 +889,7 @@ TrexStatelessPort::set_service_mode(bool enabled) {
     
     TrexCpToRxMsgBase *msg = new TrexStatelessRxQuery(m_port_id, query_type, reply);
     send_message_to_rx(msg);
-    
+
     TrexStatelessRxQuery::query_rc_e rc = reply.wait_for_reply();
     
     switch (rc) {
