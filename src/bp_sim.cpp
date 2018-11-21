@@ -4059,7 +4059,8 @@ void CFlowGenListPerThread::handle_stl_rx(CGenNode * node,
     double dtime=STL_RX_FLUSH_SEC;
     int drop=0;
     m_node_gen.m_p_queue.pop();
-    if ( on_terminate ){
+    
+    if ( on_terminate || m_dp_core->are_all_ports_idle()){
            drop=1;
     }
     if (drop) {
