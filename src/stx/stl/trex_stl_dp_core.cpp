@@ -850,7 +850,7 @@ TrexStatelessDpCore::start_scheduler() {
         // add rx node if needed 
         CGenNode * node_rx = m_core->create_node() ;
         node_rx->m_type = CGenNode::STL_RX_FLUSH;
-        node_rx->m_time = m_core->m_cur_time_sec + SYNC_TIME_OUT;
+        node_rx->m_time = m_core->m_cur_time_sec;
         m_core->m_node_gen.add_node(node_rx);
     }
 
