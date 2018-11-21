@@ -4059,8 +4059,17 @@ void CFlowGenListPerThread::handle_stl_rx(CGenNode * node,
     double dtime=STL_RX_FLUSH_SEC;
     int drop=0;
     m_node_gen.m_p_queue.pop();
+    /* in case the ports are idle for more than time ticks stop */
+    if (m_dp_core->are_all_ports_idle()){
+        m_tcp_terminate_cnt++;
+        if ( m_tcp_terminate_cnt>STL_RX_DELAY_TICKS ) {
+           drop=1;
+        }
+    }else{
+        m_tcp_terminate_cnt=0;
+    }
     
-    if ( on_terminate || m_dp_core->are_all_ports_idle()){
+    if ( on_terminate ){
            drop=1;
     }
     if (drop) {
@@ -4105,9 +4114,9 @@ uint16_t CFlowGenListPerThread::handle_stl_pkts(bool is_idle) {
                 break;
             }
         }
-        if (m_sched_accurate && sum){
+        /*if (m_sched_accurate && sum){
             v_if->flush_tx_queue();
-        }
+        }*/
         sum_both_dir += sum;
     }
     return sum_both_dir;
