@@ -850,7 +850,7 @@ TrexStatelessDpCore::start_scheduler() {
         // add rx node if needed 
         CGenNode * node_rx = m_core->create_node() ;
         node_rx->m_type = CGenNode::STL_RX_FLUSH;
-        node_rx->m_time = m_core->m_cur_time_sec;
+        node_rx->m_time = now_sec(); /* NOW to warm thing up */
         m_core->m_node_gen.add_node(node_rx);
     }
 
@@ -1231,9 +1231,13 @@ TrexStatelessDpCore::start_traffic(TrexStreamsCompiledObj *obj,
     lp_port->m_active_streams = 0;
     lp_port->set_event_id(event_id);
 
+    double schd_offset = get_dpdk_mode()->dp_rx_queues()?
+        SCHD_OFFSET_DTIME_RX_ENABLED:
+        SCHD_OFFSET_DTIME;
+
     /* update cur time */
     if ( CGlobalInfo::is_realtime() ){
-        m_core->m_cur_time_sec = now_sec() + SCHD_OFFSET_DTIME;
+        m_core->m_cur_time_sec = now_sec() + schd_offset;
     }
 
     /* no nodes in the list */

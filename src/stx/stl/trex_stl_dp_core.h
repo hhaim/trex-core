@@ -128,6 +128,8 @@ class TrexStatelessDpCore : public TrexDpCore {
 public:
 
     #define SCHD_OFFSET_DTIME  (100.0/1000000.0)
+    #define SCHD_OFFSET_DTIME_RX_ENABLED  (100000.0/1000000.0)
+    
  
     TrexStatelessDpCore(uint8_t thread_id, CFlowGenListPerThread *core);
     
@@ -215,6 +217,8 @@ public:
      * enabled/disable service mode
      */
     void set_service_mode(uint8_t port_id, bool enabled);
+
+
 
     void rx_handle_packet(int dir,
                           rte_mbuf_t * m,
