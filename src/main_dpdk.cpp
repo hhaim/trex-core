@@ -5522,6 +5522,12 @@ void CPhyEthIF::_conf_queues(uint16_t tx_qs,
     // disable non-supported best-effort offloads
     tx_offloads &= dev_info->tx_offload_capa;
 
+    /* we don't want to enable this in Stateless as mlx5 will have a big performance effect
+    other driver enable this without asking  */
+    if (get_mode()->get_opt_mode() != OP_MODE_STL){
+        tx_offloads |= DEV_TX_OFFLOAD_VLAN_INSERT;
+    }
+
     tx_offloads |= cfg.tx_offloads.common_required;
 
     if ( CGlobalInfo::m_options.preview.getTsoOffloadDisable() ) {
