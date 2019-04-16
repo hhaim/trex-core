@@ -492,6 +492,12 @@ class TRexSubscriber():
             self.ctx.event_handler.on_event("server stopped", cause)
 
 
+        elif event_id in ( ServerEventsIDs.EVENT_PROFILE_STARTED,
+                           ServerEventsIDs.EVENT_PROFILE_PAUSED,
+                           ServerEventsIDs.EVENT_PROFILE_RESUMED):
+            # should handle them, workaround to remove print into the screen 
+            pass;
+
         # unhandled
         else:
             print('Unhandled event %d' % event_id)

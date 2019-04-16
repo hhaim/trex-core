@@ -46,6 +46,9 @@ class PortProfileID(object):
     def __int__(self):
         return self.port_id
 
+    def __hash__(self):
+        return hash((self.port_id, self.profile_id))
+
     def __repr__(self):
         return self.profile_name
 
