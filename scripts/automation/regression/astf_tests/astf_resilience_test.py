@@ -60,6 +60,9 @@ class ASTFResilience_Test(CASTFGeneral_Test):
                 for templates in (1, 1<<8, 1<<12):
                     if self.weak and templates > 1<<8:
                         continue
+                    if self.weak:
+                        if (client_ips > (1<<8)) and (server_ips >(1<<8)) :
+                            continue;
 
                     params = {
                         'client_ips': client_ips,
