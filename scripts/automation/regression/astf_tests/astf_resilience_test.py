@@ -57,33 +57,34 @@ class ASTFResilience_Test(CASTFGeneral_Test):
     def test_astf_params(self):
         print('')
 
-        for client_ips in (1<<8, 1<<16):
-            for server_ips in (1<<8, 1<<16):
-                for templates in (1, 1<<8, 1<<12):
-                    if self.weak and templates > 1<<8:
-                        continue
-                    if self.weak:
-                      if (client_ips > (1<<8)) and (server_ips >(1<<8)) :
-                            continue;
-
-                    params = {
-                        'client_ips': client_ips,
-                        'server_ips': server_ips,
-                        'templates': templates,
-                    }
-
-                    print('Creating profile with params: %s' % params)
-                    profile = self.profile_gen(**params)
-                    profile_str = profile.to_json_str()
-                    print('Profile size: %s' % len(profile_str))
-
-                    start_time = time.time()
-                    self.astf_trex.load_profile(profile)
-                    print('Load took: %g' % round(time.time() - start_time, 3))
-                    start_time = time.time()
-                    self.astf_trex.start(duration = 1, nc = True)
-                    print('Start took: %g' % round(time.time() - start_time, 3))
-                    self.astf_trex.stop()
+        for i  in range(0,100):
+            for client_ips in (1<<8, 1<<18):
+                for server_ips in (1<<8, 1<<18):
+                    for templates in (1, 1<<8, 1<<12):
+                        if self.weak and templates > 1<<8:
+                            continue
+                        if self.weak:
+                          if (client_ips > (1<<8)) and (server_ips >(1<<8)) :
+                                continue;
+    
+                        params = {
+                            'client_ips': client_ips,
+                            'server_ips': server_ips,
+                            'templates': templates,
+                        }
+    
+                        print('Creating profile with params: %s' % params)
+                        profile = self.profile_gen(**params)
+                        profile_str = profile.to_json_str()
+                        print('Profile size: %s' % len(profile_str))
+    
+                        start_time = time.time()
+                        self.astf_trex.load_profile(profile)
+                        print('Load took: %g' % round(time.time() - start_time, 3))
+                        start_time = time.time()
+                        self.astf_trex.start(duration = 1, nc = True)
+                        print('Start took: %g' % round(time.time() - start_time, 3))
+                        self.astf_trex.stop()
 
 
     def test_double_start_stop(self):

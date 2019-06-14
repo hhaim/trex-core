@@ -4897,6 +4897,11 @@ int CGlobalTRex::run_in_master() {
         /* fast path */
         handle_fast_path();
 
+        int i;
+        for (i=0;i<100; i++) {
+            sync_threads_stats() ;
+        }
+
         /* slow path */
         if (slow_path_counter >= SLOWPATH_DELAY_MS) {
             handle_slow_path();
