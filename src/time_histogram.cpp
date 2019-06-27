@@ -66,6 +66,7 @@ void CTimeHistogram::Reset() {
 }
 
 bool CTimeHistogram::Create() {
+	m_hdrh=0;
     if ( CGlobalInfo::m_options.m_hdrh ) {
         int res = hdr_init(HDRH_LOWEST_TRACKABLE_VALUE, HDRH_HIGHEST_TRACKABLE_VALUE,
                         HDRH_SIGNIFICANT_DIGITS, &m_hdrh);
@@ -81,7 +82,7 @@ bool CTimeHistogram::Create() {
 
 void CTimeHistogram::Delete() {
     if (m_hdrh) {
-        free(m_hdrh);
+		hdr_close(m_hdrh);
         m_hdrh = 0;
     }
 }
