@@ -6230,6 +6230,11 @@ COLD_FUNC int  update_dpdk_args(void){
         }
     }
 
+    /* dpdk extenstion */
+    for (std::string &opts : cg->m_ext_dpdk) {
+        SET_ARGS(opts.c_str());
+    }
+
     if ( lpp->getVMode() > 0  ) {
         printf("DPDK args \n");
         int i;
