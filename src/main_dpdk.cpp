@@ -3844,6 +3844,8 @@ static bool is_val_not_in_range_dpdk_limits(struct rte_eth_desc_lim * lim,
 
 COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
+    printf(" number of dev interfaces %d ",rte_eth_dev_count());
+    
     if ( CGlobalInfo::m_options.m_is_vdev ) {
         m_max_ports = rte_eth_dev_count() + CGlobalInfo::m_options.m_dummy_count;
     } else {
