@@ -1193,6 +1193,8 @@ dpdk_includes_path =''' ../src/
                         ../src/dpdk/drivers/bus/pci/
                         ../src/dpdk/drivers/bus/vdev/
                         ../src/dpdk/drivers/bus/pci/linux/
+                        ../external_libs/dpdk_linux_tap_cross/
+
                     ''';
 
 # Include arch specific folder before generic folders
