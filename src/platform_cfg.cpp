@@ -406,6 +406,18 @@ void operator >> (const YAML::Node& node, CPlatformYamlInfo & plat_info) {
       }
     }
 
+    if (node.FindValue("interfaces_vdevs") ){
+      const YAML::Node &dpdks = node["interfaces_vdevs"];
+
+      for (unsigned i = 0; i < dpdks.size(); i++) {
+        std::string fi;
+        const YAML::Node &node = dpdks;
+        node[i] >> fi;
+        plat_info.m_if_list_vdevs.push_back(fi);
+      }
+    }
+
+
     if (node.FindValue("port_limit")) {
       node["port_limit"] >> plat_info.m_port_limit;
       plat_info.m_port_limit_exist = true;

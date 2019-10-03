@@ -188,6 +188,7 @@ public:
         m_mac_info.clear();
         m_if_list.clear();
         m_ext_dpdk.clear();
+        m_if_list_vdevs.clear();
 
         m_info_exist = false;
         m_port_limit_exist=false;
@@ -228,6 +229,7 @@ public:
     std::vector <std::string>     m_if_list;
 
     std::vector<std::string>      m_ext_dpdk; /* extended DPDK options*/
+    std::vector<std::string>      m_if_list_vdevs; /* look for explicit vdevs*/
 
     std::string                   m_prefix;
     std::string                   m_limit_memory;

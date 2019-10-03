@@ -3841,26 +3841,32 @@ static bool is_val_not_in_range_dpdk_limits(struct rte_eth_desc_lim * lim,
     return (false);
 }
 
+/* debug function to dump all DPDK interfaces and the ids */
+COLD_FUNC void  dump_dpdk_devices(void){
+        char name[100];
+        int j;
+
+        printf(" DPDK devices  %d : %d \n", rte_eth_dev_count(),
+         rte_eth_dev_count_total());
+
+        printf("-----\n");  
+        for (j=0; j < rte_eth_dev_count_total(); j++){
+            if (rte_eth_dev_get_name_by_port((uint16_t)j,name) == 0) {
+                printf(" %d : vdev %s \n",j,name);
+            }
+        }
+        printf("-----\n");
+}
 
 COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
-   printf(" number of dev interfaces %d  %d \n", rte_eth_dev_count(),
-         rte_eth_dev_count_total());
-
-   printf("-----");  
-   char name[100];
-   int j;
-   for (j=0; j < rte_eth_dev_count_total(); j++){
-       if (rte_eth_dev_get_name_by_port((uint16_t)j,name) == 0) {
-          printf(" %d : %s \n",j,name);
-      }
-   }
-   printf("-----");
+    if ( isVerbose(0) ) {
+       dump_dpdk_devices();
+    }
 
    if (CGlobalInfo::m_options.m_is_vdev) {
       m_max_ports = rte_eth_dev_count() + CGlobalInfo::m_options.m_dummy_count;
-    }
-    else {
+    } else {
       m_max_ports = port_map.get_max_num_ports();
     }
 
@@ -6685,11 +6691,25 @@ COLD_FUNC void reorder_dpdk_ports() {
 
     CTRexPortMapper * lp=CTRexPortMapper::Ins();
 
-    lp->set_map(0,2);
-    lp->set_map(1,4);
-    return;
+    CPlatformYamlInfo *cg=&global_platform_cfg_info;
 
-
+    /* we should look explict vdevs names */
+    if ( cg->m_if_list_vdevs.size()  > 0 ) {
+        int if_index = 0;
+        for (std::string &opts : cg->m_if_list_vdevs) {
+            uint16_t port_id;
+            int ret = rte_eth_dev_get_port_by_name((const char *)opts.c_str(), &port_id);
+        	if (ret) {
+                 printf("Failed to find  %s in DPDK vdev ", opts.c_str());
+                 dump_dpdk_devices();
+                 exit(1);
+	        }
+            lp->set_map(if_index,port_id);
+            if_index++;
+        }
+        return;
+    }
+   
     if ( CGlobalInfo::m_options.m_is_vdev ) {
         uint8_t if_index = 0;
         for (int i=0; i<global_platform_cfg_info.m_if_list.size(); i++) {

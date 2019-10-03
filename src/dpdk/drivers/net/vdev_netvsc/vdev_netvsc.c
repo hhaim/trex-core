@@ -49,12 +49,13 @@
 #define NETVSC_CLASS_ID "{f8615163-df3e-46c5-913f-f2d2f965ed0e}"
 #define NETVSC_MAX_ROUTE_LINE_SIZE 300
 
-#define DRV_LOG(level, ...)                                                    \
-  rte_log(RTE_LOG_WARNING, vdev_netvsc_logtype,                                \
-          RTE_FMT(VDEV_NETVSC_DRIVER_NAME                                      \
-                  ": " RTE_FMT_HEAD(__VA_ARGS__, ) "\n",                       \
-                  RTE_FMT_TAIL(__VA_ARGS__, )))
-
+#define DRV_LOG(level, ...) \
+	rte_log(RTE_LOG_ ## level, \
+		vdev_netvsc_logtype, \
+		RTE_FMT(VDEV_NETVSC_DRIVER_NAME ": " \
+			RTE_FMT_HEAD(__VA_ARGS__,) "\n", \
+		RTE_FMT_TAIL(__VA_ARGS__,)))
+		
 /** Driver-specific log messages type. */
 static int vdev_netvsc_logtype;
 

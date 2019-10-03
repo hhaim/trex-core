@@ -200,7 +200,7 @@ CTRexExtendedDriverIxgbevf::CTRexExtendedDriverIxgbevf() {
 
     
 CTRexExtendedDriverAzure::CTRexExtendedDriverAzure(){
-    m_cap = tdCAP_ONE_QUE;
+    m_cap = tdCAP_ONE_QUE | tdCAP_MULTI_QUE;;
 }
 
 TRexPortAttr* CTRexExtendedDriverAzure::create_port_attr(tvpid_t tvpid,repid_t repid){
