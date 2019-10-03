@@ -176,7 +176,7 @@ void DpdkTRexPortAttr::update_device_info(){
         intf_info_st.pci_addr = pci;
         intf_info_st.numa_node = m_dev_info.device->numa_node;
     } else {
-        assert(!ret);
+        //assert(!ret);
         intf_info_st.pci_addr = "N/A";
         intf_info_st.numa_node = -1;
     }

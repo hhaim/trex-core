@@ -3844,12 +3844,24 @@ static bool is_val_not_in_range_dpdk_limits(struct rte_eth_desc_lim * lim,
 
 COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
-    printf(" number of dev interfaces %d ",rte_eth_dev_count());
-    
-    if ( CGlobalInfo::m_options.m_is_vdev ) {
-        m_max_ports = rte_eth_dev_count() + CGlobalInfo::m_options.m_dummy_count;
-    } else {
-        m_max_ports = port_map.get_max_num_ports();
+   printf(" number of dev interfaces %d  %d \n", rte_eth_dev_count(),
+         rte_eth_dev_count_total());
+
+   printf("-----");  
+   char name[100];
+   int j;
+   for (j=0; j < rte_eth_dev_count_total(); j++){
+       if (rte_eth_dev_get_name_by_port((uint16_t)j,name) == 0) {
+          printf(" %d : %s \n",j,name);
+      }
+   }
+   printf("-----");
+
+   if (CGlobalInfo::m_options.m_is_vdev) {
+      m_max_ports = rte_eth_dev_count() + CGlobalInfo::m_options.m_dummy_count;
+    }
+    else {
+      m_max_ports = port_map.get_max_num_ports();
     }
 
     if (m_max_ports == 0)
@@ -4019,7 +4031,7 @@ COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
 
     return (0);
-}
+    }
 
 COLD_FUNC int  CGlobalTRex::cores_prob_init(){
     m_max_cores = rte_lcore_count();
@@ -6672,6 +6684,11 @@ COLD_FUNC void set_driver() {
 COLD_FUNC void reorder_dpdk_ports() {
 
     CTRexPortMapper * lp=CTRexPortMapper::Ins();
+
+    lp->set_map(0,2);
+    lp->set_map(1,4);
+    return;
+
 
     if ( CGlobalInfo::m_options.m_is_vdev ) {
         uint8_t if_index = 0;
