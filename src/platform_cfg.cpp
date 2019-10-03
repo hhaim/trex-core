@@ -593,6 +593,14 @@ void CPlatformYamlInfo::Dump(FILE *fd){
       fprintf(fd, "\n");
     }
 
+    if (m_if_list_vdevs.size()) {
+      fprintf(fd, " interfaces_vdevs  : ");
+      for (i = 0; i < (int)m_if_list_vdevs.size(); i++) {
+        fprintf(fd, " %s,", m_if_list_vdevs[i].c_str());
+      }
+      fprintf(fd, "\n");
+    }
+
     if ( m_enable_zmq_pub_exist ){
         fprintf(fd," enable_zmq_pub :  %d \n",m_enable_zmq_pub?1:0);
         fprintf(fd," zmq_pub_port   :  %d \n",m_zmq_pub_port);

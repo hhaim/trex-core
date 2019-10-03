@@ -3841,15 +3841,12 @@ static bool is_val_not_in_range_dpdk_limits(struct rte_eth_desc_lim * lim,
     return (false);
 }
 
-/* debug function to dump all DPDK interfaces and the ids */
 COLD_FUNC void  dump_dpdk_devices(void){
+        printf(" DPDK devices %d : %d \n", rte_eth_dev_count(),
+         rte_eth_dev_count_total());
+        printf("-----\n");  
         char name[100];
         int j;
-
-        printf(" DPDK devices  %d : %d \n", rte_eth_dev_count(),
-         rte_eth_dev_count_total());
-
-        printf("-----\n");  
         for (j=0; j < rte_eth_dev_count_total(); j++){
             if (rte_eth_dev_get_name_by_port((uint16_t)j,name) == 0) {
                 printf(" %d : vdev %s \n",j,name);
@@ -3857,6 +3854,7 @@ COLD_FUNC void  dump_dpdk_devices(void){
         }
         printf("-----\n");
 }
+
 
 COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
@@ -3866,7 +3864,8 @@ COLD_FUNC int  CGlobalTRex::device_prob_init(void){
 
    if (CGlobalInfo::m_options.m_is_vdev) {
       m_max_ports = rte_eth_dev_count() + CGlobalInfo::m_options.m_dummy_count;
-    } else {
+    }
+    else {
       m_max_ports = port_map.get_max_num_ports();
     }
 
@@ -6693,8 +6692,10 @@ COLD_FUNC void reorder_dpdk_ports() {
 
     CPlatformYamlInfo *cg=&global_platform_cfg_info;
 
-    /* we should look explict vdevs names */
     if ( cg->m_if_list_vdevs.size()  > 0 ) {
+        if ( isVerbose(0) ){
+           printf(" size of interfaces_vdevs %d",cg->m_if_list_vdevs.size());
+        }
         int if_index = 0;
         for (std::string &opts : cg->m_if_list_vdevs) {
             uint16_t port_id;
@@ -6704,6 +6705,9 @@ COLD_FUNC void reorder_dpdk_ports() {
                  dump_dpdk_devices();
                  exit(1);
 	        }
+            if ( isVerbose(0) ){
+                printf(" ===>>>found %s %d \n",opts.c_str(),port_id);
+            }
             lp->set_map(if_index,port_id);
             if_index++;
         }
