@@ -13,25 +13,51 @@ ifdef::backend-xhtml11[]
 :p_width: 300
 endif::backend-xhtml11[]
 
-= Test Your Limits With TRex 
-
+= Test Your Limits With TRex traffic generator 
 
 == Abstract
 
-Traditionally, network infrastructure devices have been tested using commercial traffic generators for both Stateless and Stateful use cases. The current issue with commercial traffic generators are: 
+Perfomance measurement tools are an integral part of network testing.
+There is no shortage of open source tools for network performance
+testing in the Linux world. To enumerate a few popular tools in the
+Linux world: Netperf, iperf, Linux kernel based pktgen. 
 
-* *Cost*: Commercial Stateful traffic generators are very expensive
-* *Scale*: Bandwidth does not scale up well with features complexity
-* *Standardization*: Lack of standardization of traffic patterns and methodologies
-* *Flexibility*: Commercial tools do not allow agility when flexibility and changes are needed
+These tools tend to fall into 2 categories:
+* stateless packet shooting such as the linux kernel pktgen traffic generator
+* stateful client-server tools such as netperf and iperf.
 
-The implications are:
- 
- * Extrapolation became a common practice that hides real life bottlenecks and quality issues
- * Delays in development and testing due to testing tools feature dependency
- * Different benchmarks and results methodology, hard to compare results
+When very high performance network performance testing is required (quantified as
+many 10s of Gigabits per second, and/or hundreds of thousands of flows) the
+classical tools like iperf/netperf and pktgen are insufficient. Most organizations
+will opt for very expensive commercial tools such as Ixia, Spirent and similar
 
-TRex xref:1[] addresses these implications through an innovative and extendable open source software implementation and by leveraging COTS x86/ARM servers. TRex in a nutshell supports stateful and stateless traffic generation pattern, fueled by DPDK, scale to 200gbps and has automation API. This paper focus on one software design concepts that has been used to achieve scale for Stateful mode
+In this paper we will introduce TRex a high performance traffic generator
+and illustrate sample stateless and stateful use cases that apply to testing
+Linux networking. We will also discuss its design and tricks that help us
+achieve such high performance.
+
+TRex has the following interesting features:
+
+ -It leverages COTS x86/ARM servers and NICs (Intel, Mellanox etc).
+
+ -It can serve both stateless and stateful traffic generation.
+  tcp stack for stateful traffic and emulation layer to simulate L7 application 
+
+ -It outperforms all of iperf, netperf and pktgen 
+   a) it can generate upto 200gbps traffic and millions of real
+      world tcp/udp flows.
+   b) High connection rate - order of Millions of Connection/s
+
+ -It is extensible
+   a) Emulate L7 application (on top of TCP/IP),
+       e.g. HTTP/HTTPS/Citrix using a programable language
+   b) Ability to change fields in the L7 application - for example,
+      change HTTP User-Agent field
+
+Although TRex is implemented on top of DPDK, a lot of the issues we had
+to deal with when writting the tool apply equally to scaling Linux networking;
+we share our experiences in that regard and hope to inspire some
+of the techniques to be adopted in Linux.
 
 == Introduction 
 
