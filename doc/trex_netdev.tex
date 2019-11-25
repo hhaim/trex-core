@@ -7,6 +7,8 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\graphicspath{ {./images/} }
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
@@ -15,6 +17,8 @@
 \thanks{Cisco systems}
 }
 
+
+
 \author{\IEEEauthorblockN{Hanoch Haim}
 \textit{Cisco systems}\\
 }
@@ -22,13 +26,17 @@
 \maketitle
 
 \begin{abstract}
-Perfomance measurement tools are an integral part of network testing. 
+Performance measurement tools are an integral part of network testing. 
 There is no shortage of open source tools for network performance
 testing in the Linux world. 
 To enumerate a few popular tools in the Linux world: Netperf, iperf, Linux kernel based pktgen.
-These tools tend to fall into two categories, stateless packet shooting such as the linux kernel pktgen traffic generator and stateful client-server tools such as netperf and iperf. 
+These tools tend to fall into two categories:
+\begin{itemize}
+  \item  Stateless packet shooting such as the linux kernel pktgen traffic generator 
+  \item Stateful client-server tools such as netperf and iperf. 
+\end{itemize}  
 When very high performance network performance testing is required (quantified as
-many 10s of Gigabits per second/100MPPS and/or hundreds of thousands of flows) or more advanced realistic functionality is required the
+many 10s of Gigabits per second/100MPPS and/or hundreds of thousands of flows) or more advanced functionality (e.g. realistic) is required the
 linux classical tools are insufficient. Most organizations
 will opt for very expensive commercial tools such as Ixia, Spirent. 
 In this paper we will introduce TRex a high performance realistic traffic generator
@@ -43,18 +51,19 @@ tcp, performance, scale,realistic traffic generation
 
 \section{Introduction}
 
-TRex is an advanced traffic generator, it has the following interesting features:
+TRex \cite{b1} is an advanced traffic generator, it has the following interesting features:
 
 \begin{itemize}
-\item It leverages COTS x86/ARM servers and NICs (Intel, Mellanox etc).
-\item  It can serve both stateless and stateful traffic generation.
-  tcp stack for stateful traffic and emulation layer to simulate L7 application 
+\item It leverages COTS x86/ARM servers and Physical NICs (Intel, Mellanox etc) for high scale 
+\item Can support linux driver or paravirtual (e.g. virtio) for low scale advance feature 
+\item  It can serve both Stateless and Stateful traffic generation.
+  tcp stack for stateful traffic and emulation layer to simulate L7 applications
 \item It outperforms all of iperf, netperf and pktgen 
    \begin{itemize}
-    \item it can generate upto 200gbps traffic and millions of real
+    \item It can generate upto 200gbps/100mpps advance traffic pattern and millions of real
       world tcp/udp flows.
-    \item High connection rate - order of Millions of Connection/s
-   \end{itemize}
+    \item High connection rate - order of Millions of Connection/s (CPS)
+  \end{itemize}
 \item It is extensible
 \begin{itemize}
     \item Emulate L7 application (on top of TCP/IP),
@@ -62,15 +71,26 @@ TRex is an advanced traffic generator, it has the following interesting features
     \item Ability to change fields in the L7 application - for example,
       change HTTP User-Agent field
 \end{itemize}
+\item Support routing protocols like BGP/OSPF/RIP using BIRD \cite{b4}
+\item Support high scale client simulation protocols (arp.ipv6-nd,dhcp,802.1x,icmp) 
 \end{itemize}
 Although TRex is implemented on top of DPDK, a lot of the issues we had
-to deal with when writting the tool apply equally to scaling Linux networking;
+to deal with when writing the tool apply equally to scaling Linux networking;
 we share our experiences in that regard and hope to inspire some
 of the techniques to be adopted in Linux.
 
 \section{Software design high level}
 
+\begin{figure}[h]
+\includegraphics[width=0.4
+\textwidth, center]{trex_arch_2.png}
+\caption{architecture}
+\label{fig:figure2}
+\end{figure}
+
 \section{Stateless mode}
+
+this is a demo
 
 \section{Stateful mode}
 
@@ -80,7 +100,7 @@ of the techniques to be adopted in Linux.
 \item User space multi-threaded linux process TBD . DP cores (blue) can scale up
 \item One thread per core, event driven, almost no sharing between the cores,no locks. This way multiplex many flows operation without context switch 
 \item No syscall into kernel, driver are DPDK PMD for batching operations 
-\item Each core has its own context, communication is via fast shared rings (DP->CP, CP->DP, Rx->DP, RX->CP)
+\item Each core has its own context, communication is via fast shared rings (DP$\rightarrow$CP, CP$\rightarrow$DP, Rx$\rightarrow$DP, RX$\rightarrow$CP)
 \item Application emulation are via programable language that work in async API 
 \begin{itemize}
     \item Start write buffer
@@ -286,10 +306,10 @@ For papers published in translation journals, please give the English
 citation first, followed by the original foreign-language citation \cite{b6}.
 
 \begin{thebibliography}{00}
-\bibitem{b1} G. Eason, B. Noble, and I. N. Sneddon, ``On certain integrals of Lipschitz-Hankel type involving products of Bessel functions,'' Phil. Trans. Roy. Soc. London, vol. A247, pp. 529--551, April 1955.
-\bibitem{b2} J. Clerk Maxwell, A Treatise on Electricity and Magnetism, 3rd ed., vol. 2. Oxford: Clarendon, 1892, pp.68--73.
-\bibitem{b3} I. S. Jacobs and C. P. Bean, ``Fine particles, thin films and exchange anisotropy,'' in Magnetism, vol. III, G. T. Rado and H. Suhl, Eds. New York: Academic, 1963, pp. 271--350.
-\bibitem{b4} K. Elissa, ``Title of paper if known,'' unpublished.
+\bibitem{b1} Cisco systems: ``TRex realistic traffic generator'',\\\texttt{https://trex-tgn.cisco.com/trex/doc/}
+\bibitem{b2} Cisco systems, ``TRex Stateless'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_stateless.html}
+\bibitem{b3} Cisco systems, ``TRex Stateful ASTF'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_astf.html}
+\bibitem{b4} BIRD, Faculty of Math and Physics, Charles University Prague \\\texttt{https://bird.network.cz/}
 \bibitem{b5} R. Nicole, ``Title of paper with only first word capitalized,'' J. Name Stand. Abbrev., in press.
 \bibitem{b6} Y. Yorozu, M. Hirano, K. Oka, and Y. Tagawa, ``Electron spectroscopy studies on magneto-optical media and plastic substrate interface,'' IEEE Transl. J. Magn. Japan, vol. 2, pp. 740--741, August 1987 [Digests 9th Annual Conf. Magnetics Japan, p. 301, 1982].
 \bibitem{b7} M. Young, The Technical Writer's Handbook. Mill Valley, CA: University Science, 1989.
