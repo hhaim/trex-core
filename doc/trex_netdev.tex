@@ -85,12 +85,62 @@ of the techniques to be adopted in Linux.
 \includegraphics[width=0.4
 \textwidth, center]{trex_arch_2.png}
 \caption{architecture}
-\label{fig:figure2}
+\label{fig:arch}
 \end{figure}
+
+Figure \ref{fig:arch} presents the main processes. TRex server (*1) is a multi-threaded process, each thread is pinned to a core and works in 
+event driven fashion using a user-space scheduler with a few hierarchy. There is one control-plane (CP) thread that handle the RPC over ZMQ requests and maintenance tasks. 
+The RX thread responsible to handle the low latency traffic for accurate latency measurement. This thread is usually in very low CPU. 
+The DP threads are generating the traffic using and interact with DPDK to transmit/receive traffic via PMD queues. The number of DP threads can be scale up as the number of Tx/Rx queues. 
+There is almost no sharing data structure and no locks to get to best performance. Any information is moved between the threads using a messaging bus which 
+is a shared rings (DP$\rightarrow$CP, CP$\rightarrow$DP, Rx$\rightarrow$DP, RX$\rightarrow$CP).
+There is minimum system call to the kernel (only when required for example with PF\\\_PACKET driver)
+(*4) is a Python wrapper to the JSON-RPC2 API over ZMQ so it would be easy automation (e.g. load a profile, get statistics etc)
+on top of Python API there is a Console that can simplify the way to work with the API. 
+(*5) is the GUI process that written in Java that works directly with the JSON-RPC2 and supports only the Stateless mode.
+(*2) is a BIRD \cite{b4} process that works inside a linux namespace and connected to TRex via a programmable veths. Inside TRex RX thread there is a Switch that forward packets to/from the veth related to the linux namespace. BIRD is used to simulate routing protocols like BGP/OSPF/RIP.
+(*6) and (*3) is used for simulating clients slow-path protocols like ARP/IPV6-ND/IGMP/MLD/802.1x/DHCP/DHCPv6 while TRex server is for the fast-path high speed TCP/UDP
+
+\begin{figure}[h]
+  \includegraphics[width=0.4
+  \textwidth, center]{trex_dp_sheduler.png}
+  \caption{DP Scheduler}
+  \label{fig:dp_schduler}
+\end{figure}
+  
+Figure \ref{fig:dp_schduler} presents the schedulers in each DP thread. The priority queue is the low level scheduler that can schedule events in nsec resolution. On top of that there are two timer wheels for lower resolution events. The first has resolution of 20usec with 1024 buckets for maximum of 2msec time. 
+the second timer wheel has resolution of 1msec with 1024 buckets maximum of 1sec. Each event in the second level is spread each 20usec tick to reduce processing spikes. 
+DP transmit/receive messages from the share rings using events. 
+This design gives linear scale with of performance about 4-20MPPS/core and 200gbps for one COGS server. 
+
+\begin{figure}[h]
+  \includegraphics[width=0.4
+  \textwidth, center]{sfr_profile.png}
+  \caption{emix}
+  \label{fig:emix}
+\end{figure}
+
+From functionality point of view TRex has two main operation modes. Stateful and Stateless. Stateful is for testing L7 services that care about clients/flows/L7 application like DPI/NAT/Firewall, Figure \ref{fig:emix} is an example of mix of traffic that can be generated using this mode. 
+Stateless is for testing Switch/Filters/ACL/Qos services and has no flow/client state
 
 \section{Stateless mode}
 
-this is a demo
+\begin{figure}[h]
+  \includegraphics[width=0.3
+  \textwidth, center]{stateless_objects_02.png}
+  \caption{Stateless objects}
+  \label{fig:stlobjects}
+\end{figure}
+
+
+\begin{figure}[h]
+  \includegraphics[width=0.4
+  \textwidth, center]{stl_interleaving_01.png}
+  \caption{Stateless profile example}
+  \label{fig:stlhello}
+\end{figure}
+
+
 
 \section{Stateful mode}
 
