@@ -7,13 +7,16 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{minted}
+\usepackage{caption}
 \usepackage[export]{adjustbox}
 \graphicspath{ {./images/} }
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-\title{Test Your Limits With TRex traffic generator 
+
+\title{Test Your Limits With TRex Traffic Generator 
 \thanks{Cisco systems}
 }
 
@@ -102,7 +105,7 @@ on top of Python API there is a Console that can simplify the way to work with t
 (*6) and (*3) is used for simulating clients slow-path protocols like ARP/IPV6-ND/IGMP/MLD/802.1x/DHCP/DHCPv6 while TRex server is for the fast-path high speed TCP/UDP
 
 \begin{figure}[h]
-  \includegraphics[width=0.4
+  \includegraphics[width=0.3
   \textwidth, center]{trex_dp_sheduler.png}
   \caption{DP Scheduler}
   \label{fig:dp_schduler}
@@ -125,13 +128,26 @@ Stateless is for testing Switch/Filters/ACL/Qos services and has no flow/client 
 
 \section{Stateless mode}
 
+Stateless traffic model is for testing Switch and device under test (DUT) that are relatively simple and does not have flow/client context. 
+
 \begin{figure}[h]
-  \includegraphics[width=0.3
+  \includegraphics[width=0.25
   \textwidth, center]{stateless_objects_02.png}
   \caption{Stateless objects}
   \label{fig:stlobjects}
 \end{figure}
 
+Figure \ref{fig:stlobjects} shows the model of a profile. Each interface supports one or more traffic profiles in parallel.
+Each traffic profile supports one or more streams. Each stream includes
+
+\begin{itemize}
+  \item \textbf{Packet}: Packet template up to 9 KB
+  \item \textbf{Field Engine}: A program that determines which field/packet size
+  \item \textbf{Mode}: Specifies how to send packets [Continuous,Burst,Multi-burst]
+  \item \textbf{Rx Stats}: Statistics to collect for each stream
+  \item \textbf{Rate}: Rate (pps or bps)
+  \item \textbf{Action}: Specifies stream to follow when the current stream is complete (valid for Continuous or Burst modes)
+\end{itemize}
 
 \begin{figure}[h]
   \includegraphics[width=0.4
@@ -140,232 +156,652 @@ Stateless is for testing Switch/Filters/ACL/Qos services and has no flow/client 
   \label{fig:stlhello}
 \end{figure}
 
+Figure \ref{fig:stlhello} shows an example of a profile, three streams configured for Continuous, Burst, and Multi-burst traffic.
 
+List \ref{listing:1} shows a profile with one UDP stream. The mode is continues 
 
-\section{Stateful mode}
+\begin{listing}[h]
+\caption{Profile with one continues UDP stream}
+\label{listing:1}
+\begin{minted}
+ [
+    frame=lines,
+    linenos,
+    fontsize=\scriptsize,
+]
+{python}
+from trex_stl_lib.api import *
 
-// TBD this is an example 
+class STLS1(object):
+
+  def create_stream (self):
+
+    return STLStream(
+          packet =
+                STLPktBuilder(
+                pkt = Ether()/
+                      IP(src="16.0.0.1",dst="48.0.0.1")/
+                      UDP(dport=12,sport=1025)/(10*'x')      
+                    ),
+            mode = STLTXCont())
+
+    def get_streams (self, direction = 0, **kwargs):
+        # create 1 stream
+        return [ self.create_stream() ]
+
+# dynamic load - used for TRex console or simulator
+def register():
+    return STLS1()  
+\end{minted}
+\end{listing}
+  
+\subsection{Stateless Features}
 
 \begin{itemize}
-\item User space multi-threaded linux process TBD . DP cores (blue) can scale up
-\item One thread per core, event driven, almost no sharing between the cores,no locks. This way multiplex many flows operation without context switch 
-\item No syscall into kernel, driver are DPDK PMD for batching operations 
-\item Each core has its own context, communication is via fast shared rings (DP$\rightarrow$CP, CP$\rightarrow$DP, Rx$\rightarrow$DP, RX$\rightarrow$CP)
-\item Application emulation are via programable language that work in async API 
+  \item Large scale - Supports about 10-22 million packets per second (mpps) per core, scalable with the number of cores
+  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with Linux driver vs PF\\\_PACKET
+  \item Support for multiple traffic profiles per interface
+  \item Programable Field Engine to change any field inside the packet (e.g. \mint{html}|src_ip=10.0.0.1..10.0.0.255|)
+  \item Ability to change the packet size 
+  \item API,Console, GUI
+  \item Statistics, per interface,per stream 
+  \item Latency and jitter per stream
+  \item Multi-user support 
+\end{itemize}
+
+\subsection{Multi stream example}
+
+Figure \ref{fig:stlmulti} shows two streams the blue one is a burst stream that activate a multi-burst stream. 
+List \ref{listing:4} shows the python profile to create this profile 
+
+\begin{figure}[h]
+  \includegraphics[width=0.4
+  \textwidth, center]{stl_multiple_streams_01.png}
+  \caption{Multi stream profile}
+  \label{fig:stlmulti}
+\end{figure}
+
+
+\begin{listing}[h]
+\caption{Multi profile example}
+\label{listing:4}
+\begin{minted}
+  [
+      frame=lines,
+      fontsize=\scriptsize,
+  ]
+{python}
+  
+  def create_stream (self):
+
+  # create a base packet and pad it to size
+  size = self.fsize - 4 # no FCS
+  base_pkt =  Ether()/
+              IP(src="16.0.0.1",dst="48.0.0.1")/
+              UDP(dport=12,sport=1025)
+  base_pkt1 = Ether()/
+              IP(src="16.0.0.2",dst="48.0.0.1")/
+              UDP(dport=12,sport=1025)
+  base_pkt2 = Ether()/
+              IP(src="16.0.0.3",dst="48.0.0.1")/
+              UDP(dport=12,sport=1025)
+  pad = max(0, size - len(base_pkt)) * 'x'
+
+
+  return STLProfile( 
+    
+   [ STLStream( isg = 10.0, # star in delay
+                name    ='S0',
+                packet = STLPktBuilder(pkt=base_pkt/pad),
+                mode = STLTXSingleBurst(pps= 10, 
+                total_pkts = 10),  1
+                next = 'S1'), # point to next stream
+
+    STLStream( self_start = False, 
+               name    ='S1',
+               packet  = STLPktBuilder(pkt=base_pkt1/pad),
+               mode    = STLTXSingleBurst(pps=10, 
+              total_pkts = 20),
+               next    = 'S2' ),
+
+    STLStream(  self_start = False, 
+                name   ='S2',
+                packet = STLPktBuilder(pkt= base_pkt2/pad),
+                mode = STLTXSingleBurst(pps=10, 
+                total_pkts=30)
+                )
+  ]).get_streams()
+
+\end{minted}
+\end{listing}
+
+
+\subsection{Field Engine}
+
+The field engine (FE) is a programable engine that can change any field in the packet and is loaded from python to a fast bytecode.
+The implementation challenge was to provide an engine that change packet fields on number of core in parallel but as a black-box behave like it runs on a single thread (hardware like)
+Let gives an example of syn-attack and explain it 
+
+\begin{listing}[h]
+  \caption{FE syn attack 48.0.0.1 server}
+  \label{listing:2}
+  \begin{minted}
+  [
+      frame=lines,
+      fontsize=\scriptsize,
+  ]
+  {python}
+  class STLS1(object):
+  """ attack 48.0.0.1 at port 80
+  """
+
+  def __init__ (self):
+      self.max_pkt_size_l3  =9*1024;
+
+  def create_stream (self):
+
+      # TCP SYN
+      base_pkt  = Ether()/
+                  IP(dst="48.0.0.1")/
+                  TCP(dport=80,flags="S")
+
+      # create an empty program (VM)
+      vm = STLVM()
+
+      # define two vars
+      vm.var(name = "ip_src", 
+             min_value = "16.0.0.0", 
+             max_value = "18.0.0.254", 
+             size = 4, 
+             op = "random")
+      
+      vm.var(name = "src_port", 
+            min_value = 1025, 
+            max_value = 65000, 
+            size = 2, 
+            op = "random")
+        
+      # write src IP and fix checksum
+      vm.write(fv_name = "ip_src", 
+               pkt_offset = "IP.src")
+      
+      vm.fix_chksum()
+        
+      # write TCP source port
+      vm.write(fv_name = "src_port", 
+               pkt_offset = "TCP.sport")
+        
+      # create the packet
+      pkt = STLPktBuilder(pkt = base_pkt, vm = vm)
+
+      return STLStream(packet = pkt,
+                      random_seed = 0x1234,
+                      mode = STLTXCont())
+
+
+  \end{minted}
+  \end{listing}
+  
+List \ref{listing:2} shows a FE program that generate a syn attack using one stream. 
+every stream has a context of a FE. in this context in this example there are two variables 
+\textbf{ip\\\_src} for the range of the source ipv4 ips and the \textbf{source\\\_port} for the range of the source protocols.
+Those variables are written to the right offset in the packet and fix the checksum (using hardware assist if exists)
+
+\subsection{Automation using Python API}
+
+List \ref{listing:6} shows a simple script to automate TRex. it self explained 
+
+\begin{listing}[h]
+  \caption{Stateless automation example}
+  \label{listing:6}
+  \begin{minted}
+  [
+      frame=lines,
+      fontsize=\scriptsize,
+  ]
+{python}
+ 
+c = STLClient(username="itay",
+              server = "10.0.0.10", 
+              verbose_level = "error")
+try:
+    # connect to server
+    c.connect()
+
+    # prepare our ports 
+    c.reset(ports = [0, 1])
+
+    # add both streams to ports
+    c.add_streams(s1, ports = [0])
+
+    # clear the stats before injecting
+    c.clear_stats()
+
+    c.start(ports = [0, 1], 
+            mult = "5mpps", 
+            duration = 10)
+
+    # block until done
+    c.wait_on_traffic(ports = [0, 1])
+
+    # check for any warnings
+    if c.get_warnings():
+      # handle warnings here
+      pass
+
+finally:
+    c.disconnect()
+\end{minted}
+\end{listing}
+ 
+\subsection{Stateles Performance}
+
+\begin{figure}[h]
+  \includegraphics[width=0.4
+  \textwidth, center]{stl_perf.png}
+  \caption{Stateless performance with Intel XL710}
+  \label{fig:stlperf}
+\end{figure}
+
+Figure \ref{fig:stlperf} \cite{b5} shows the measured performance on a Cisco UCS server with dual socket and two Intel XL710 NICS 
+
+\section{Stateful mode} 
+
+Stateful model objective is to simulate realistic L7 applications on top of TCP/UDP stack (based on BSD source code) at high scale.
+The scale could reach millions of flows and ~100k clients/servers up to 200gbps for one server. 
+It is important to test Stateful features using realistic traffic scenarios because this is the only way to estimate more accurate performance metrics and identify bottlenecks in the design. 
+Figure \ref{fig:astf} present the traffic generation model. 
+
+Each profile includes:
 \begin{itemize}
-    \item Start write buffer
-    \item Continue write
-    \item End Write
-    \item Wait for buffer/timeout
-    \item OnConnect/OnReset/OnClose
-    \item Scale with the number of flows by having pull approach instead of push 
+  \item \textbf{Client pool}: Range of clients with a distribution model e.g. random,seq. a profile can include a few pool
+  \item \textbf{Server pool}: Range of servers, profile can include a few pools 
+  \item \textbf{Template}: A model that describe an application on top of TCP/UDP. A pcap for L7 data can be taken 
+  \begin{itemize}
+  \item \textbf{CPS}: How many connection per second for this template 
+  \item \textbf{flowLimit}: to limit the flows 
+  \end{itemize}
 \end{itemize}
+
+\begin{figure}[h]
+  \includegraphics[width=0.3
+  \textwidth, center]{stateful_model.png}
+  \caption{Stateful model}
+  \label{fig:astf}
+\end{figure}
+
+In this model each core has its own context of TCP/UDP stack with no sharing and no locks. It works on top of the scheduler hierarchy in Figure \ref{fig:dp_schduler}
+The changes to the BSD stack were
+\begin{itemize}
+  \item Each stack has a context per thread 
+  \item Tx work in pool mode (build the packets only when required) and save reference to the template data. This saves three order of magnitude of memory resource 
 \end{itemize}
+
+\begin{figure}[h]
+  \includegraphics[width=0.15
+  \textwidth, center]{t_c4.png}
+  \caption{Stateful stack}
+  \label{fig:astf_stack}
+\end{figure}
+
+Figure \ref{fig:astf_stack} shows the stack of the programable application emulation layer. this module responsible to simulate application on top of the TCP/UDP stack. 
+Example for commands are:
 
 \begin{itemize}
-\item Very low memory footprint with millions of flows (~1KB per flow)
-\item 3-4MPPS/core almost linear scale with cores/flows. 
-\item With average packet size of 600B (application application mix )  ~200gbps with x86 server with 2 sockets 
+  \item Start write buffer
+  \item Continue write
+  \item End Write
+  \item Wait for buffer/timeout
+  \item OnConnect/OnReset/OnClose
 \end{itemize}
 
 
-\section{Prepare Your Paper Before Styling}
-Before you begin to format your paper, first write and save the content as a 
-separate text file. Complete all content and organizational editing before 
-formatting. Please note sections \ref{AA}--\ref{SCM} below for more information on 
-proofreading, spelling and grammar.
+\subsection{ Stateful Profile }
 
-Keep your text and graphic files separate until after the text has been 
-formatted and styled. Do not number text heads---{\LaTeX} will do that 
-for you.
+\begin{listing}[h]
+  \caption{Stateful profile}
+  \label{listing:7}
+  \begin{minted}
+  [
+    frame=lines,
+    fontsize=\scriptsize,
+  ]
+{python}
+ 
+from trex.astf.api import *
 
-\subsection{Abbreviations and Acronyms}\label{AA}
-Define abbreviations and acronyms the first time they are used in the text, 
-even after they have been defined in the abstract. Abbreviations such as 
-IEEE, SI, MKS, CGS, ac, dc, and rms do not have to be defined. Do not use 
-abbreviations in the title or heads unless they are unavoidable.
+class Prof1():
+    def get_profile(self):
+        # ip generator
+        ip_gen_c = ASTFIPGenDist(
+          ip_range=["16.0.0.1", "16.0.0.254"],
+          distribution="seq")
+        ip_gen_s = ASTFIPGenDist(
+          ip_range=["48.0.0.1", "48.0.255.254"],
+          distribution="seq")
+        ip_gen = 
+          ASTFIPGen(
+            glob=ASTFIPGenGlobal(ip_offset="1.0.0.0"), 
+                  dist_client=ip_gen_c,
+                  dist_server=ip_gen_s)
 
-\subsection{Units}
+        return ASTFProfile(default_ip_gen=ip_gen,
+                          cap_list=[ASTFCapInfo(
+                file="../avl/delay_10_http_browsing_0.pcap"
+               cps=1)
+        ])
+    
+\end{minted}
+\end{listing}
+
+List \ref{listing:7} shows a simple profile with one pool of client (16.0.0.1-16.0.0.254) and one pool of servers (48.0.0.1-48.0.255.254) 
+The pcap file is parsed and the L7 data is converted to instructions on top of the TCP stack 
+
+\subsection{ Emulation layer instructions}
+
+List \ref{listing:8} shows a simple example of a low level instructions of the emulation layer. 
+This example the client send request and wait for response while the server wait for request and send a response. 
+
+\begin{listing}[h]
+  \caption{Emulation layer instructions}
+  \label{listing:8}
+  \begin{minted}
+  [
+    frame=lines,
+    fontsize=\scriptsize,
+  ]
+{python}
+ 
+  prog_c = ASTFProgram()
+  prog_c.send(http_req)
+  prog_c.recv(len(http_response))
+
+  prog_s = ASTFProgram()
+  prog_s.recv(len(http_req))
+  prog_s.send(http_response)
+
+\end{minted}
+\end{listing}
+
+
+\begin{listing}[h]
+  \caption{Client pseudo code}
+  \label{listing:9}
+  \begin{minted}
+  [
+    frame=lines,
+    fontsize=\scriptsize,
+  ]
+{python}
+ 
+template = choose_template() 
+
+src_ip,dest_ip,src_port = generate from pool of client
+dst_port                = template.get_dest_port()
+
+s = socket.socket(socket.AF_INET, 
+                  socket.SOCK_STREAM)
+
+s.connect(dest_ip,dst_port)   
+
+# program  
+s.write(template.request) 
+  # GET /3384 HTTP/1.1
+  # Host: 22.0.0.3
+  # Connection: Keep-Alive
+  # User-Agent: Mozilla/4.0
+  # Accept: */*
+  # Accept-Language: en-us
+  # Accept-Encoding: gzip, deflate, compress
+
+s.read(template.request_size) 
+   #HTTP/1.1 200 OK
+   #Server: Microsoft-IIS/6.0
+   #Content-Type: text/html
+   #Content-Length: 32000
+   # body ..
+
+
+s.close();
+
+\end{minted}
+\end{listing}
+
+
+\begin{listing}[h]
+  \caption{Server pseudo code}
+  \label{listing:10}
+  \begin{minted}
+  [
+    frame=lines,
+    fontsize=\scriptsize,
+  ]
+{python}
+ 
+# if this is SYN for flow that already exist, 
+let TCP handle it
+
+if ( flow_table.lookup(pkt) == False ) :
+    # first SYN in the right direction with no flow
+    compare (pkt.src_ip/dst_ip to the generator ranges) 
+    # check that it is in the range or 
+    valid server IP (src_ip,dest_ip)
+    #get template for the dest_port
+    template= lookup_template(pkt.dest_port) 
+
+    # create a socket for TCP server
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)               1
+
+    # bind to the port
+    s.bind(pkt.dst_ip, pkt.dst_port)
+
+    s.listen(1)
+    #program of the template                                            2
+    s.read(template.request_size)   
+
+       GET /3384 HTTP/1.1
+       Host: 22.0.0.3
+       Connection: Keep-Alive
+       User-Agent: Mozilla/4.0 ..
+       Accept: */*
+       Accept-Language: en-us
+       Accept-Encoding: gzip, deflate, compress
+
+
+    s.write(template.response)   
+      #HTTP/1.1 200 OK
+      #Server: Microsoft-IIS/6.0
+      #Content-Type: text/html
+      #Content-Length: 32000
+      # body ..
+
+    s.close()
+\end{minted}
+\end{listing}
+
+
+\subsection{Features}
+
 \begin{itemize}
-\item Use either SI (MKS) or CGS as primary units. (SI units are encouraged.) English units may be used as secondary units (in parentheses). An exception would be the use of English units as identifiers in trade, such as ``3.5-inch disk drive''.
-\item Avoid combining SI and CGS units, such as current in amperes and magnetic field in oersteds. This often leads to confusion because equations do not balance dimensionally. If you must use mixed units, clearly state the units for each quantity that you use in an equation.
-\item Do not mix complete spellings and abbreviations of units: ``Wb/m\textsuperscript{2}'' or ``webers per square meter'', not ``webers/m\textsuperscript{2}''. Spell out units when they appear in text: ``. . . a few henries'', not ``. . . a few H''.
-\item Use a zero before decimal points: ``0.25'', not ``.25''. Use ``cm\textsuperscript{3}'', not ``cc''.)
+
+ \item high scale (flows, bandwidth, connection per second)
+ \item measure latency/jitter/drop in high rate
+ \item Emulate L7 application, e.g. HTTP/HTTPS/Citrix- there is no need to implement the exact application.
+ \item TCP implementation based on BSD
+ \item  automation Python API 
+ \item TCP/UDP/Application statistics (per client side/per template)
 \end{itemize}
 
-\subsection{Equations}
-Number equations consecutively. To make your 
-equations more compact, you may use the solidus (~/~), the exp function, or 
-appropriate exponents. Italicize Roman symbols for quantities and variables, 
-but not Greek symbols. Use a long dash rather than a hyphen for a minus 
-sign. Punctuate equations with commas or periods when they are part of a 
-sentence, as in:
-\begin{equation}
-a+b=\gamma\label{eq}
-\end{equation}
+\subsection{Automation example}
 
-Be sure that the 
-symbols in your equation have been defined before or immediately following 
-the equation. Use ``\eqref{eq}'', not ``Eq.~\eqref{eq}'' or ``equation \eqref{eq}'', except at 
-the beginning of a sentence: ``Equation \eqref{eq} is . . .''
+Listing \ref{listing:10} shows an example of python script to automate load a stateful profile and read port and TCP statistics 
 
-\subsection{\LaTeX-Specific Advice}
+\begin{listing}[h]
+  \caption{Stateless automation example}
+  \label{listing:10}
+  \begin{minted}
+  [
+      frame=lines,
+      fontsize=\scriptsize,
+  ]
+{python}
+ 
+c = ASTFClient(server = server)
 
-Please use ``soft'' (e.g., \verb|\eqref{Eq}|) cross references instead
-of ``hard'' references (e.g., \verb|(1)|). That will make it possible
-to combine sections, add equations, or change the order of figures or
-citations without having to go through the file line by line.
+c.connect()
 
-Please don't use the \verb|{eqnarray}| equation environment. Use
-\verb|{align}| or \verb|{IEEEeqnarray}| instead. The \verb|{eqnarray}|
-environment leaves unsightly spaces around relation symbols.
+try:
+    c.reset()
 
-Please note that the \verb|{subequations}| environment in {\LaTeX}
-will increment the main equation counter even when there are no
-equation numbers displayed. If you forget that, you might write an
-article in which the equation numbers skip from (17) to (20), causing
-the copy editors to wonder if you've discovered a new method of
-counting.
+    c.load_profile(profile_path)
 
-{\BibTeX} does not work by magic. It doesn't get the bibliographic
-data from thin air but from .bib files. If you use {\BibTeX} to produce a
-bibliography you must send the .bib files. 
+    c.clear_stats()
 
-{\LaTeX} can't read your mind. If you assign the same label to a
-subsubsection and a table, you might find that Table I has been cross
-referenced as Table IV-B3. 
+    c.start(mult = mult, 
+           duration = duration, 
+           nc = True)
 
-{\LaTeX} does not have precognitive abilities. If you put a
-\verb|\label| command before the command that updates the counter it's
-supposed to be using, the label will pick up the last counter to be
-cross referenced instead. In particular, a \verb|\label| command
-should not go before the caption of a figure or a table.
+    c.wait_on_traffic()
 
-Do not use \verb|\nonumber| inside the \verb|{array}| environment. It
-will not stop equation numbers inside \verb|{array}| (there won't be
-any anyway) and it might stop a wanted equation number in the
-surrounding equation.
+    stats = c.get_stats()
 
-\subsection{Some Common Mistakes}\label{SCM}
-\begin{itemize}
-\item The word ``data'' is plural, not singular.
-\item The subscript for the permeability of vacuum $\mu_{0}$, and other common scientific constants, is zero with subscript formatting, not a lowercase letter ``o''.
-\item In American English, commas, semicolons, periods, question and exclamation marks are located within quotation marks only when a complete thought or name is cited, such as a title or full quotation. When quotation marks are used, instead of a bold or italic typeface, to highlight a word or phrase, punctuation should appear outside of the quotation marks. A parenthetical phrase or statement at the end of a sentence is punctuated outside of the closing parenthesis (like this). (A parenthetical sentence is punctuated within the parentheses.)
-\item A graph within a graph is an ``inset'', not an ``insert''. The word alternatively is preferred to the word ``alternately'' (unless you really mean something that alternates).
-\item Do not use the word ``essentially'' to mean ``approximately'' or ``effectively''.
-\item In your paper title, if the words ``that uses'' can accurately replace the word ``using'', capitalize the ``u''; if not, keep using lower-cased.
-\item Be aware of the different meanings of the homophones ``affect'' and ``effect'', ``complement'' and ``compliment'', ``discreet'' and ``discrete'', ``principal'' and ``principle''.
-\item Do not confuse ``imply'' and ``infer''.
-\item The prefix ``non'' is not a word; it should be joined to the word it modifies, usually without a hyphen.
-\item There is no period after the ``et'' in the Latin abbreviation ``et al.''.
-\item The abbreviation ``i.e.'' means ``that is'', and the abbreviation ``e.g.'' means ``for example''.
-\end{itemize}
-An excellent style manual for science writers is \cite{b7}.
+    pprint.pprint(stats)
 
-\subsection{Authors and Affiliations}
-\textbf{The class file is designed for, but not limited to, six authors.} A 
-minimum of one author is required for all conference articles. Author names 
-should be listed starting from left to right and then moving down to the 
-next line. This is the author sequence that will be used in future citations 
-and by indexing services. Names should not be listed in columns nor group by 
-affiliation. Please keep your affiliations as succinct as possible (for 
-example, do not differentiate among departments of the same organization).
-
-\subsection{Identify the Headings}
-Headings, or heads, are organizational devices that guide the reader through 
-your paper. There are two types: component heads and text heads.
-
-Component heads identify the different components of your paper and are not 
-topically subordinate to each other. Examples include Acknowledgments and 
-References and, for these, the correct style to use is ``Heading 5''. Use 
-``figure caption'' for your Figure captions, and ``table head'' for your 
-table title. Run-in heads, such as ``Abstract'', will require you to apply a 
-style (in this case, italic) in addition to the style provided by the drop 
-down menu to differentiate the head from the text.
-
-Text heads organize the topics on a relational, hierarchical basis. For 
-example, the paper title is the primary text head because all subsequent 
-material relates and elaborates on this one topic. If there are two or more 
-sub-topics, the next level head (uppercase Roman numerals) should be used 
-and, conversely, if there are not at least two sub-topics, then no subheads 
-should be introduced.
-
-\subsection{Figures and Tables}
-\paragraph{Positioning Figures and Tables} Place figures and tables at the top and 
-bottom of columns. Avoid placing them in the middle of columns. Large 
-figures and tables may span across both columns. Figure captions should be 
-below the figures; table heads should appear above the tables. Insert 
-figures and tables after they are cited in the text. Use the abbreviation 
- even at the beginning of a sentence.
-
-\begin{table}[htbp]
-\caption{Table Type Styles}
-\begin{center}
-\begin{tabular}{|c|c|c|c|}
-\hline
-\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
-\cline{2-4} 
-\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
-\hline
-copy& More table copy$^{\mathrm{a}}$& &  \\
-\hline
-\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
-\end{tabular}
-\label{tab1}
-\end{center}
-\end{table}
+    if c.get_warnings():
+        for w in c.get_warnings():
+            print(w)
 
 
+except TRexError as e:
+    print(e)
 
-Figure Labels: Use 8 point Times New Roman for Figure labels. Use words 
-rather than symbols or abbreviations when writing Figure axis labels to 
-avoid confusing the reader. As an example, write the quantity 
-``Magnetization'', or ``Magnetization, M'', not just ``M''. If including 
-units in the label, present them within parentheses. Do not label axes only 
-with units. In the example, write ``Magnetization (A/m)'' or ``Magnetization 
-\{A[m(1)]\}'', not just ``A/m''. Do not label axes with a ratio of 
-quantities and units. For example, write ``Temperature (K)'', not 
-``Temperature/K''.
+except AssertionError as e:
+    print(e)
 
-\section*{Acknowledgment}
+finally:
+    c.disconnect()
+\end{minted}
+\end{listing}
 
-The preferred spelling of the word ``acknowledgment'' in America is without 
-an ``e'' after the ``g''. Avoid the stilted expression ``one of us (R. B. 
-G.) thanks $\ldots$''. Instead, try ``R. B. G. thanks$\ldots$''. Put sponsor 
-acknowledgments in the unnumbered footnote on the first page.
+\subsection{Memory saving}
 
-\section*{References}
+\begin{figure}[h]
+  \includegraphics[width=0.15
+  \textwidth, center]{t_c5.png}
+  \caption{One Flow Tx Ring}
+  \label{fig:tx_ring}
+\end{figure}
 
-Please number citations consecutively within brackets \cite{b1}. The 
-sentence punctuation follows the bracket \cite{b2}. Refer simply to the reference 
-number, as in \cite{b3}---do not use ``Ref. \cite{b3}'' or ``reference \cite{b3}'' except at 
-the beginning of a sentence: ``Reference \cite{b3} was the first $\ldots$''
+Most TCP stacks have an API that allow the user to provide a buffer (write operation). 
+The TCP module saves the buffer until the data is acknowledged by the remote side. 
+With big windows (required with high RTT) and many flows this could create a memory scale issue. 
+Figure \ref{fig:tx_ring} shows one TCP flow TX queue. For 1M active flows with 64K TX buffer 
+the worst case memory requirement is 1M x 64K * mbuf-factor (let's assume 2) = 128GB. 
+The mbuf resource is expensive and needs to be allocated ahead of time. 
+The chosen solution for this problem is to change the API to be a poll API, 
+meaning TCP Tx queue will just save a reference to the constant traffic and offset into this ring the mbufs are allocated only when packets need to be sent (lazy) but virtually have a tx queue only for management of queue (two pointers). 
+Now because most of the traffic is almost constant in traffic generation case (per template) and known ahead of time it was possible to implement and save most of the memory.
+The same idea happen in the Rx side with reassembly \footnote{This will not work for TLS streams}
 
-Number footnotes separately in superscripts. Place the actual footnote at 
-the bottom of the column in which it was cited. Do not put footnotes in the 
-abstract or reference list. Use letters for table footnotes.
+\begin{figure}[h]
+  \includegraphics[width=0.15
+  \textwidth, center]{t_c6.png}
+  \caption{One Flow Rx Ring}
+  \label{fig:rx_ring}
+\end{figure}
 
-Unless there are six authors or more give all authors' names; do not use 
-``et al.''. Papers that have not been published, even if they have been 
-submitted for publication, should be cited as ``unpublished'' \cite{b4}. Papers 
-that have been accepted for publication should be cited as ``in press'' \cite{b5}. 
-Capitalize only the first word in a paper title, except for proper nouns and 
-element symbols.
 
-For papers published in translation journals, please give the English 
-citation first, followed by the original foreign-language citation \cite{b6}.
+\subsection{Benchmark  TRex vs Linux kernel}
+
+To evaluate the performance and memory scale of TRex and compare it against standard linux tools the following was done. 
+Linux \textbf{curl} as a client and \textbf{nginx} as a server were compared to TRex for stressing a device under test.
+
+\begin{figure}[h]
+  \includegraphics[width=0.3
+  \textwidth, center]{nginx_setup1.png}
+  \caption{TRex vs NGINX}
+  \label{fig:trex_nginx}
+\end{figure}
+
+The benchmark setup was designed to take a good event-driven Linux server application and to test a TRex client against it. 
+TRex is the client requesting the pages. Figure \ref{fig:trex_nginx} shows the topology in this case.
+TRex generates requests using \textbf{one} DP core/thread and exercises the \textbf{whole} 16 cores of the NGINX/Linux server. 
+The server is installed with the NGINX process on all 16 cores.  
+After some trial and error, it was determined that is is more difficult to separate Linux kernel/IRQ contexts events from user space process CPU, 
+so it was chosen to give the NGINX all server resources, and monitor to determine the limiting factor.
+The objective is to simulate HTTP sessions as it was defined in our benchmark (e.g. new session for each REQ/RES, initwnd=2 etc.) 
+and not to make the fastest most efficient TCP configuration. 
+This might be the main \textbf{difference} between NGINX benchmark configuration and this document configuration. 
+In both cases (client/server), the same type of x86 server was used (2 sockets,CPU E5-2667, Intel X710)
+
+\begin{figure}[h]
+  \includegraphics[width=0.3
+  \textwidth, center]{nginx_setup2.png}
+  \caption{TRex vs TRex}
+  \label{fig:trex_vs_trex}
+\end{figure}
+
+To compare apples to apples, the nginx server was replaced with a TRex server with \textbf{one} DP core, using an XL710 NIC (40Gb). 
+see Figure \ref{fig:trex_vs_trex}
+
+\subsection{Benchmark traffic profile}
+
+Typically, web servers are tested with a constant number of active flows that are opened ahead of time. 
+In the nginx benchmark blog, only 50 TCP constant connections are used with many requests/responses 
+for each TCP connection see here \cite{b6}. In our traffic generation use case, each HTTP request/response (for each new TCP connection) requires opening a \textbf{new} TCP connection. 
+A simple HTTP flow with a request of 100B and a response of 32KB (about 32 packets/flow with initwnd=2) was used.
+
+\subsection{Benchmark Limitations}
+
+The comparison is not perfect, as TRex merely emulates HTTP traffic. 
+It is not a real-world web server or HTTP client. For example, currently the TRex client does not parse the HTTP response for the Length field. 
+TRex simply waits for a specific data size (32KB) over TCP. However the TCP layer is a full featured TCP (e.g. delay-ack/Retransmission/Reassembly/timers) . 
+The bench objective is to compare traffic generation capabilities for stressing network gears. 
+
+\subsection{Benchmark results}
+
+Comparing 1 DP core running TRex to NGINX running on 16 cores with a kernel that can interrupt any NGINX process with IRQ. Figure 3 shows the performance of one DP TRex. 
+It can scale to about 25Gb/sec of download of HTTP (total of 3MPPS for one core).
+
+\begin{figure}[h]
+  \includegraphics[width=0.5
+  \textwidth, center]{nginx_result_trex1.png}
+  \caption{TRex 1 DP core}
+  \label{fig:trex_nginx_r1}
+\end{figure}
+
+\begin{figure}[h]
+  \includegraphics[width=0.5
+  \textwidth, center]{nginx_result_linux1.png}
+  \caption{NGINX 16 cores}
+  \label{fig:trex_nginx_r2}
+\end{figure}
+
+nginx cannot handle more than 20K new flows/sec, due to kernel TCP software interrupt and thread processing. 
+The limitation is the kernel and not NGINX user space process.
+ With more NICs and optimized distribution, the number of flows could be increased X2, but not more than that. 
+ The total number of packets was approximately 600KPPS (Tx+Rx). The number of active flows were 12K.
+
+TRex with one core could scale to about 25Gb/sec, 3MPPS of the same HTTP profile.
+The main issue with nginx and Linux setup is the tunning. 
+It is very hard to let the hardware utilizing the full server resource (half of the server was idle in this case and still experience a lot of drop). 
+TRex is not perfect too, we couldn't reach 100\\\% CPU utilization without a drop (CPU was 84\\\%). To achieve 100gbps with this profile on the server side requires ~4 cores for TRex, vs. 20x16 cores for NGINX servers. 
+TRex is faster by a factor of \textbf{80}. In this implementation, each flow requires approximately 1K bytes of memory (Regardless of Tx/Rx rings because of TRex architecture). 
+In the kernel, with a real-world server, TRex optimization can't be applied and each TCP connection must save memory in Tx/Rx rings.
+For about 5Gb/sec traffic with this profile, approximately 10GB of memory was required (both NGINX and Kernel). For 100Gb/sec traffic, approximately 200GB is required (If we will do the extrapolation)  With a TRex optimized implementation, approximately 100MB is required. 
+TRex thus provides an improvement by a factor or \textbf{2000} in the use of memory resources.
+
+\section{Emulation layers}
+
+To simulate clients there is a need for many a slow path 
 
 \begin{thebibliography}{00}
 \bibitem{b1} Cisco systems: ``TRex realistic traffic generator'',\\\texttt{https://trex-tgn.cisco.com/trex/doc/}
 \bibitem{b2} Cisco systems, ``TRex Stateless'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_stateless.html}
 \bibitem{b3} Cisco systems, ``TRex Stateful ASTF'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_astf.html}
 \bibitem{b4} BIRD, Faculty of Math and Physics, Charles University Prague \\\texttt{https://bird.network.cz/}
-\bibitem{b5} R. Nicole, ``Title of paper with only first word capitalized,'' J. Name Stand. Abbrev., in press.
-\bibitem{b6} Y. Yorozu, M. Hirano, K. Oka, and Y. Tagawa, ``Electron spectroscopy studies on magneto-optical media and plastic substrate interface,'' IEEE Transl. J. Magn. Japan, vol. 2, pp. 740--741, August 1987 [Digests 9th Annual Conf. Magnetics Japan, p. 301, 1982].
-\bibitem{b7} M. Young, The Technical Writer's Handbook. Mill Valley, CA: University Science, 1989.
+\bibitem{b5} Cisco systems, ``TRex STL benchmark'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_stateless\\\_bench.html}
+\bibitem{b6} NGINX performance  \\\texttt{https://www.nginx.com/blog/testing-the-performance-of-nginx-and-nginx-plus-web-servers/}
 \end{thebibliography}
-\vspace{12pt}
-\color{red}
-IEEE conference templates contain guidance text for composing and formatting conference papers. Please ensure that all template text is removed from your conference paper prior to submission to the conference. Failure to remove the template text from your paper may result in your paper not being published.
 
 \end{document}
