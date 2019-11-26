@@ -15,12 +15,9 @@
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-
 \title{Test Your Limits With TRex Traffic Generator 
 \thanks{Cisco systems}
 }
-
-
 
 \author{\IEEEauthorblockN{Hanoch Haim}
 \textit{Cisco systems}\\
@@ -93,11 +90,13 @@ of the techniques to be adopted in Linux.
 
 Figure \ref{fig:arch} presents the main processes. TRex server (*1) is a multi-threaded process, each thread is pinned to a core and works in 
 event driven fashion using a user-space scheduler with a few hierarchy. There is one control-plane (CP) thread that handle the RPC over ZMQ requests and maintenance tasks. 
-The RX thread responsible to handle the low latency traffic for accurate latency measurement. This thread is usually in very low CPU. 
-The DP threads are generating the traffic using and interact with DPDK to transmit/receive traffic via PMD queues. The number of DP threads can be scale up as the number of Tx/Rx queues. 
-There is almost no sharing data structure and no locks to get to best performance. Any information is moved between the threads using a messaging bus which 
+The RX thread responsible to handle the low latency traffic for accurate latency measurement. This thread is usually in very low CPU utilization. 
+The DP threads are generating the traffic using and interact with DPDK to transmit/receive traffic via PMD queues. 
+The number of DP threads can be scale up as the number of Tx/Rx queues. 
+There is almost no sharing data structure and no locks to get to best performance. 
+Any information is moved between the threads using a messaging bus which 
 is a shared rings (DP$\rightarrow$CP, CP$\rightarrow$DP, Rx$\rightarrow$DP, RX$\rightarrow$CP).
-There is minimum system call to the kernel (only when required for example with PF\\\_PACKET driver)
+There is minimum system call to the kernel (only when required for example with PF\_PACKET/AF\_XDP driver)
 (*4) is a Python wrapper to the JSON-RPC2 API over ZMQ so it would be easy automation (e.g. load a profile, get statistics etc)
 on top of Python API there is a Console that can simplify the way to work with the API. 
 (*5) is the GUI process that written in Java that works directly with the JSON-RPC2 and supports only the Stateless mode.
@@ -123,12 +122,13 @@ This design gives linear scale with of performance about 4-20MPPS/core and 200gb
   \label{fig:emix}
 \end{figure}
 
-From functionality point of view TRex has two main operation modes. Stateful and Stateless. Stateful is for testing L7 services that care about clients/flows/L7 application like DPI/NAT/Firewall, Figure \ref{fig:emix} is an example of mix of traffic that can be generated using this mode. 
+From functionality point of view TRex has two main operation modes. Stateful and Stateless. 
+Stateful is for testing L7 services that care about clients/flows/L7 application like DPI/NAT/Firewall, Figure \ref{fig:emix} is an example of mix of traffic that can be generated using this mode. 
 Stateless is for testing Switch/Filters/ACL/Qos services and has no flow/client state
 
 \section{Stateless mode}
 
-Stateless traffic model is for testing Switch and device under test (DUT) that are relatively simple and does not have flow/client context. 
+Stateless traffic model is for testing  device under test (DUT) that is relatively simple and does not care about flow/client context. 
 
 \begin{figure}[h]
   \includegraphics[width=0.25
@@ -142,11 +142,11 @@ Each traffic profile supports one or more streams. Each stream includes
 
 \begin{itemize}
   \item \textbf{Packet}: Packet template up to 9 KB
-  \item \textbf{Field Engine}: A program that determines which field/packet size
+  \item \textbf{Field Engine}: A program that determines which field to change and how to change 
   \item \textbf{Mode}: Specifies how to send packets [Continuous,Burst,Multi-burst]
-  \item \textbf{Rx Stats}: Statistics to collect for each stream
+  \item \textbf{Rx Stats}: Which statistics to collect for each stream
   \item \textbf{Rate}: Rate (pps or bps)
-  \item \textbf{Action}: Specifies stream to follow when the current stream is complete (valid for Continuous or Burst modes)
+  \item \textbf{Action}: Specifies the next stream to follow when the current stream is complete (valid for Continuous or Burst modes)
 \end{itemize}
 
 \begin{figure}[h]
@@ -156,9 +156,11 @@ Each traffic profile supports one or more streams. Each stream includes
   \label{fig:stlhello}
 \end{figure}
 
-Figure \ref{fig:stlhello} shows an example of a profile, three streams configured for Continuous, Burst, and Multi-burst traffic.
+Figure \ref{fig:stlhello} shows an example of a profile with three streams.  
+Stream 1 is in rate of 10pps stream 2 has a rate of 20 pps and streams 3 has rate of 40 pps. All are continues mode.
 
-List \ref{listing:1} shows a profile with one UDP stream. The mode is continues 
+List \ref{listing:1} shows a profile with one UDP stream. The mode is Continues. 
+It uses Scapy for building the template packet. 
 
 \begin{listing}[h]
 \caption{Profile with one continues UDP stream}
@@ -199,7 +201,7 @@ def register():
 
 \begin{itemize}
   \item Large scale - Supports about 10-22 million packets per second (mpps) per core, scalable with the number of cores
-  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with Linux driver vs PF\\\_PACKET
+  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with Linux driver vs PF\_PACKET
   \item Support for multiple traffic profiles per interface
   \item Programable Field Engine to change any field inside the packet (e.g. \mint{html}|src_ip=10.0.0.1..10.0.0.255|)
   \item Ability to change the packet size 
@@ -211,7 +213,7 @@ def register():
 
 \subsection{Multi stream example}
 
-Figure \ref{fig:stlmulti} shows two streams the blue one is a burst stream that activate a multi-burst stream. 
+Figure \ref{fig:stlmulti} shows two streams the Stream 0 is a burst stream that activate a multi-burst stream 1 (With 5 burst of 4 packets). 
 List \ref{listing:4} shows the python profile to create this profile 
 
 \begin{figure}[h]
@@ -232,54 +234,43 @@ List \ref{listing:4} shows the python profile to create this profile
   ]
 {python}
   
-  def create_stream (self):
+def create_stream (self):
 
-  # create a base packet and pad it to size
-  size = self.fsize - 4 # no FCS
-  base_pkt =  Ether()/
-              IP(src="16.0.0.1",dst="48.0.0.1")/
-              UDP(dport=12,sport=1025)
-  base_pkt1 = Ether()/
-              IP(src="16.0.0.2",dst="48.0.0.1")/
-              UDP(dport=12,sport=1025)
-  base_pkt2 = Ether()/
-              IP(src="16.0.0.3",dst="48.0.0.1")/
-              UDP(dport=12,sport=1025)
-  pad = max(0, size - len(base_pkt)) * 'x'
+# create a base packet and pad it to size
+size = self.fsize - 4 # no FCS
+base_pkt =  Ether()/
+            IP(src="16.0.0.1",dst="48.0.0.1")/
+            UDP(dport=12,sport=1025)
+base_pkt1 =  Ether()/
+             IP(src="16.0.0.2",dst="48.0.0.1")/
+             UDP(dport=12,sport=1025)
+pad = max(0, size - len(base_pkt)) * 'x'
 
+return STLProfile( 
+  [ STLStream( isg = 10.0, # start in delay                                  1
+     name    ='S0',
+     packet = STLPktBuilder(pkt = base_pkt/pad),
+     mode = STLTXSingleBurst( pps = 10, total_pkts = self.burst_size),
+     next = 'S1'), # point 
 
-  return STLProfile( 
-    
-   [ STLStream( isg = 10.0, # star in delay
-                name    ='S0',
-                packet = STLPktBuilder(pkt=base_pkt/pad),
-                mode = STLTXSingleBurst(pps= 10, 
-                total_pkts = 10),  1
-                next = 'S1'), # point to next stream
-
+    # stream is disabled. Enabled by S0 
     STLStream( self_start = False, 
-               name    ='S1',
-               packet  = STLPktBuilder(pkt=base_pkt1/pad),
-               mode    = STLTXSingleBurst(pps=10, 
-              total_pkts = 20),
-               next    = 'S2' ),
-
-    STLStream(  self_start = False, 
-                name   ='S2',
-                packet = STLPktBuilder(pkt= base_pkt2/pad),
-                mode = STLTXSingleBurst(pps=10, 
-                total_pkts=30)
-                )
-  ]).get_streams()
-
+      name    ='S1',
+      packet  = STLPktBuilder(pkt = base_pkt1/pad),
+      mode    = STLTXMultiBurst( pps = 1000,
+                                pkts_per_burst = 4,
+                                ibg = 1000000.0,
+                                count = 5)
+                               )
+                    ]).get_streams()
 \end{minted}
 \end{listing}
 
 
 \subsection{Field Engine}
 
-The field engine (FE) is a programable engine that can change any field in the packet and is loaded from python to a fast bytecode.
-The implementation challenge was to provide an engine that change packet fields on number of core in parallel but as a black-box behave like it runs on a single thread (hardware like)
+The field engine (FE) is a programable engine that can change any field in the packet and is part of the profile and compiled to bytecode in the TRex server. 
+The challenge was to provide an engine that change packet fields on number of core in parallel but as a black-box behave like it runs on a single thread (hardware like)
 Let gives an example of syn-attack and explain it 
 
 \begin{listing}[h]
@@ -344,7 +335,7 @@ Let gives an example of syn-attack and explain it
   
 List \ref{listing:2} shows a FE program that generate a syn attack using one stream. 
 every stream has a context of a FE. in this context in this example there are two variables 
-\textbf{ip\\\_src} for the range of the source ipv4 ips and the \textbf{source\\\_port} for the range of the source protocols.
+\textbf{ip\_src} for the range of the source ipv4 ips and the \textbf{source\_port} for the range of the source protocols.
 Those variables are written to the right offset in the packet and fix the checksum (using hardware assist if exists)
 
 \subsection{Automation using Python API}
@@ -785,7 +776,7 @@ The limitation is the kernel and not NGINX user space process.
 TRex with one core could scale to about 25Gb/sec, 3MPPS of the same HTTP profile.
 The main issue with nginx and Linux setup is the tunning. 
 It is very hard to let the hardware utilizing the full server resource (half of the server was idle in this case and still experience a lot of drop). 
-TRex is not perfect too, we couldn't reach 100\\\% CPU utilization without a drop (CPU was 84\\\%). To achieve 100gbps with this profile on the server side requires ~4 cores for TRex, vs. 20x16 cores for NGINX servers. 
+TRex is not perfect too, we couldn't reach 100\% CPU utilization without a drop (CPU was 84\%). To achieve 100gbps with this profile on the server side requires ~4 cores for TRex, vs. 20x16 cores for NGINX servers. 
 TRex is faster by a factor of \textbf{80}. In this implementation, each flow requires approximately 1K bytes of memory (Regardless of Tx/Rx rings because of TRex architecture). 
 In the kernel, with a real-world server, TRex optimization can't be applied and each TCP connection must save memory in Tx/Rx rings.
 For about 5Gb/sec traffic with this profile, approximately 10GB of memory was required (both NGINX and Kernel). For 100Gb/sec traffic, approximately 200GB is required (If we will do the extrapolation)  With a TRex optimized implementation, approximately 100MB is required. 
@@ -796,12 +787,12 @@ TRex thus provides an improvement by a factor or \textbf{2000} in the use of mem
 To simulate clients there is a need for many a slow path 
 
 \begin{thebibliography}{00}
-\bibitem{b1} Cisco systems: ``TRex realistic traffic generator'',\\\texttt{https://trex-tgn.cisco.com/trex/doc/}
-\bibitem{b2} Cisco systems, ``TRex Stateless'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_stateless.html}
-\bibitem{b3} Cisco systems, ``TRex Stateful ASTF'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_astf.html}
-\bibitem{b4} BIRD, Faculty of Math and Physics, Charles University Prague \\\texttt{https://bird.network.cz/}
-\bibitem{b5} Cisco systems, ``TRex STL benchmark'',,\\\texttt{https://trex-tgn.cisco.com/trex/doc/trex\\\_stateless\\\_bench.html}
-\bibitem{b6} NGINX performance  \\\texttt{https://www.nginx.com/blog/testing-the-performance-of-nginx-and-nginx-plus-web-servers/}
+\bibitem{b1} Cisco systems: ``TRex realistic traffic generator'',\texttt{https://trex-tgn.cisco.com/trex/doc/}
+\bibitem{b2} Cisco systems, ``TRex Stateless'',,\texttt{https://trex-tgn.cisco.com/trex/doc/trex\_stateless.html}
+\bibitem{b3} Cisco systems, ``TRex Stateful ASTF'',,\texttt{https://trex-tgn.cisco.com/trex/doc/trex\_astf.html}
+\bibitem{b4} BIRD, Faculty of Math and Physics, Charles University Prague \texttt{https://bird.network.cz/}
+\bibitem{b5} Cisco systems, ``TRex STL benchmark'',,\texttt{https://trex-tgn.cisco.com/trex/doc/trex\_stateless\_bench.html}
+\bibitem{b6} NGINX performance  \texttt{https://www.nginx.com/blog/testing-the-performance-of-nginx-and-nginx-plus-web-servers/}
 \end{thebibliography}
 
 \end{document}
