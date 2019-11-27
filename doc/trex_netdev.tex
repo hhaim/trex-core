@@ -56,8 +56,8 @@ TRex \cite{b1} is an advanced traffic generator, it has the following interestin
 
 \begin{itemize}
 \item It leverages COTS x86/ARM servers and physical NICs (Intel, Mellanox etc) for high scale.
-\item Can support Linux driver or paravirtual (e.g. virtio) for low scale with advanced features. 
-\item  It can serve both Stateless and Stateful traffic generation.
+\item Can support Linux driver or paravirtual (e.g. virtio) for low scale with advanced features \texttt{(PF\_PACKET/AF\_XDP driver)}
+\item It can serve both Stateless and Stateful traffic generation.
   tcp stack for stateful traffic and emulation layer to simulate L7 applications.
 \item It outperforms all of iperf, netperf and pktgen: 
    \begin{itemize}
@@ -73,7 +73,7 @@ TRex \cite{b1} is an advanced traffic generator, it has the following interestin
       change HTTP User-Agent field
 \end{itemize}
 \item Support routing protocols like BGP/OSPF/RIP using BIRD \cite{b4}
-\item Support high scale client simulation protocols (arp.ipv6-nd,dhcp,802.1x,icmp) 
+\item Support high scale client simulation protocols (arp,ipv6-nd,dhcp4,dhcp6,802.1x,icmp,igmp,mld) 
 \end{itemize}
 Although TRex is implemented on top of DPDK, a lot of the issues we had
 to deal with when writing the tool apply equally to scaling Linux networking;
@@ -85,7 +85,7 @@ of the techniques to be adopted in Linux.
 \begin{figure}[h]
 \includegraphics[width=0.4
 \textwidth, center]{trex_arch_2.png}
-\caption{architecture}
+\caption{Architecture}
 \label{fig:arch}
 \end{figure}
 
@@ -108,7 +108,7 @@ BIRD is used to simulate routing protocols like BGP/OSPF/RIP.
 \begin{figure}[h]
   \includegraphics[width=0.3
   \textwidth, center]{trex_dp_sheduler.png}
-  \caption{DP Scheduler}
+  \caption{Data-plane Scheduler}
   \label{fig:dp_schduler}
 \end{figure}
   
@@ -124,11 +124,15 @@ This design achieves linear scale with of performance about 4-20MPPS/core and 20
   \label{fig:emix}
 \end{figure}
 
+
 From the functionality point of view TRex has two main operation modes, Stateful and Stateless. 
 Stateful is meant for testing L7 services that care about clients/flows/L7 application like DPI/NAT/Firewall, Figure \ref{fig:emix} is an example of a mix of traffic that can be generated using this mode. 
 Stateless is meant for testing Switch/Filters/ACL/QoS services and has no flow/client state context.
 
 \section{Stateless mode}
+
+Stateless mode is meant to test networking gear/feature that does not manage any state per flow (instead operating on a per packet basis). 
+This is usually done by injecting customized packet streams to the device under test.
 
 \begin{figure}[h]
   \includegraphics[width=0.25
@@ -160,7 +164,7 @@ Figure \ref{fig:stlhello} shows an example of a profile with three streams.
 Stream 1 has a rate of 10pps stream 2 has a rate of 20 pps and streams 3 has rate of 40 pps. All are configured for continues mode.
 
 List \ref{listing:1} shows a profile with one UDP stream. The mode is Continuous. 
-It uses Scapy for building the template packet. 
+It uses Scapy for building the template packet. This profile is converted to json and sent to the TRex server for processing. 
 
 \begin{listing}[h]
 \caption{Profile with one continues UDP stream}
@@ -201,7 +205,7 @@ def register():
 
 \begin{itemize}
   \item Large scale - Supports about 10-22 million packets per second (mpps) per core, scalable with the number of cores
-  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with Linux driver vs PF\_PACKET
+  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with DPDK or PF\_PACKET.
   \item Support for multiple traffic profiles per interface
   \item Programmable Field Engine to change any field inside the packet i.e. \mint{html}|src_ip=10.0.0.1..10.0.0.255|
   \item Ability to change the packet size 
@@ -211,10 +215,10 @@ def register():
   \item Multi-user support 
 \end{itemize}
 
-\subsection{Multi stream example}
+\subsection{Multi stream profile example}
 
 
-Figure \ref{fig:stlmulti} shows two streams the Stream 0 is a burst stream that activate a multi-burst stream 1 (With 5 burst of 4 packets). 
+Figure \ref{fig:stlmulti} shows two streams. Stream 0 is a burst that activate a multi-burst Stream 1 (With 5 burst of 4 packets). 
 List \ref{listing:4} shows the Python script to create this profile 
 
 \begin{figure}[h]
@@ -250,15 +254,16 @@ pad = max(0, size - len(base_pkt)) * 'x'
 return STLProfile( 
   [ STLStream( isg = 10.0, # start in delay                                  1
      name    ='S0',
-     packet = STLPktBuilder(pkt = base_pkt/pad),
-     mode = STLTXSingleBurst( pps = 10, total_pkts = self.burst_size),
-     next = 'S1'), # point 
+     packet = STLPktBuilder(pkt=base_pkt/pad),
+     mode = STLTXSingleBurst(pps=10, 
+                            total_pkts=self.burst_size),
+     next = 'S1'), # point to s1
 
     # stream is disabled. Enabled by S0 
     STLStream( self_start = False, 
       name    ='S1',
-      packet  = STLPktBuilder(pkt = base_pkt1/pad),
-      mode    = STLTXMultiBurst( pps = 1000,
+      packet  = STLPktBuilder(pkt=base_pkt1/pad),
+      mode    = STLTXMultiBurst(pps = 1000,
                                 pkts_per_burst = 4,
                                 ibg = 1000000.0,
                                 count = 5)
@@ -270,9 +275,9 @@ return STLProfile(
 
 \subsection{Field Engine}
 
-The field engine (FE) is a programmable engine that can change any field in the packet and is part of the profile and compiled to bytecode in the TRex server. 
-The challenge was to provide an engine that can change packet fields on a number of cores in parallel but as a black-box it behaves like it runs on a single core (hardware like)
-Let us provide an example of a syn-attack profile and explain it:
+The field engine (FE) is a programmable engine that can change any field in the packet and is part of the profile and compiled into bytecode in the TRex server. 
+The challenge was to provide an engine that can change packet fields on a number of cores in parallel but as a black-box it behaves like it runs on a single core (hardware like).
+Let us provide an example of a syn-attack profile with a simple field engine program and explain it:
 
 \begin{listing}[h]
   \caption{FE syn-attack on 48.0.0.1 server}
@@ -286,10 +291,6 @@ Let us provide an example of a syn-attack profile and explain it:
   class STLS1(object):
   """ attack 48.0.0.1 at port 80
   """
-
-  def __init__ (self):
-      self.max_pkt_size_l3  =9*1024;
-
   def create_stream (self):
 
       # TCP SYN
@@ -329,19 +330,17 @@ Let us provide an example of a syn-attack profile and explain it:
       return STLStream(packet = pkt,
                       random_seed = 0x1234,
                       mode = STLTXCont())
-
-
   \end{minted}
   \end{listing}
   
 List \ref{listing:2} shows a FE program that generates a syn-attack using one stream. 
-Each stream object has a context for FE variables.In this example there are two variables,
-\textbf{ip\_src} for the range of the source IPv4 ips and the \textbf{source\_port} for the range of the source protocols.
+Each stream object has a context for FE variables. In this example there are two variables,
+\texttt{ip\_src} for the range of the source IPv4 ips and the \texttt{source\_port} for the range of the source tcp ports.
 Those variables are written to the right offset in the packet and the checksum is fixed accordingly (using hardware assist if possible).
 
 \subsection{Automation using Python API}
 
-List \ref{listing:6} shows a simple script to automate TRex. It is self-explainatory.
+List \ref{listing:6} shows a simple script to automate TRex. It is self-explanatory.
 
 \begin{listing}[h]
   \caption{Stateless automation example}
@@ -386,7 +385,7 @@ finally:
 \end{minted}
 \end{listing}
  
-\subsection{Stateles Performance}
+\subsection{Stateless Performance}
 
 \begin{figure}[h]
   \includegraphics[width=0.4
@@ -408,10 +407,10 @@ Each profile includes:
 \begin{itemize}
   \item \textbf{Client pool}: Range of clients with a distribution model (e.g. random,seq). A profile can include a few pools.
   \item \textbf{Server pool}: Range of servers, profile can include a few pools. 
-  \item \textbf{Template}: A model that describes an application on top of TCP/UDP. L7 data that can be taken from a pcap:
+  \item \textbf{Template}: A model that describes an application on top of TCP/UDP. Each template could be associated with a different pool of clients/servers. The L7 data that can be taken from a pcap:
   \begin{itemize}
   \item \textbf{CPS}: How many connection per second for this template. 
-  \item \textbf{flowLimit}: Maximum number of flows to generate. good for elefant flows simulation.
+  \item \textbf{flowLimit}: Maximum number of flows to generate. good for elephant flows simulation.
   \end{itemize}
 \end{itemize}
 
@@ -422,10 +421,10 @@ Each profile includes:
   \label{fig:astf}
 \end{figure}
 
-In this model each core has its own context of TCP/UDP stack with no memory sharing and no locks. It works on top of the scheduler hierarchy shown in Figure \ref{fig:dp_schduler}
+In this model each core has its own context of TCP/UDP stack with no memory sharing and no locks. It works on top of the scheduler hierarchy shown in Figure \ref{fig:dp_schduler}.
 The most significant changes to the BSD stack were:
 \begin{itemize}
-  \item Each stack has a context per thread.
+  \item Each stack has a context per thread. No memory sharing, no locks. GRO/LRO/TSO is supported. 
   \item Tx works in pool mode (it builds the packets only when required) and saves reference to the template data. This saves three orders of magnitude of memory resource.
 \end{itemize}
 
@@ -436,7 +435,7 @@ The most significant changes to the BSD stack were:
   \label{fig:astf_stack}
 \end{figure}
 
-Figure \ref{fig:astf_stack} shows the stack of the programable application emulation layer. This module is responsible to simulate applications on top of the TCP/UDP stack. 
+Figure \ref{fig:astf_stack} shows the stack of the programmable application emulation layer. This module is responsible to simulate applications on top of the TCP/UDP stack. 
 Some possible commands are:
 
 \begin{itemize}
@@ -448,7 +447,7 @@ Some possible commands are:
 \end{itemize}
 
 
-\subsection{ Stateful Profile }
+\subsection{Stateful Profile Example}
 
 \begin{listing}[h]
   \caption{Stateful profile}
@@ -486,13 +485,14 @@ class Prof1():
 \end{minted}
 \end{listing}
 
-List \ref{listing:7} shows a simple profile with one pool of clients (16.0.0.1-16.0.0.254) and one pool of servers (48.0.0.1-48.0.255.254). 
+List \ref{listing:7} shows a simple profile with one pool of clients \texttt{(16.0.0.1-16.0.0.254)} and one pool of servers \texttt{(48.0.0.1-48.0.255.254)}. 
 The pcap file is parsed and the L7 data is converted to instructions on top of the TCP stack.
 
 \subsection{ Emulation layer instructions}
 
 List \ref{listing:8} shows a simple example of a low level instructions of the emulation layer. 
 In this example the client sends request and waits for the response while the server waits for request and sends a response. 
+List \ref{listing:client} and List \ref{listing:server} shows the pseudo user-space code that run for each flow for List \ref{listing:8} emulation program.
 
 \begin{listing}[h]
   \caption{Emulation layer instructions}
@@ -518,7 +518,7 @@ In this example the client sends request and waits for the response while the se
 
 \begin{listing}[h]
   \caption{Client pseudo code}
-  \label{listing:9}
+  \label{listing:client}
   \begin{minted}
   [
     frame=lines,
@@ -562,7 +562,7 @@ s.close();
 
 \begin{listing}[h]
   \caption{Server pseudo code}
-  \label{listing:10}
+  \label{listing:server}
   \begin{minted}
   [
     frame=lines,
@@ -612,11 +612,11 @@ if ( flow_table.lookup(pkt) == False ) :
 \end{listing}
 
 
-\subsection{Features}
+\subsection{Stateful Features}
 
 \begin{itemize}
 
- \item High scale (flows, bandwidth, connection per second)
+ \item Realistic traffic at high scale (flows, bandwidth, connection per second)
  \item Measure latency/jitter/drop in high rate
  \item Emulate L7 application, e.g. HTTP/HTTPS/Citrix- there is no need to implement the exact application.
  \item TCP implementation based on BSD
@@ -688,7 +688,7 @@ Most TCP stacks have an API that allow the user to provide a buffer (write opera
 The TCP module stores the buffer until the data is acknowledged by the remote side. 
 With big TCP windows (required with high RTT) and many flows this could create a memory scale issue. 
 Figure \ref{fig:tx_ring} shows one TCP flow TX queue. For 1M active flows with a 64K TX buffer 
-the worst case memory requirement is 1M x 64K * mbuf-factor (let's assume 2) = 128GB. 
+the worst case memory requirement is $1M \cdot 64K \cdot  mbufs  = 128GB$
 The mbuf resource is expensive and needs to be allocated ahead of time. 
 The chosen solution for this problem is to change the API to be a poll API, 
 meaning the TCP Tx queue will just save a reference to the constant traffic and offset. The packets will be assembeld with a referance to a constant mbufs only when packets need to be sent (lazy). 
@@ -706,7 +706,7 @@ The same idea happens in the Rx side with reassembly \footnote{This will not wor
 \subsection{Benchmark  TRex vs Linux kernel}
 
 To evaluate the performance and memory scale of TRex and compare it against standard Linux tools the following was done: 
-Linux \textbf{curl} as a client and \textbf{nginx} as a server were compared to TRex for stressing a device under test.
+Linux \texttt{curl} as a client and \texttt{nginx} as a server were compared to TRex for stressing a device under test.
 
 \begin{figure}[h]
   \includegraphics[width=0.3
