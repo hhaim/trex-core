@@ -1,30 +1,35 @@
-\documentclass[conference]{IEEEtran}
-\IEEEoverridecommandlockouts
-% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
-\usepackage{cite}
+% This file is isea.tex.  It contains the formatting instructions for and acts as a template for submissions to ISEA 2015.  It is based on the ICCC  formats and instructions.  It uses the files isea.sty, isea.bst and isea.bib, the first two of which also borrow from AAAI IJCAI formats and instructions.
+% Modified from ICCC.tex by B. Bogart
+
+\documentclass[letterpaper]{article}
+\usepackage{isea}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
-\usepackage{graphicx}
-\usepackage{textcomp}
+\usepackage[pdftex]{graphicx}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
 \usepackage{xcolor}
 \usepackage{minted}
 \usepackage{caption}
+\usepackage[numbers]{natbib}
 \usepackage[export]{adjustbox}
 \graphicspath{ {./images/} }
-\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
-    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
-\begin{document}
-
-\title{Test Your Limits With TRex Traffic Generator 
-\thanks{Cisco systems}
+\pdfinfo{
+/Title (Test Your Limits With TRex Traffic Generator)
+/Author (Hanoch Haim)}
+% The file isea.sty is the style file for ISEA 2015 proceedings.
+%
+\title{Test Your Limits With TRex Traffic Generator}
+\author{Hanoch Haim, 
+Cisco Systems \\
+\newline
+\newline
 }
+\setcounter{secnumdepth}{0}
 
-\author{\IEEEauthorblockN{Hanoch Haim}
-\textit{Cisco systems}\\
-}
-
+\begin{document} 
 \maketitle
-
 \begin{abstract}
 Performance measurement tools are an integral part of network testing. 
 There is no shortage of open source tools for network performance
@@ -32,8 +37,8 @@ testing in the Linux world.
 To enumerate a few popular tools in the Linux world: Netperf, iperf, Linux kernel based pktgen.
 These tools tend to fall into two categories:
 \begin{itemize}
-  \item Stateless packet shooting such as the Linux kernel pktgen traffic generator 
-  \item Stateful client-server tools such as netperf and iperf. 
+\item Stateless packet shooting such as the Linux kernel pktgen traffic generator 
+\item Stateful client-server tools such as netperf and iperf. 
 \end{itemize}  
 When very high performance network performance testing is required (quantified as
 many 10s of Gigabits per second/100MPPS and/or hundreds of thousands of flows) or more advanced functionality (e.g. realistic) is required the
@@ -44,11 +49,10 @@ and illustrate sample stateless and stateful use cases that apply to testing
 Linux networking. We will also discuss its design and tricks that help us
 achieve such high performance.
 \end{abstract}
+    
+\section{Keywords}
 
-
-\begin{IEEEkeywords}
 tcp, performance, scale,realistic traffic generation 
-\end{IEEEkeywords}
 
 \section{Introduction}
 
@@ -58,19 +62,19 @@ TRex \cite{b1} is an advanced traffic generator, it has the following interestin
 \item It leverages COTS x86/ARM servers and physical NICs (Intel, Mellanox etc) for high scale.
 \item Can support Linux driver or virtual (e.g. virtio/veth) for low scale with advanced features \texttt{(PF\_PACKET)}
 \item It can serve both stateless and stateful traffic generation.
-  tcp stack for stateful traffic and emulation layer to simulate L7 applications.
+tcp stack for stateful traffic and emulation layer to simulate L7 applications.
 \item It outperforms all of iperf, netperf and kernel pktgen: 
-   \begin{itemize}
+\begin{itemize}
     \item It can generate upto 200gbps/100mpps advance complex patterns and millions of real
-      world tcp/udp flows.
+    world tcp/udp flows.
     \item High connection rate - order of Millions of Connection/s (CPS).
-  \end{itemize}
+\end{itemize}
 \item It is extensible:
 \begin{itemize}
     \item Can emulate L7 application (on top of TCP/IP),
-       e.g. HTTP/HTTPS/Citrix using a DSL programmable language described in Python 
+    e.g. HTTP/HTTPS/Citrix using a DSL programmable language described in Python 
     \item Ability to change fields in the L7 application - for example,
-      change HTTP User-Agent field
+    change HTTP User-Agent field
 \end{itemize}
 \item Support routing protocols like BGP/OSPF/RIP using BIRD \cite{b4}
 \item Support high scale clients simulation protocols like arp,ipv6-nd,dhcp4,dhcp6,802.1x,icmp,igmp,mld using a new process written in golang 
@@ -108,10 +112,10 @@ BIRD is used to simulate routing protocols like BGP/OSPF/RIP.
 \subsection{Dataplane scheduler}
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{trex_dp_sheduler.png}
-  \caption{Dataplane Scheduler}
-  \label{fig:dp_schduler}
+\includegraphics[width=0.3
+\textwidth, center]{trex_dp_sheduler.png}
+\caption{Dataplane Scheduler}
+\label{fig:dp_schduler}
 \end{figure}
   
 Figure \ref{fig:dp_schduler} presents the schedulers in each DP thread. The priority queue is the low level scheduler that can schedule events at nsec resolution. In addition there are two timer wheels for lower resolution events. The first timer wheel has a resolution of 20usec with 1024 buckets for maximum of 2msec time. 
@@ -120,10 +124,10 @@ The DPs transmit/receive messages from the share rings using events.
 This design achieves linear scale with of performance about 4-20MPPS/core and 200gbps for one COGS server. 
 
 \begin{figure}[h]
-  \includegraphics[width=0.4
-  \textwidth, center]{sfr_profile.png}
-  \caption{emix}
-  \label{fig:emix}
+\includegraphics[width=0.4
+\textwidth, center]{sfr_profile.png}
+\caption{emix}
+\label{fig:emix}
 \end{figure}
 
 \subsection{Operation modes}
@@ -140,29 +144,29 @@ Stateless mode is meant to test networking gear/feature that does not manage any
 This is usually done by injecting customized packet streams to the device under test.
 
 \begin{figure}[h]
-  \includegraphics[width=0.25
-  \textwidth, center]{stateless_objects_02.png}
-  \caption{Stateless main objects}
-  \label{fig:stlobjects}
+\includegraphics[width=0.25
+\textwidth, center]{stateless_objects_02.png}
+\caption{Stateless main objects}
+\label{fig:stlobjects}
 \end{figure}
 
 Figure \ref{fig:stlobjects} shows the model of a profile. Each interface supports one or more traffic profiles in parallel.
 Each traffic profile supports one or more streams. Each stream includes the following main properties:
 
 \begin{itemize}
-  \item \textbf{Packet}: Packet template up to 9 KB
-  \item \textbf{Field Engine}: A program that determines which field to change and how to change 
-  \item \textbf{Mode}: Specifies how to send packets \{Continuous, Burst, Multi-burst\}
-  \item \textbf{Rx Stats}: Which statistics to collect for each stream
-  \item \textbf{Rate}: Rate (pps or bps) 
-  \item \textbf{Action}: Specifies stream to follow when the current stream is complete (valid for Continuous or Burst modes)
+\item \textbf{Packet}: Packet template up to 9 KB
+\item \textbf{Field Engine}: A program that determines which field to change and how to change 
+\item \textbf{Mode}: Specifies how to send packets \{Continuous, Burst, Multi-burst\}
+\item \textbf{Rx Stats}: Which statistics to collect for each stream
+\item \textbf{Rate}: Rate (pps or bps) 
+\item \textbf{Action}: Specifies stream to follow when the current stream is complete (valid for Continuous or Burst modes)
 \end{itemize}
 
 \begin{figure}[h]
-  \includegraphics[width=0.4
-  \textwidth, center]{stl_interleaving_01.png}
-  \caption{Stateless profile example}
-  \label{fig:stlhello}
+\includegraphics[width=0.4
+\textwidth, center]{stl_interleaving_01.png}
+\caption{Stateless profile example}
+\label{fig:stlhello}
 \end{figure}
 
 Figure \ref{fig:stlhello} shows an example of a profile with three streams.  
@@ -175,7 +179,7 @@ It uses Scapy for building the template packet. This profile is converted to jso
 \caption{Profile with one continues UDP stream}
 \label{listing:1}
 \begin{minted}
- [
+[
     frame=lines,
     fontsize=\scriptsize,
 ]
@@ -196,7 +200,7 @@ def create_stream (self):
 
 
     return STLProfile( 
-      [ STLStream(isg = 1.0, # start in delay in usec 
+    [ STLStream(isg = 1.0, # start in delay in usec 
         packet=STLPktBuilder(pkt=base_pkt/pad),
         mode=STLTXCont(pps=10),
         ), 
@@ -209,22 +213,22 @@ def create_stream (self):
         STLStream(isg = 3.0,
         packet = STLPktBuilder(pkt=base_pkt/pad),
         mode = STLTXCont(pps=40))
-      ]).get_streams()
+    ]).get_streams()
 \end{minted}
 \end{listing}
   
 \subsection{Stateless Features}
 
 \begin{itemize}
-  \item Large scale - Supports about 10-22 million packets per second (mpps) per core, scalable with the number of cores
-  \item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with DPDK or PF\_PACKET.
-  \item Support for multiple stateless traffic profiles per interface each profile supports multiple streams. 
-  \item Programmable Field Engine to change any field inside the packet template i.e. \mint{html}|src_ip=10.0.0.1..10.0.0.255| 
-  \item Ability to change the packet size 
-  \item API,Console, GUI
-  \item Statistics, per interface,per stream 
-  \item Latency and jitter per stream
-  \item Multi-user support 
+\item Large scale - Supports about 10-22 million packets per second (mpps) per core, scalable with the number of cores
+\item Support for 1, 10, 25, 40, and 100 Gb/sec interfaces with DPDK or PF\_PACKET.
+\item Support for multiple stateless traffic profiles per interface each profile supports multiple streams. 
+\item Programmable Field Engine to change any field inside the packet template i.e. \mint{html}|src_ip=10.0.0.1..10.0.0.255| 
+\item Ability to change the packet size 
+\item API,Console, GUI
+\item Statistics, per interface,per stream 
+\item Latency and jitter per stream
+\item Multi-user support 
 \end{itemize}
 
 \subsection{Multi stream profile example}
@@ -234,10 +238,10 @@ Figure \ref{fig:stlmulti} shows two streams. Stream 0 is a burst that activate a
 Listing \ref{listing:4} shows the Python script to create this profile 
 
 \begin{figure}[h]
-  \includegraphics[width=0.4
-  \textwidth, center]{stl_multiple_streams_01.png}
-  \caption{Multi stream profile}
-  \label{fig:stlmulti}
+\includegraphics[width=0.4
+\textwidth, center]{stl_multiple_streams_01.png}
+\caption{Multi stream profile}
+\label{fig:stlmulti}
 \end{figure}
 
 
@@ -245,10 +249,10 @@ Listing \ref{listing:4} shows the Python script to create this profile
 \caption{Multi profile example}
 \label{listing:4}
 \begin{minted}
-  [
-      frame=lines,
-      fontsize=\scriptsize,
-  ]
+[
+    frame=lines,
+    fontsize=\scriptsize,
+]
 {python}
   
 def create_stream (self):
@@ -259,27 +263,27 @@ base_pkt =  Ether()/
             IP(src="16.0.0.1",dst="48.0.0.1")/
             UDP(dport=12,sport=1025)
 base_pkt1 =  Ether()/
-             IP(src="16.0.0.2",dst="48.0.0.1")/
-             UDP(dport=12,sport=1025)
+            IP(src="16.0.0.2",dst="48.0.0.1")/
+            UDP(dport=12,sport=1025)
 pad = max(0, size - len(base_pkt)) * 'x'
 
 return STLProfile( 
-  [ STLStream( isg = 10.0, # start in delay                                  1
-     name    ='S0',
-     packet = STLPktBuilder(pkt=base_pkt/pad),
-     mode = STLTXSingleBurst(pps=10, 
+[ STLStream( isg = 10.0, # start in delay                                  1
+    name    ='S0',
+    packet = STLPktBuilder(pkt=base_pkt/pad),
+    mode = STLTXSingleBurst(pps=10, 
                             total_pkts=self.burst_size),
-     next = 'S1'), # run s1 after s0 
+    next = 'S1'), # run s1 after s0 
 
     # stream is disabled. Enabled by S0 
     STLStream( self_start = False, 
-      name    ='S1',
-      packet  = STLPktBuilder(pkt=base_pkt1/pad),
-      mode    = STLTXMultiBurst(pps = 1000,
+    name    ='S1',
+    packet  = STLPktBuilder(pkt=base_pkt1/pad),
+    mode    = STLTXMultiBurst(pps = 1000,
                                 pkts_per_burst = 4,
                                 ibg = 1000000.0,
                                 count = 5)
-                               )
+                            )
                     ]).get_streams()
 \end{minted}
 \end{listing}
@@ -292,58 +296,58 @@ The challenge was to provide an engine that can change packet fields on a number
 FE works on stateless mode only. Let us provide an example of a syn-attack profile with a simple field engine program and explain it:
 
 \begin{listing}[h]
-  \caption{FE syn-attack on 48.0.0.1 server}
-  \label{listing:2}
-  \begin{minted}
-  [
-      frame=lines,
-      fontsize=\scriptsize,
-  ]
-  {python}
-  class STLS1(object):
-  """ attack 48.0.0.1 at port 80
-  """
-  def create_stream (self):
+\caption{FE syn-attack on 48.0.0.1 server}
+\label{listing:2}
+\begin{minted}
+[
+    frame=lines,
+    fontsize=\scriptsize,
+]
+{python}
+class STLS1(object):
+""" attack 48.0.0.1 at port 80
+"""
+def create_stream (self):
 
-      # TCP SYN
-      base_pkt  = Ether()/
-                  IP(dst="48.0.0.1")/
-                  TCP(dport=80,flags="S")
+    # TCP SYN
+    base_pkt  = Ether()/
+                IP(dst="48.0.0.1")/
+                TCP(dport=80,flags="S")
 
-      # create an empty program (VM)
-      vm = STLVM()
+    # create an empty program (VM)
+    vm = STLVM()
 
-      # define two vars
-      vm.var(name = "ip_src", 
-             min_value = "16.0.0.0", 
-             max_value = "18.0.0.254", 
-             size = 4, 
-             op = "random")
+    # define two vars
+    vm.var(name = "ip_src", 
+            min_value = "16.0.0.0", 
+            max_value = "18.0.0.254", 
+            size = 4, 
+            op = "random")
       
-      vm.var(name = "src_port", 
+    vm.var(name = "src_port", 
             min_value = 1025, 
             max_value = 65000, 
             size = 2, 
             op = "random")
         
-      # write src IP and fix checksum
-      vm.write(fv_name = "ip_src", 
-               pkt_offset = "IP.src")
+    # write src IP and fix checksum
+    vm.write(fv_name = "ip_src", 
+            pkt_offset = "IP.src")
       
-      vm.fix_chksum()
+    vm.fix_chksum()
         
-      # write TCP source port
-      vm.write(fv_name = "src_port", 
-               pkt_offset = "TCP.sport")
+    # write TCP source port
+    vm.write(fv_name = "src_port", 
+            pkt_offset = "TCP.sport")
         
-      # create the packet
-      pkt = STLPktBuilder(pkt = base_pkt, vm = vm)
+    # create the packet
+    pkt = STLPktBuilder(pkt = base_pkt, vm = vm)
 
-      return STLStream(packet = pkt,
-                      random_seed = 0x1234,
-                      mode = STLTXCont())
-  \end{minted}
-  \end{listing}
+    return STLStream(packet = pkt,
+                    random_seed = 0x1234,
+                    mode = STLTXCont())
+\end{minted}
+\end{listing}
   
 Listing \ref{listing:2} shows a FE program that generates a syn-attack using one stream. 
 Each stream object has a context for FE variables. In this example there are two variables,
@@ -355,18 +359,18 @@ Those variables are written to the right offset in the packet and the checksum i
 Listing \ref{listing:6} shows a simple script to automate TRex. It is self-explanatory.
 
 \begin{listing}[h]
-  \caption{Stateless automation example}
-  \label{listing:6}
-  \begin{minted}
-  [
-      frame=lines,
-      fontsize=\scriptsize,
-  ]
+\caption{Stateless automation example}
+\label{listing:6}
+\begin{minted}
+[
+    frame=lines,
+    fontsize=\scriptsize,
+]
 {python}
  
 c = STLClient(username="itay",
-              server = "10.0.0.10", 
-              verbose_level = "error")
+            server = "10.0.0.10", 
+            verbose_level = "error")
 try:
     # connect to server
     c.connect()
@@ -389,8 +393,8 @@ try:
 
     # check for any warnings
     if c.get_warnings():
-      # handle warnings here
-      pass
+    # handle warnings here
+    pass
 
 finally:
     c.disconnect()
@@ -402,10 +406,10 @@ finally:
 Figure \ref{fig:stlperf} \cite{b5} shows the measured performance on a Cisco UCS server with dual socket CPU E5-2667 v3@3.20GHz 8cores/per socket and two Intel XL710 NICS (4 ports total of 4x40gbps)
 
 \begin{figure}[h]
-  \includegraphics[width=0.4
-  \textwidth, center]{stl_perf.png}
-  \caption{Stateless performance with Intel XL710}
-  \label{fig:stlperf}
+\includegraphics[width=0.4
+\textwidth, center]{stl_perf.png}
+\caption{Stateless performance with Intel XL710}
+\label{fig:stlperf}
 \end{figure}
 
 In Figure \ref{fig:stlperf} IMIX refer to a mix of packets size see \cite{b7} with an average packet size of 364 bytes.
@@ -420,81 +424,81 @@ It is important to test stateful features using realistic traffic scenarios beca
 The high level features are:
 
 \begin{itemize}
-  \item Realistic traffic at high scale (flows, bandwidth, connection per second)
-  \item Measure latency/jitter/drop in high rate
-  \item Emulate L7 application, e.g. HTTP/HTTPS/Citrix- there is no need to implement the exact application.
-  \item TCP implementation
-  \item Automation Python API 
-  \item TCP/UDP/Application statistics (per client side/per template)
+\item Realistic traffic at high scale (flows, bandwidth, connection per second)
+\item Measure latency/jitter/drop in high rate
+\item Emulate L7 application, e.g. HTTP/HTTPS/Citrix- there is no need to implement the exact application.
+\item TCP implementation
+\item Automation Python API 
+\item TCP/UDP/Application statistics (per client side/per template)
 \end{itemize}
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{stateful_objects.png}
-  \caption{Stateful main objects}
-  \label{fig:astf_objects}
+\includegraphics[width=0.3
+\textwidth, center]{stateful_objects.png}
+\caption{Stateful main objects}
+\label{fig:astf_objects}
 \end{figure}
 
 Figure \ref{fig:astf_objects} presents the main objects in stateful mode 
 
 Each profile includes:
 \begin{itemize}
-  \item \textbf{Client pool}: Range of clients with a distribution model (e.g. random,seq). A profile can include a few pools.
-  \item \textbf{Server pool}: Range of servers, profile can include a few pools. 
-  \item \textbf{Template}: A model that describes an application on top of TCP/UDP. Each template could be associated with a different pool of clients/servers. The L7 data that can be extracted from a pcap file and converted to emulation program
-  \begin{itemize}
-  \item \textbf{CPS}: How many connection per second to generate for this template. 
-  \item \textbf{Program}: Emulation instructions to simulate the L7 application e.g. HTTP e.g. writeBuffer/readBuffer
-  \item \textbf{Client/Server pool name} Associate with one of the pools 
-  \item \textbf{Statistic pool} The index of the TCP/UDP statistic counters pool. Good for QoS scenarios each template could be associated with different pool of counters 
-  \end{itemize}
+\item \textbf{Client pool}: Range of clients with a distribution model (e.g. random,seq). A profile can include a few pools.
+\item \textbf{Server pool}: Range of servers, profile can include a few pools. 
+\item \textbf{Template}: A model that describes an application on top of TCP/UDP. Each template could be associated with a different pool of clients/servers. The L7 data that can be extracted from a pcap file and converted to emulation program
+\begin{itemize}
+\item \textbf{CPS}: How many connection per second to generate for this template. 
+\item \textbf{Program}: Emulation instructions to simulate the L7 application e.g. HTTP e.g. writeBuffer/readBuffer
+\item \textbf{Client/Server pool name} Associate with one of the pools 
+\item \textbf{Statistic pool} The index of the TCP/UDP statistic counters pool. Good for QoS scenarios each template could be associated with different pool of counters 
+\end{itemize}
 \end{itemize}
 
 Figure \ref{fig:astf} presents the traffic generation model. 
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{stateful_model.png}
-  \caption{Stateful model}
-  \label{fig:astf}
+\includegraphics[width=0.3
+\textwidth, center]{stateful_model.png}
+\caption{Stateful model}
+\label{fig:astf}
 \end{figure}
 
 In this mode, each core has its own context of TCP/UDP stack with no memory sharing and no locks. It works on top of the scheduler hierarchy shown in Figure \ref{fig:dp_schduler}.
 The most significant changes to the BSD stack were:
 \begin{itemize}
-  \item Each stack has a context per thread. No memory sharing, no locks. GRO/LRO/TSO is supported. 
-  \item Tx works in pool mode (it builds the packets only when required) and saves reference to the template data. This saves three orders of magnitude of memory resource.
+\item Each stack has a context per thread. No memory sharing, no locks. GRO/LRO/TSO is supported. 
+\item Tx works in pool mode (it builds the packets only when required) and saves reference to the template data. This saves three orders of magnitude of memory resource.
 \end{itemize}
 
 \begin{figure}[h]
-  \includegraphics[width=0.15
-  \textwidth, center]{t_c4.png}
-  \caption{Stateful stack}
-  \label{fig:astf_stack}
+\includegraphics[width=0.15
+\textwidth, center]{t_c4.png}
+\caption{Stateful stack}
+\label{fig:astf_stack}
 \end{figure}
 
 Figure \ref{fig:astf_stack} shows the stack of the programmable application emulation layer. This module is responsible to simulate applications on top of the TCP/UDP stack. The program is part of a template.  
 Some possible instructions are:
 
 \begin{itemize}
-  \item Start write of buffer
-  \item Continue write
-  \item End Write
-  \item Wait for buffer/timeout
-  \item OnConnect/OnReset/OnClose
+\item Start write of buffer
+\item Continue write
+\item End Write
+\item Wait for buffer/timeout
+\item OnConnect/OnReset/OnClose
 \end{itemize}
 
 
 \subsection{Stateful Profile Example}
 
 \begin{listing}[h]
-  \caption{Stateful profile}
-  \label{listing:7}
-  \begin{minted}
-  [
+\caption{Stateful profile}
+\label{listing:7}
+\begin{minted}
+[
     frame=lines,
     fontsize=\scriptsize,
-  ]
+]
 {python}
  
 from trex.astf.api import *
@@ -503,25 +507,25 @@ class Prof1():
     def get_profile(self):
         # clients pool range and distribution type
         ip_gen_c = ASTFIPGenDist(
-          ip_range=["16.0.0.1", "16.0.0.254"],
-          distribution="seq")
+        ip_range=["16.0.0.1", "16.0.0.254"],
+        distribution="seq")
         # servers pool range and distribution type
         ip_gen_s = ASTFIPGenDist(
-          ip_range=["48.0.0.1", "48.0.255.254"],
-          distribution="seq")
+        ip_range=["48.0.0.1", "48.0.255.254"],
+        distribution="seq")
         # pool definition for both clients and servers
         ip_gen = 
-          ASTFIPGen(
+        ASTFIPGen(
             glob=ASTFIPGenGlobal(ip_offset="1.0.0.0"), 
-                  dist_client=ip_gen_c,
-                  dist_server=ip_gen_s)
+                dist_client=ip_gen_c,
+                dist_server=ip_gen_s)
 
         # Parse the pcap file and convert to instructions 
         # cps is 1 flows/sec           
         return ASTFProfile(default_ip_gen=ip_gen,
-                          cap_list=[ASTFCapInfo(
+                        cap_list=[ASTFCapInfo(
                 file="../avl/delay_10_http_browsing_0.pcap"
-               cps=1)
+            cps=1)
         ])
     
 \end{minted}
@@ -537,37 +541,37 @@ In this example the client sends request and waits for the response while the se
 Listing \ref{listing:client} and Listing \ref{listing:server} shows the pseudo user-space code that is executed for each flow for Listing \ref{listing:8} emulation program to better understand how it works internally. 
 
 \begin{listing}[h]
-  \caption{Emulation layer instructions}
-  \label{listing:8}
-  \begin{minted}
-  [
+\caption{Emulation layer instructions}
+\label{listing:8}
+\begin{minted}
+[
     frame=lines,
     fontsize=\scriptsize,
-  ]
+]
 {python}
  
-  # client side HTTP program
-  prog_c = ASTFProgram()
-  prog_c.send(http_req)
-  prog_c.recv(len(http_response))
+# client side HTTP program
+prog_c = ASTFProgram()
+prog_c.send(http_req)
+prog_c.recv(len(http_response))
 
-  # server side HTTP program
-  prog_s = ASTFProgram()
-  prog_s.recv(len(http_req))
-  prog_s.send(http_response)
+# server side HTTP program
+prog_s = ASTFProgram()
+prog_s.recv(len(http_req))
+prog_s.send(http_response)
 
 \end{minted}
 \end{listing}
 
 
 \begin{listing}[h]
-  \caption{Client pseudo code}
-  \label{listing:client}
-  \begin{minted}
-  [
+\caption{Client pseudo code}
+\label{listing:client}
+\begin{minted}
+[
     frame=lines,
     fontsize=\scriptsize,
-  ]
+]
 {python}
 # for better understand how TRex works, 
 # this pseudo code is the linux version of the emulation 
@@ -578,26 +582,26 @@ src_ip,dest_ip,src_port = generate from pool of client
 dst_port                = template.get_dest_port()
 
 s = socket.socket(socket.AF_INET, 
-                  socket.SOCK_STREAM)
+                socket.SOCK_STREAM)
 
 s.connect(dest_ip,dst_port)   
 
 # program  
 s.write(template.request) 
-  # GET /3384 HTTP/1.1
-  # Host: 22.0.0.3
-  # Connection: Keep-Alive
-  # User-Agent: Mozilla/4.0
-  # Accept: */*
-  # Accept-Language: en-us
-  # Accept-Encoding: gzip, deflate, compress
+# GET /3384 HTTP/1.1
+# Host: 22.0.0.3
+# Connection: Keep-Alive
+# User-Agent: Mozilla/4.0
+# Accept: */*
+# Accept-Language: en-us
+# Accept-Encoding: gzip, deflate, compress
 
 s.read(template.request_size) 
-   #HTTP/1.1 200 OK
-   #Server: Microsoft-IIS/6.0
-   #Content-Type: text/html
-   #Content-Length: 32000
-   # body ..
+#HTTP/1.1 200 OK
+#Server: Microsoft-IIS/6.0
+#Content-Type: text/html
+#Content-Length: 32000
+# body ..
 
 
 s.close();
@@ -607,13 +611,13 @@ s.close();
 
 
 \begin{listing}[h]
-  \caption{Server pseudo code}
-  \label{listing:server}
-  \begin{minted}
-  [
+\caption{Server pseudo code}
+\label{listing:server}
+\begin{minted}
+[
     frame=lines,
     fontsize=\scriptsize,
-  ]
+]
 {python}
 # for better understand how TRex works, 
 # this pseudo code is the linux version of the emulation 
@@ -639,21 +643,21 @@ if ( flow_table.lookup(pkt) == False ) :
     #program of the template                                            2
     s.read(template.request_size)   
 
-       GET /3384 HTTP/1.1
-       Host: 22.0.0.3
-       Connection: Keep-Alive
-       User-Agent: Mozilla/4.0 ..
-       Accept: */*
-       Accept-Language: en-us
-       Accept-Encoding: gzip, deflate, compress
+    GET /3384 HTTP/1.1
+    Host: 22.0.0.3
+    Connection: Keep-Alive
+    User-Agent: Mozilla/4.0 ..
+    Accept: */*
+    Accept-Language: en-us
+    Accept-Encoding: gzip, deflate, compress
 
 
     s.write(template.response)   
-      #HTTP/1.1 200 OK
-      #Server: Microsoft-IIS/6.0
-      #Content-Type: text/html
-      #Content-Length: 32000
-      # body ..
+    #HTTP/1.1 200 OK
+    #Server: Microsoft-IIS/6.0
+    #Content-Type: text/html
+    #Content-Length: 32000
+    # body ..
 
     s.close()
 \end{minted}
@@ -667,13 +671,13 @@ if ( flow_table.lookup(pkt) == False ) :
 Listing \ref{listing:10} shows an example of a Python script to automate a stateful profile and read the port and the TCP statistics.
 
 \begin{listing}[h]
-  \caption{Stateful automation example}
-  \label{listing:10}
-  \begin{minted}
-  [
-      frame=lines,
-      fontsize=\scriptsize,
-  ]
+\caption{Stateful automation example}
+\label{listing:10}
+\begin{minted}
+[
+    frame=lines,
+    fontsize=\scriptsize,
+]
 {python}
  
 c = ASTFClient(server = server)
@@ -688,8 +692,8 @@ try:
     c.clear_stats()
 
     c.start(mult = mult, 
-           duration = duration, 
-           nc = True)
+        duration = duration, 
+        nc = True)
 
     c.wait_on_traffic()
 
@@ -716,10 +720,10 @@ finally:
 \section{Stateful optimization}
 
 \begin{figure}[h]
-  \includegraphics[width=0.15
-  \textwidth, center]{t_c5.png}
-  \caption{One Flow Tx Ring}
-  \label{fig:tx_ring}
+\includegraphics[width=0.15
+\textwidth, center]{t_c5.png}
+\caption{One Flow Tx Ring}
+\label{fig:tx_ring}
 \end{figure}
 
 Most TCP stacks have an API that allow the user to provide a buffer (write operation). 
@@ -734,10 +738,10 @@ Now because most of the traffic is almost constant in traffic generation case (p
 The same idea happens in the Rx side with reassembly \footnote{This will not work for TLS streams}
 
 \begin{figure}[h]
-  \includegraphics[width=0.15
-  \textwidth, center]{t_c6.png}
-  \caption{One Flow Rx Ring}
-  \label{fig:rx_ring}
+\includegraphics[width=0.15
+\textwidth, center]{t_c6.png}
+\caption{One Flow Rx Ring}
+\label{fig:rx_ring}
 \end{figure}
 
 
@@ -747,10 +751,10 @@ To evaluate the performance and memory scale of TRex and compare it against stan
 Linux \texttt{nginx} as a server were compared to TRex for stressing a device under test.
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{nginx_setup1.png}
-  \caption{TRex,NGINX server Performance Testing}
-  \label{fig:trex_nginx}
+\includegraphics[width=0.3
+\textwidth, center]{nginx_setup1.png}
+\caption{TRex,NGINX server Performance Testing}
+\label{fig:trex_nginx}
 \end{figure}
 
 The benchmark setup was designed to take a popular event-driven Linux server application and to test using a TRex client. 
@@ -762,10 +766,10 @@ The objective is to creates a new TCP flow for each HTTP request/response sessio
 This might be the main difference between NGINX benchmark configuration and this document configuration. 
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{nginx_setup2.png}
-  \caption{TRex Client Server}
-  \label{fig:trex_vs_trex}
+\includegraphics[width=0.3
+\textwidth, center]{nginx_setup2.png}
+\caption{TRex Client Server}
+\label{fig:trex_vs_trex}
 \end{figure}
 
 To provide a baseline benchmark, the NGINX server was replaced with a TRex server with one DP core, using an XL710 NIC (40Gb). 
@@ -792,17 +796,17 @@ Comparing 1 DP core running TRex to NGINX running on 16 cores with a kernel that
 It can scale to about 25Gb/sec of download of HTTP (total of 3MPPS/90KCPS/60k active flows for one core).
 
 \begin{figure}[h]
-  \includegraphics[width=0.5
-  \textwidth, center]{nginx_result_trex1.png}
-  \caption{TRex 1 DP core}
-  \label{fig:trex_nginx_r1}
+\includegraphics[width=0.5
+\textwidth, center]{nginx_result_trex1.png}
+\caption{TRex 1 DP core}
+\label{fig:trex_nginx_r1}
 \end{figure}
 
 \begin{figure}[h]
-  \includegraphics[width=0.5
-  \textwidth, center]{nginx_result_linux1.png}
-  \caption{NGINX 16 cores}
-  \label{fig:trex_nginx_r2}
+\includegraphics[width=0.5
+\textwidth, center]{nginx_result_linux1.png}
+\caption{NGINX 16 cores}
+\label{fig:trex_nginx_r2}
 \end{figure}
 
 Nginx cannot handle more than 20K new flows/sec, due to the kernel TCP software IRQ interrupts processing. 
@@ -828,31 +832,33 @@ Figure \ref{fig:bird} shows the integration with TRex server. The pyBird server 
 The BIRD automation API expose the daemon capabilities and iteract with TRex for the right filters and veth creation. Using this API's one can push 1M of BGP routes in a few seconds to the DUT.
 
 \begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{trex_bird_general_scheme.png}
-  \caption{BIRD TRex integration}
-  \label{fig:bird}
+\includegraphics[width=0.5
+\textwidth, center]{trex_bird_general_scheme.png}
+\caption{BIRD TRex integration}
+\label{fig:bird}
 \end{figure}
 
-
+\begin{figure}[h]
+    \includegraphics[width=0.5
+    \textwidth, center]{TRex_Bird_General_Scheme_With_ips.png}
+    \caption{BIRD Simple Example}
+    \label{fig:bird_example}
+\end{figure}
+  
+    
 Figure \ref{fig:bird_example} show a simple example of configuration with 2 ports. BIRD has 2 veth's in the same subnet of TRex ports. 
 Listing \ref{listing:bird} shows a sample profile to push 11 BGP routes 42.42.42.0-10/32 via 1.1.1.3
 
-\begin{figure}[h]
-  \includegraphics[width=0.3
-  \textwidth, center]{TRex_Bird_General_Scheme_With_ips.png}
-  \caption{BIRD Simple Example}
-  \label{fig:bird_example}
-\end{figure}
+
 
 \begin{listing}[h]
-  \caption{BIRD configuration}
-  \label{listing:bird}
-  \begin{minted}
-  [
-      frame=lines,
-      fontsize=\scriptsize,
-  ]
+\caption{BIRD configuration}
+\label{listing:bird}
+\begin{minted}
+[
+    frame=lines,
+    fontsize=\scriptsize,
+]
 {python}
 
 router id 100.100.100.100;
@@ -905,7 +911,7 @@ protocol static {
 \end{minted}
 \end{listing}
 
-
+\newpage
 
 \begin{thebibliography}{00}
 \bibitem{b1} Cisco systems: ``TRex realistic traffic generator'',\\\texttt{https://trex-tgn.cisco.com/trex/doc/}
