@@ -512,6 +512,19 @@ struct rte_eth_rss_conf {
 #define ETH_RSS_NVGRE              (1ULL << 21)
 #define ETH_RSS_GTPU               (1ULL << 23)
 
+/* Napatech ADD ON */
+#define RTE_ETH_FLOW_INNER_IPV4         24
+#define RTE_ETH_FLOW_INNER_IPV4_TCP     25
+#define RTE_ETH_FLOW_INNER_IPV4_UDP     26
+#define RTE_ETH_FLOW_INNER_IPV4_SCTP    27
+#define RTE_ETH_FLOW_INNER_IPV4_OTHER   28
+#define RTE_ETH_FLOW_INNER_IPV6         29
+#define RTE_ETH_FLOW_INNER_IPV6_TCP     30
+#define RTE_ETH_FLOW_INNER_IPV6_UDP     31
+#define RTE_ETH_FLOW_INNER_IPV6_SCTP    32
+#define RTE_ETH_FLOW_INNER_IPV6_OTHER   33
+#define RTE_ETH_FLOW_NTPL               34
+
 /*
  * We use the following macros to combine with above ETH_RSS_* for
  * more specific input set selection. These bits are defined starting
@@ -547,6 +560,18 @@ rte_eth_rss_hf_refine(uint64_t rss_hf)
 
 	return rss_hf;
 }
+
+/* Napatech ADD ON */
+#define ETH_RSS_INNER_IPV4	       (1ULL << RTE_ETH_FLOW_INNER_IPV4)
+#define ETH_RSS_INNER_IPV4_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_TCP)
+#define ETH_RSS_INNER_IPV4_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_UDP)
+#define ETH_RSS_INNER_IPV4_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV4_SCTP)
+#define ETH_RSS_INNER_IPV4_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV4_OTHER)
+#define ETH_RSS_INNER_IPV6         (1ULL << RTE_ETH_FLOW_INNER_IPV6)
+#define ETH_RSS_INNER_IPV6_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_TCP)
+#define ETH_RSS_INNER_IPV6_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_UDP)
+#define ETH_RSS_INNER_IPV6_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV6_SCTP)
+#define ETH_RSS_INNER_IPV6_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV6_OTHER)
 
 #define ETH_RSS_IP ( \
 	ETH_RSS_IPV4 | \
@@ -1011,6 +1036,9 @@ struct rte_fdir_conf {
 	struct rte_eth_fdir_masks mask;
 	struct rte_eth_fdir_flex_conf flex_conf;
 	/**< Flex payload configuration. */
+#ifdef TREX_PATCH
+    uint8_t flexbytes_offset;
+#endif
 };
 
 /**

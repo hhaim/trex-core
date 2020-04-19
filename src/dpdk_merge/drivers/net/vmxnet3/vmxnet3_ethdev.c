@@ -42,6 +42,11 @@
 
 #define	VMXNET3_TX_MAX_SEG	UINT8_MAX
 
+/* TREX_PATCH, it seems the driver can't calculate checksum
+	 DEV_TX_OFFLOAD_IPV4_CKSUM |	\
+
+*/
+
 #define VMXNET3_TX_OFFLOAD_CAP		\
 	(DEV_TX_OFFLOAD_VLAN_INSERT |	\
 	 DEV_TX_OFFLOAD_TCP_CKSUM |	\
