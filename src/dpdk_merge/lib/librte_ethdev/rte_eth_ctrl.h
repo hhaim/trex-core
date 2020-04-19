@@ -348,6 +348,9 @@ struct rte_eth_l2_flow {
 struct rte_eth_ipv4_flow {
 	uint32_t src_ip;      /**< IPv4 source address in big endian. */
 	uint32_t dst_ip;      /**< IPv4 destination address in big endian. */
+#ifdef TREX_PATCH
+    uint16_t ip_id;       /**< IPv4 IP ID to match */
+#endif
 	uint8_t  tos;         /**< Type of service to match. */
 	uint8_t  ttl;         /**< Time to live to match. */
 	uint8_t  proto;       /**< Protocol, next header in big endian. */
@@ -390,6 +393,9 @@ struct rte_eth_ipv6_flow {
 	uint8_t  tc;             /**< Traffic class to match. */
 	uint8_t  proto;          /**< Protocol, next header to match. */
 	uint8_t  hop_limits;     /**< Hop limits to match. */
+#ifdef TREX_PATCH
+    uint32_t flow_label;     /**<flow label to match. */
+#endif
 };
 
 /**
@@ -518,6 +524,10 @@ struct rte_eth_fdir_action {
 	/**< If report_status is RTE_ETH_FDIR_REPORT_ID_FLEX_4 or
 	     RTE_ETH_FDIR_REPORT_FLEX_8, flex_off specifies where the reported
 	     flex bytes start from in flexible payload. */
+#ifdef TREX_PATCH
+    // Index for statistics counter that will count FDIR matches.
+    uint16_t stat_count_index;
+#endif
 };
 
 /**

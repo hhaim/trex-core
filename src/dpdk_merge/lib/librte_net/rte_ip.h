@@ -221,8 +221,10 @@ rte_raw_cksum_mbuf(const struct rte_mbuf *m, uint32_t off, uint32_t len,
 	done = 0;
 	for (;;) {
 		tmp = __rte_raw_cksum(buf, seglen, 0);
-		if (done & 1)
+		if (done & 1) {
+			tmp = __rte_raw_cksum_reduce(tmp);
 			tmp = rte_bswap16((uint16_t)tmp);
+                }
 		sum += tmp;
 		done += seglen;
 		if (done == len)
@@ -236,6 +238,10 @@ rte_raw_cksum_mbuf(const struct rte_mbuf *m, uint32_t off, uint32_t len,
 
 	*cksum = __rte_raw_cksum_reduce(sum);
 	return 0;
+}
+
+static inline uint16_t rte_ipv4_header_len(const struct ipv4_hdr *ipv4_hdr){
+   return((ipv4_hdr->version_ihl &0xf)<<2);
 }
 
 /**
@@ -252,7 +258,7 @@ static inline uint16_t
 rte_ipv4_cksum(const struct ipv4_hdr *ipv4_hdr)
 {
 	uint16_t cksum;
-	cksum = rte_raw_cksum(ipv4_hdr, sizeof(struct ipv4_hdr));
+	cksum = rte_raw_cksum(ipv4_hdr, rte_ipv4_header_len(ipv4_hdr));
 	return (cksum == 0xffff) ? cksum : (uint16_t)~cksum;
 }
 
@@ -294,7 +300,7 @@ rte_ipv4_phdr_cksum(const struct ipv4_hdr *ipv4_hdr, uint64_t ol_flags)
 	} else {
 		psd_hdr.len = rte_cpu_to_be_16(
 			(uint16_t)(rte_be_to_cpu_16(ipv4_hdr->total_length)
-				- sizeof(struct ipv4_hdr)));
+				- rte_ipv4_header_len(ipv4_hdr)));
 	}
 	return rte_raw_cksum(&psd_hdr, sizeof(psd_hdr));
 }
@@ -323,7 +329,7 @@ rte_ipv4_udptcp_cksum(const struct ipv4_hdr *ipv4_hdr, const void *l4_hdr)
 	if (l3_len < sizeof(struct ipv4_hdr))
 		return 0;
 
-	l4_len = l3_len - sizeof(struct ipv4_hdr);
+	l4_len = l3_len - rte_ipv4_header_len(ipv4_hdr);
 
 	cksum = rte_raw_cksum(l4_hdr, l4_len);
 	cksum += rte_ipv4_phdr_cksum(ipv4_hdr, 0);

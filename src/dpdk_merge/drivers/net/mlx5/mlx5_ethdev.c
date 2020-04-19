@@ -432,6 +432,11 @@ mlx5_dev_configure(struct rte_eth_dev *dev)
 		DRV_LOG(INFO, "port %u Rx queues number update: %u -> %u",
 			dev->data->port_id, priv->rxqs_n, rxqs_n);
 		priv->rxqs_n = rxqs_n;
+
+        #ifdef TREX_PATCH
+        reta_idx_n = priv->config.ind_table_max_size;
+
+        #else
 		/*
 		 * If the requested number of RX queues is not a power of two,
 		 * use the maximum indirection table size for better balancing.
@@ -440,6 +445,8 @@ mlx5_dev_configure(struct rte_eth_dev *dev)
 		reta_idx_n = (1 << log2above((rxqs_n & (rxqs_n - 1)) ?
 					     priv->config.ind_table_max_size :
 					     rxqs_n));
+        #endif
+
 		ret = mlx5_rss_reta_index_resize(dev, reta_idx_n);
 		if (ret)
 			return ret;

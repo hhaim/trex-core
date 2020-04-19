@@ -1141,6 +1141,7 @@ mlx5_flow_validate_item_vlan(const struct rte_flow_item *item,
 					error);
 	if (ret)
 		return ret;
+#ifndef TREX_PATCH
 	if (spec) {
 		vlan_tag = spec->tci;
 		vlan_tag &= mask->tci;
@@ -1154,6 +1155,7 @@ mlx5_flow_validate_item_vlan(const struct rte_flow_item *item,
 					  RTE_FLOW_ERROR_TYPE_ITEM_SPEC,
 					  item->spec,
 					  "VLAN cannot be empty");
+#endif
 	return 0;
 }
 
@@ -2964,7 +2966,7 @@ mlx5_dev_filter_ctrl(struct rte_eth_dev *dev,
 	case RTE_ETH_FILTER_FDIR:
 		return flow_fdir_ctrl_func(dev, filter_op, arg);
 	default:
-		DRV_LOG(ERR, "port %u filter type (%d) not supported",
+		DRV_LOG(DEBUG, "port %u filter type (%d) not supported",
 			dev->data->port_id, filter_type);
 		rte_errno = ENOTSUP;
 		return -rte_errno;

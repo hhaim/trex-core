@@ -448,7 +448,7 @@ int bnxt_rx_queue_stop(struct rte_eth_dev *dev, uint16_t rx_queue_id)
 	/* Rx CQ 0 also works as Default CQ for async notifications */
 	if (!rx_queue_id) {
 		PMD_DRV_LOG(ERR, "Cannot stop Rx queue id %d\n", rx_queue_id);
-		return -EINVAL;
+		return 0;
 	}
 
 	rxq = bp->rx_queues[rx_queue_id];

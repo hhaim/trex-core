@@ -720,6 +720,10 @@ struct rte_mbuf {
 	/** Sequence number. See also rte_reorder_insert(). */
 	uint32_t seqn;
 
+#ifdef TREX_PATCH
+    uint8_t m_core_locality;
+#endif
+
 	/** Shared data for external buffer attached to mbuf. See
 	 * rte_pktmbuf_attach_extbuf().
 	 */
@@ -740,6 +744,61 @@ struct rte_mbuf_ext_shared_info {
 	void *fcb_opaque;                        /**< Free callback argument */
 	rte_atomic16_t refcnt_atomic;        /**< Atomically accessed refcnt */
 };
+
+#ifdef TREX_PATCH
+
+/**
+ * MBUF core locality type 
+ *  
+ * if RTE_MBUF_TYPE_CORE_LOCAL then the MBUF should be used with 
+ * the allocating core only.
+ *  
+ * RTE_MBUF_TYPE_CORE_CONST means that the mbuf is shared and there is no need to do ref count 
+ * 
+ * when RTE_MBUF_TYPE_CORE_MULTI is set, the MBUF can be 
+ * used with multiple cores 
+ *  
+ * having an MBUF set as core-local will allow us to skip 
+ * atomic checks 
+ * 
+ * WARNING don't change the NUMBERS orders 0,1,2
+ */
+typedef enum {
+    RTE_MBUF_CORE_LOCALITY_MULTI = 0,
+    RTE_MBUF_CORE_LOCALITY_LOCAL = 1,
+    RTE_MBUF_CORE_LOCALITY_CONST = 2,
+} mbuf_type_e;
+
+static inline void
+rte_mbuf_set_as_core_local(struct rte_mbuf *m) {
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_LOCAL;
+}
+
+static inline void
+rte_mbuf_set_as_core_const(struct rte_mbuf *m) {
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_CONST;
+}
+
+static inline void
+rte_mbuf_set_as_core_multi(struct rte_mbuf *m) {
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+}
+
+#else
+
+static inline void
+rte_mbuf_set_as_core_local(struct rte_mbuf *m) {
+}
+
+static inline void
+rte_mbuf_set_as_core_const(struct rte_mbuf *m) {
+}
+
+static inline void
+rte_mbuf_set_as_core_multi(struct rte_mbuf *m) {
+}
+
+#endif
 
 /**< Maximum number of nb_segs allowed. */
 #define RTE_MBUF_MAX_NB_SEGS	UINT16_MAX
@@ -990,7 +1049,25 @@ struct rte_pktmbuf_pool_private {
 static inline uint16_t
 rte_mbuf_refcnt_read(const struct rte_mbuf *m)
 {
+#ifdef TREX_PATCH
+     uint16_t res;
+      switch (m->m_core_locality) {
+      case     RTE_MBUF_CORE_LOCALITY_MULTI :
+          res=(uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+          break;
+      case     RTE_MBUF_CORE_LOCALITY_LOCAL :
+          res=m->refcnt;
+          break;
+      case     RTE_MBUF_CORE_LOCALITY_CONST :
+          res=7;
+          break;
+      default:
+          res=(uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+      };
+      return (res);
+#else
 	return (uint16_t)(rte_atomic16_read(&m->refcnt_atomic));
+#endif
 }
 
 /**
@@ -1003,7 +1080,15 @@ rte_mbuf_refcnt_read(const struct rte_mbuf *m)
 static inline void
 rte_mbuf_refcnt_set(struct rte_mbuf *m, uint16_t new_value)
 {
+#ifdef TREX_PATCH
+        if (likely(m->m_core_locality > RTE_MBUF_CORE_LOCALITY_MULTI)) {
+            m->refcnt = new_value;
+        } else {
+            rte_atomic16_set(&m->refcnt_atomic, (int16_t)new_value);
+        }
+#else
 	rte_atomic16_set(&m->refcnt_atomic, (int16_t)new_value);
+#endif
 }
 
 /* internal */
@@ -1025,6 +1110,7 @@ __rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 static inline uint16_t
 rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 {
+#ifndef TREX_PATCH
 	/*
 	 * The atomic_add is an expensive operation, so we don't want to
 	 * call it in the case where we know we are the unique holder of
@@ -1039,6 +1125,20 @@ rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 	}
 
 	return __rte_mbuf_refcnt_update(m, value);
+
+#else
+    if (likely(m->m_core_locality == RTE_MBUF_CORE_LOCALITY_LOCAL)) {
+        m->refcnt = (uint16_t)(m->refcnt + value);
+        return m->refcnt;
+    } else {
+        if ( m->m_core_locality == RTE_MBUF_CORE_LOCALITY_CONST ){
+            /* no ref count */
+            return m->refcnt;
+        }else{
+            return (uint16_t)(rte_atomic16_add_return(&m->refcnt_atomic, value));
+        }
+    }
+#endif
 }
 
 #else /* ! RTE_MBUF_REFCNT_ATOMIC */
@@ -1235,6 +1335,12 @@ rte_mbuf_raw_free(struct rte_mbuf *m)
 	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 1);
 	RTE_ASSERT(m->next == NULL);
 	RTE_ASSERT(m->nb_segs == 1);
+#ifdef TREX_PATCH
+    RTE_ASSERT(m->m_core_locality!=RTE_MBUF_CORE_LOCALITY_CONST);
+    if (m->m_core_locality != RTE_MBUF_CORE_LOCALITY_MULTI) {
+        m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+    }
+#endif
 	__rte_mbuf_sanity_check(m, 0);
 	rte_mempool_put(m->pool, m);
 }
@@ -1439,6 +1545,10 @@ static inline void rte_pktmbuf_reset(struct rte_mbuf *m)
 
 	m->ol_flags = 0;
 	m->packet_type = 0;
+#ifdef TREX_PATCH
+    m->m_core_locality = RTE_MBUF_CORE_LOCALITY_MULTI;
+#endif
+
 	rte_pktmbuf_reset_headroom(m);
 
 	m->data_len = 0;
@@ -1828,7 +1938,11 @@ rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
 
 		return m;
 
+#ifndef TREX_PATCH
 	} else if (__rte_mbuf_refcnt_update(m, -1) == 0) {
+#else
+    } else if (likely(rte_mbuf_refcnt_update(m, -1) == 0)) {
+#endif
 
 		if (!RTE_MBUF_DIRECT(m))
 			rte_pktmbuf_detach(m);

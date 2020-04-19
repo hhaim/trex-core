@@ -1966,6 +1966,8 @@ static void ena_infos_get(struct rte_eth_dev *dev,
 	if (adapter->offloads.tso4_supported)
 		tx_feat	|= DEV_TX_OFFLOAD_TCP_TSO;
 
+    tx_feat	|= DEV_TX_OFFLOAD_MULTI_SEGS;
+
 	if (adapter->offloads.tx_csum_supported)
 		tx_feat |= DEV_TX_OFFLOAD_IPV4_CKSUM |
 			DEV_TX_OFFLOAD_UDP_CKSUM |

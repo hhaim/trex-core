@@ -481,6 +481,19 @@ struct rte_eth_rss_conf {
 #define RTE_ETH_FLOW_VXLAN_GPE          22 /**< VXLAN-GPE protocol based flow */
 #define RTE_ETH_FLOW_MAX                23
 
+/* Napatech ADD ON */
+#define RTE_ETH_FLOW_INNER_IPV4         24
+#define RTE_ETH_FLOW_INNER_IPV4_TCP     25
+#define RTE_ETH_FLOW_INNER_IPV4_UDP     26
+#define RTE_ETH_FLOW_INNER_IPV4_SCTP    27
+#define RTE_ETH_FLOW_INNER_IPV4_OTHER   28
+#define RTE_ETH_FLOW_INNER_IPV6         29
+#define RTE_ETH_FLOW_INNER_IPV6_TCP     30
+#define RTE_ETH_FLOW_INNER_IPV6_UDP     31
+#define RTE_ETH_FLOW_INNER_IPV6_SCTP    32
+#define RTE_ETH_FLOW_INNER_IPV6_OTHER   33
+#define RTE_ETH_FLOW_NTPL               34
+
 /*
  * The RSS offload types are defined based on flow types.
  * Different NIC hardware may support different RSS offload
@@ -507,6 +520,18 @@ struct rte_eth_rss_conf {
 #define ETH_RSS_VXLAN              (1ULL << RTE_ETH_FLOW_VXLAN)
 #define ETH_RSS_GENEVE             (1ULL << RTE_ETH_FLOW_GENEVE)
 #define ETH_RSS_NVGRE              (1ULL << RTE_ETH_FLOW_NVGRE)
+
+/* Napatech ADD ON */
+#define ETH_RSS_INNER_IPV4	       (1ULL << RTE_ETH_FLOW_INNER_IPV4)
+#define ETH_RSS_INNER_IPV4_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_TCP)
+#define ETH_RSS_INNER_IPV4_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV4_UDP)
+#define ETH_RSS_INNER_IPV4_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV4_SCTP)
+#define ETH_RSS_INNER_IPV4_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV4_OTHER)
+#define ETH_RSS_INNER_IPV6         (1ULL << RTE_ETH_FLOW_INNER_IPV6)
+#define ETH_RSS_INNER_IPV6_TCP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_TCP)
+#define ETH_RSS_INNER_IPV6_UDP     (1ULL << RTE_ETH_FLOW_INNER_IPV6_UDP)
+#define ETH_RSS_INNER_IPV6_SCTP    (1ULL << RTE_ETH_FLOW_INNER_IPV6_SCTP)
+#define ETH_RSS_INNER_IPV6_OTHER   (1ULL << RTE_ETH_FLOW_INNER_IPV6_OTHER)
 
 #define ETH_RSS_IP ( \
 	ETH_RSS_IPV4 | \
@@ -920,6 +945,9 @@ struct rte_fdir_conf {
 	struct rte_eth_fdir_masks mask;
 	struct rte_eth_fdir_flex_conf flex_conf;
 	/**< Flex payload configuration. */
+#ifdef TREX_PATCH
+    uint8_t flexbytes_offset;
+#endif
 };
 
 /**
