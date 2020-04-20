@@ -1302,7 +1302,7 @@ dpdk_includes_path_ppc64le ='''
 
 dpdk_includes_path =''' ../src/
                         ../src/pal/linux_dpdk/
-                        ../src/pal/linux_dpdk/dpdk1905_'''+ march +'''/
+                        ../src/pal/linux_dpdk/dpdk2002_'''+ march +'''/
                         ../src/dpdk/drivers/
                         ../src/dpdk/drivers/common/mlx5/
                         ../src/dpdk/drivers/net/
@@ -1398,11 +1398,11 @@ bpf_includes_path = '../external_libs/bpf ../external_libs/bpf/bpfjit'
 
 
 if march == 'x86_64':
-    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk1905_x86_64/rte_config.h'];
+    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk2002_x86_64/rte_config.h'];
 elif march == 'aarch64':
-    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DVF_DRIVER', '-DINTEGRATED_VF', '-DRTE_FORCE_INTRINSICS', '-include', '../src/pal/linux_dpdk/dpdk1905_aarch64/rte_config.h'];
+    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DVF_DRIVER', '-DINTEGRATED_VF', '-DRTE_FORCE_INTRINSICS', '-include', '../src/pal/linux_dpdk/dpdk2002_aarch64/rte_config.h'];
 elif march == 'ppc64le':
-    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk1905_ppc64le/rte_config.h'];
+    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk2002_ppc64le/rte_config.h'];
 
 client_external_libs = [
         'simple_enum',
@@ -2291,16 +2291,3 @@ def test (ctx):
     r=getstatusoutput("git log --pretty=format:'%H' -n 1")
     if r[0]==0:
         print(r[1])
-
-
-
-
-
-
-
-
-
-
-
-
-
