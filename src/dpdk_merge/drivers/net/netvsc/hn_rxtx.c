@@ -100,7 +100,7 @@ struct hn_txdesc {
 
 /* Minimum space required for a packet */
 #define HN_PKTSIZE_MIN(align) \
-	RTE_ALIGN(ETHER_MIN_LEN + HN_RNDIS_PKT_LEN, align)
+	RTE_ALIGN(RTE_ETHER_MIN_LEN + HN_RNDIS_PKT_LEN, align)
 
 #define DEFAULT_TX_FREE_THRESH 32U
 
@@ -108,7 +108,7 @@ static void
 hn_update_packet_stats(struct hn_stats *stats, const struct rte_mbuf *m)
 {
 	uint32_t s = m->pkt_len;
-	const struct ether_addr *ea;
+	const struct rte_ether_addr *ea;
 
 	if (s == 64) {
 		stats->size_bins[1]++;
@@ -127,9 +127,9 @@ hn_update_packet_stats(struct hn_stats *stats, const struct rte_mbuf *m)
 			stats->size_bins[7]++;
 	}
 
-	ea = rte_pktmbuf_mtod(m, const struct ether_addr *);
-	if (is_multicast_ether_addr(ea)) {
-		if (is_broadcast_ether_addr(ea))
+	ea = rte_pktmbuf_mtod(m, const struct rte_ether_addr *);
+	if (rte_is_multicast_ether_addr(ea)) {
+		if (rte_is_broadcast_ether_addr(ea))
 			stats->broadcast++;
 		else
 			stats->multicast++;
@@ -606,7 +606,7 @@ static void hn_rndis_rx_data(struct hn_rx_queue *rxq,
 	if (unlikely(data_off + data_len > pkt->len))
 		goto error;
 
-	if (unlikely(data_len < ETHER_HDR_LEN))
+	if (unlikely(data_len < RTE_ETHER_HDR_LEN))
 		goto error;
 
 	hn_rxpkt(rxq, rxb, data, data_off, data_len, &info);

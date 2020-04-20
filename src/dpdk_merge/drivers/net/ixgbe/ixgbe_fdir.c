@@ -12,7 +12,7 @@
 #include <rte_log.h>
 #include <rte_debug.h>
 #include <rte_pci.h>
-#include <rte_ether.h>
+#include <rte_vxlan.h>
 #include <rte_ethdev_driver.h>
 #include <rte_malloc.h>
 
@@ -77,7 +77,6 @@
 	rte_memcpy((ipaddr), ipv6_addr, sizeof(ipv6_addr));\
 } while (0)
 
-#define DEFAULT_VXLAN_PORT 4789
 #define IXGBE_FDIRIP6M_INNER_MAC_SHIFT 4
 
 static int fdir_erase_filter_82599(struct ixgbe_hw *hw, uint32_t fdirhash);
@@ -218,12 +217,8 @@ configure_fdir_flags(const struct rte_fdir_conf *conf, uint32_t *fdirctrl)
 		return -EINVAL;
 	};
 
-#ifdef TREX_PATCH
-	*fdirctrl |= (conf->flexbytes_offset << IXGBE_FDIRCTRL_FLEX_SHIFT);
-#else
 	*fdirctrl |= (IXGBE_DEFAULT_FLEXBYTES_OFFSET / sizeof(uint16_t)) <<
 		     IXGBE_FDIRCTRL_FLEX_SHIFT;
-#endif
 
 	if (conf->mode >= RTE_FDIR_MODE_PERFECT &&
 	    conf->mode <= RTE_FDIR_MODE_PERFECT_TUNNEL) {
@@ -370,7 +365,7 @@ fdir_set_input_mask_x550(struct rte_eth_dev *dev)
 
 	/* set the default UDP port for VxLAN */
 	if (mode == RTE_FDIR_MODE_PERFECT_TUNNEL)
-		IXGBE_WRITE_REG(hw, IXGBE_VXLANCTRL, DEFAULT_VXLAN_PORT);
+		IXGBE_WRITE_REG(hw, IXGBE_VXLANCTRL, RTE_VXLAN_DEFAULT_PORT);
 
 	/* some bits must be set for mac vlan or tunnel mode */
 	fdirm |= IXGBE_FDIRM_L4P | IXGBE_FDIRM_L3P;
@@ -572,7 +567,6 @@ ixgbe_set_fdir_flex_conf(struct rte_eth_dev *dev,
 
 	fdirm = IXGBE_READ_REG(hw, IXGBE_FDIRM);
 
-#ifndef TREX_PATCH
 	if (conf == NULL) {
 		PMD_DRV_LOG(ERR, "NULL pointer.");
 		return -EINVAL;
@@ -613,12 +607,6 @@ ixgbe_set_fdir_flex_conf(struct rte_eth_dev *dev,
 			return -EINVAL;
 		}
 	}
-#else
-    fdirm &= ~IXGBE_FDIRM_FLEX;
-    flexbytes = 1;
-    // fdirctrl gets flex_bytes_offset in configure_fdir_flags
-#endif
-
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRM, fdirm);
 	info->mask.flex_bytes_mask = flexbytes ? UINT16_MAX : 0;
 	info->flex_bytes_offset = (uint8_t)((*fdirctrl &
@@ -650,9 +638,6 @@ ixgbe_fdir_configure(struct rte_eth_dev *dev)
 	    hw->mac.type != ixgbe_mac_X550EM_x &&
 	    hw->mac.type != ixgbe_mac_X550EM_a &&
 	    mode != RTE_FDIR_MODE_SIGNATURE &&
-#ifdef TREX_PATCH
-	    mode != RTE_FDIR_MODE_PERFECT_MAC_VLAN &&
-#endif
 	    mode != RTE_FDIR_MODE_PERFECT)
 		return -ENOSYS;
 
@@ -1289,15 +1274,12 @@ ixgbe_fdir_filter_program(struct rte_eth_dev *dev,
 		is_perfect = TRUE;
 
 	if (is_perfect) {
-#ifndef TREX_PATCH
-        // No reason not to use IPV6 in perfect filters. It is working.
 		if (rule->ixgbe_fdir.formatted.flow_type &
 		    IXGBE_ATR_L4TYPE_IPV6_MASK) {
 			PMD_DRV_LOG(ERR, "IPv6 is not supported in"
 				    " perfect mode!");
 			return -ENOTSUP;
 		}
-#endif
 		fdirhash = atr_compute_perfect_hash_82599(&rule->ixgbe_fdir,
 							  dev->data->dev_conf.fdir_conf.pballoc);
 		fdirhash |= rule->soft_id <<
