@@ -376,7 +376,7 @@ uint64_t rte_rand(void){
 #define DEV_TX_OFFLOAD_UDP_CKSUM   0x00000004
 #define DEV_TX_OFFLOAD_TCP_CKSUM   0x00000008
 
-struct tcp_hdr {
+struct rte_tcp_hdr {
 	uint16_t src_port;  /**< TCP source port. */
 	uint16_t dst_port;  /**< TCP destination port. */
 	uint32_t sent_seq;  /**< TX data sequence number. */
@@ -389,14 +389,14 @@ struct tcp_hdr {
 } __attribute__((__packed__));
 
 
-struct udp_hdr {
+struct rte_udp_hdr {
 	uint16_t src_port;    /**< UDP source port. */
 	uint16_t dst_port;    /**< UDP destination port. */
 	uint16_t dgram_len;   /**< UDP datagram length */
 	uint16_t dgram_cksum; /**< UDP datagram checksum */
 } __attribute__((__packed__));
 
-struct ipv4_hdr {
+struct rte_ipv4_hdr {
 	uint8_t  version_ihl;		/**< version and header length */
 	uint8_t  type_of_service;	/**< type of service */
 	uint16_t total_length;		/**< length of packet */
@@ -409,7 +409,7 @@ struct ipv4_hdr {
 	uint32_t dst_addr;		/**< destination address */
 } __attribute__((__packed__));
 
-struct ipv6_hdr {
+struct rte_ipv6_hdr {
 	uint32_t vtc_flow;     /**< IP version, traffic class & flow label. */
 	uint16_t payload_len;  /**< IP packet length - includes sizeof(ip_header). */
 	uint8_t  proto;        /**< Protocol, next header. */

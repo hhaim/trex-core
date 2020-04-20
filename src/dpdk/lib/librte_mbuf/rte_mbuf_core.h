@@ -662,10 +662,12 @@ struct rte_mbuf {
 	 */
 	struct rte_mbuf_ext_shared_info *shinfo;
 
-	uint64_t dynfield1[2]; /**< Reserved for dynamic fields. */
 
 #ifdef TREX_PATCH
     uint8_t m_core_locality;
+	uint64_t dynfield1[1]; /**< Reserved for dynamic fields. */
+#else 
+	uint64_t dynfield1[2]; /**< Reserved for dynamic fields. */
 #endif
 
 } __rte_cache_aligned;

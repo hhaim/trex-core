@@ -1928,20 +1928,13 @@ virtio_recv_mergeable_pkts_packed(void *rx_queue,
 				prev = rxm;
 				rx_pkts[nb_rx]->pkt_len += len[extra_idx];
 				extra_idx += 1;
-			}
-			seg_res -= rcv_cnt;
-			if (!seg_res) {
-				virtio_rx_stats_updated(rxvq, rx_pkts[nb_rx]);
-				nb_rx++;
-			}
-		} else {
-			PMD_RX_LOG(ERR,
-					"No enough segments for packet.");
-			virtio_discard_rxbuf(vq, prev);
-			rxvq->stats.errors++;
-			break;
 		}
-	}
+		seg_res -= rcv_cnt;
+		if (!seg_res) {
+			virtio_rx_stats_updated(rxvq, rx_pkts[nb_rx]);
+			nb_rx++;
+		}
+	} 
 
 	rxvq->stats.packets += nb_rx;
 

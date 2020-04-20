@@ -2586,7 +2586,7 @@ i40e_dev_close(struct rte_eth_dev *dev)
 #ifdef TREX_PATCH
     // return removed in DPDK 17.02 disable of lldp
 	/* Disable LLDP */
-	ret = i40e_aq_stop_lldp(hw, true, NULL);
+	ret = i40e_aq_stop_lldp(hw, true,true, NULL);
 	if (ret != I40E_SUCCESS) /* Its failure can be ignored */
 		PMD_INIT_LOG(INFO, "Failed to stop lldp");
 #endif
@@ -10275,8 +10275,8 @@ i40e_ethertype_filter_set(struct i40e_pf *pf,
 		PMD_DRV_LOG(ERR, "Invalid queue ID");
 		return -EINVAL;
 	}
-	if (filter->ether_type == RTE_ETHER_TYPE_IPv4 ||
-		filter->ether_type == RTE_ETHER_TYPE_IPv6) {
+	if (filter->ether_type == RTE_ETHER_TYPE_IPV4 ||
+		filter->ether_type == RTE_ETHER_TYPE_IPV6) {
 		PMD_DRV_LOG(INFO,
 			"unsupported ether_type(0x%04x) in control packet filter.",
 			filter->ether_type);

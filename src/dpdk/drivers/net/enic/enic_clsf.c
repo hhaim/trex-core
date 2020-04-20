@@ -114,7 +114,7 @@ copy_fltr_recv_all(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
     struct filter_generic_1 *gp = &fltr->u.generic_1;
     memset(gp, 0, sizeof(*gp));
 
-    struct ether_hdr eth_mask, eth_val;
+    struct rte_ether_hdr eth_mask, eth_val;
     memset(&eth_mask, 0, sizeof(eth_mask));
     memset(&eth_val, 0, sizeof(eth_val));
 
@@ -123,7 +123,7 @@ copy_fltr_recv_all(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
 
     gp->position = 0;
     enic_set_layer(gp, 0, FILTER_GENERIC_1_L2,
-                   &eth_mask, &eth_val, sizeof(struct ether_hdr));
+                   &eth_mask, &eth_val, sizeof(struct rte_ether_hdr));
 
     fltr->type = FILTER_DPDK_1;
 }

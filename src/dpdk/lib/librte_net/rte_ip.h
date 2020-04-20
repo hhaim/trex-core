@@ -254,7 +254,7 @@ rte_raw_cksum_mbuf(const struct rte_mbuf *m, uint32_t off, uint32_t len,
 	return 0;
 }
 
-static inline uint16_t rte_ipv4_header_len(const struct ipv4_hdr *ipv4_hdr){
+static inline uint16_t rte_ipv4_header_len(const struct rte_ipv4_hdr *ipv4_hdr){
    return((ipv4_hdr->version_ihl &0xf)<<2);
 }
 

@@ -203,6 +203,7 @@ bnxt_parse_csum(struct rte_mbuf *mbuf, struct rx_pkt_cmpl_hi *rxcmp1)
 	}
 }
 
+
 uint16_t
 bnxt_recv_pkts_vec(void *rx_queue, struct rte_mbuf **rx_pkts,
 		   uint16_t nb_pkts)
