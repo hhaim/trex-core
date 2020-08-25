@@ -1,108 +1,99 @@
-## This file is part of Scapy
-## See http://www.secdev.org/projects/scapy for more informations
-## Copyright (C) Philippe Biondi <phil@secdev.org>
-## This program is published under a GPLv2 license
+# This file is part of Scapy
+# See http://www.secdev.org/projects/scapy for more information
+# Copyright (C) Philippe Biondi <phil@secdev.org>
+# This program is published under a GPLv2 license
 
 """
 Operating system specific functionality.
 """
 
+from __future__ import absolute_import
+import socket
 
-import sys,os,socket
-from scapy.error import *
-import scapy.config
-
-try:
-    import matplotlib.pyplot as plt
-    MATPLOTLIB = True
-    if scapy.config.conf.interactive:
-        plt.ion()
-except ImportError:
-    log_loading.info("Can't import matplotlib. Not critical, but won't be able to plot.")
-    MATPLOTLIB = False
-
-try:
-    import networkx as nx
-    NETWORKX = True
-except ImportError:
-    log_loading.info("Can't import networkx. Not criticial, but won't be able to draw network graphs.")
-    NETWORKX = False
-
-try:
-    import pyx
-    PYX=1
-except ImportError:
-    log_loading.info("Can't import PyX. Won't be able to use psdump() or pdfdump().")
-    PYX=0
+import scapy.consts
+from scapy.consts import LINUX, SOLARIS, WINDOWS, BSD
+from scapy.error import Scapy_Exception
+from scapy.config import conf, _set_conf_sockets
+from scapy.pton_ntop import inet_pton, inet_ntop
+from scapy.data import ARPHDR_ETHER, ARPHDR_LOOPBACK, IPV6_ADDR_GLOBAL
+from scapy.compat import orb
 
 
 def str2mac(s):
-    #return ("%02x:"*6)[:-1] % tuple(map(ord, s)) 
-    return ("%02x:"*6)[:-1] % tuple(s)
+    return ("%02x:" * 6)[:-1] % tuple(orb(x) for x in s)
 
 
-    
+if not WINDOWS:
+    if not conf.use_pcap and not conf.use_dnet:
+        from scapy.arch.bpf.core import get_if_raw_addr
+
+
 def get_if_addr(iff):
-    return socket.inet_ntoa(get_if_raw_addr(iff))
-    
+    return inet_ntop(socket.AF_INET, get_if_raw_addr(iff))
+
+
 def get_if_hwaddr(iff):
-    mac = get_if_raw_hwaddr(iff)
-    return str2mac(mac)
+    addrfamily, mac = get_if_raw_hwaddr(iff)  # noqa: F405
+    if addrfamily in [ARPHDR_ETHER, ARPHDR_LOOPBACK]:
+        return str2mac(mac)
+    else:
+        raise Scapy_Exception("Unsupported address family (%i) for interface [%s]" % (addrfamily, iff))  # noqa: E501
 
-
-LINUX=sys.platform.startswith("linux")
-OPENBSD=sys.platform.startswith("openbsd")
-FREEBSD=sys.platform.startswith("freebsd")
-NETBSD = sys.platform.startswith("netbsd")
-DARWIN=sys.platform.startswith("darwin")
-SOLARIS=sys.platform.startswith("sunos")
-WINDOWS=sys.platform.startswith("win32")
-
-X86_64 = not WINDOWS and (os.uname()[4] == 'x86_64')
-
-#if WINDOWS:
-#  log_loading.warning("Windows support for scapy3k is currently in testing. Sniffing/sending/receiving packets should be working with WinPcap driver and Powershell. Create issues at https://github.com/phaethon/scapy")
 
 # Next step is to import following architecture specific functions:
 # def get_if_raw_hwaddr(iff)
 # def get_if_raw_addr(iff):
 # def get_if_list():
 # def get_working_if():
-# def attach_filter(s, filter):
+# def attach_filter(s, filter, iface):
 # def set_promisc(s,iff,val=1):
 # def read_routes():
+# def read_routes6():
 # def get_if(iff,cmd):
 # def get_if_index(iff):
 
-
-
 if LINUX:
-    from .linux import *
-    if scapy.config.conf.use_winpcapy or scapy.config.conf.use_netifaces:
-        from pcapdnet import *
-elif OPENBSD or FREEBSD or NETBSD or DARWIN:
-    from .bsd import *
+    from scapy.arch.linux import *  # noqa F403
+elif BSD:
+    from scapy.arch.unix import read_routes, read_routes6, in6_getifaddr  # noqa: F401, E501
+    from scapy.arch.bpf.core import *  # noqa F403
+    if not (conf.use_pcap or conf.use_dnet):
+        # Native
+        from scapy.arch.bpf.supersocket import * # noqa F403
+        conf.use_bpf = True
 elif SOLARIS:
-    from .solaris import *
+    from scapy.arch.solaris import *  # noqa F403
 elif WINDOWS:
-    pass;
-    #from .windows import *
+    # TRex Change - No support for Windows.
+    pass
+    # from scapy.arch.windows import *  # noqa F403
+    # from scapy.arch.windows.native import *  # noqa F403
 
-LOOPBACK_NAME="a"
 
-if scapy.config.conf.iface is None:
-    scapy.config.conf.iface = LOOPBACK_NAME
+if conf.iface is None:
+    conf.iface = scapy.consts.LOOPBACK_INTERFACE
+
+_set_conf_sockets()  # Apply config
+
+
+def get_if_addr6(iff):
+    """
+    Returns the main global unicast address associated with provided
+    interface, in human readable form. If no global address is found,
+    None is returned.
+    """
+    return next((x[0] for x in in6_getifaddr()
+                 if x[2] == iff and x[1] == IPV6_ADDR_GLOBAL), None)
+
 
 def get_if_raw_addr6(iff):
     """
-    Returns the main global unicast address associated with provided 
-    interface, in network format. If no global address is found, None 
-    is returned. 
+    Returns the main global unicast address associated with provided
+    interface, in network format. If no global address is found, None
+    is returned.
     """
-    #r = filter(lambda x: x[2] == iff and x[1] == IPV6_ADDR_GLOBAL, in6_getifaddr())
-    r = [ x for x in in6_getifaddr() if x[2] == iff and x[1] == IPV6_ADDR_GLOBAL]
-    if len(r) == 0:
-        return None
-    else:
-        r = r[0][0] 
-    return inet_pton(socket.AF_INET6, r)
+    ip6 = get_if_addr6(iff)
+    if ip6 is not None:
+        return inet_pton(socket.AF_INET6, ip6)
+
+    return None

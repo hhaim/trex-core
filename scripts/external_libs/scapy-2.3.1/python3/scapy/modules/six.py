@@ -170,6 +170,7 @@ class _SixMetaPathImporter(object):
 
     """
     A meta path importer to import scapy.modules.six.moves and its submodules.
+
     This class implements a PEP302 finder and loader. It should be compatible
     with Python 2.5 and all existing versions of Python3
     """
@@ -213,6 +214,7 @@ class _SixMetaPathImporter(object):
     def is_package(self, fullname):
         """
         Return true, if the named module is a package.
+
         We need this method to get correct spec objects with
         Python 3.4 (see PEP451)
         """
@@ -220,6 +222,7 @@ class _SixMetaPathImporter(object):
 
     def get_code(self, fullname):
         """Return None
+
         Required, if is_package is implemented"""
         self.__get_module(fullname)  # eventually raises ImportError
         return None
@@ -849,6 +852,7 @@ def python_2_unicode_compatible(klass):
     """
     A decorator that defines __unicode__ and __str__ methods under Python 2.
     Under Python 3 it does nothing.
+
     To support Python 2 and 3 with a single code base, define a __str__ method
     returning text and apply this decorator to the class.
     """

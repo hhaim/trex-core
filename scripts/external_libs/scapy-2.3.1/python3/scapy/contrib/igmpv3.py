@@ -14,19 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with Scapy. If not, see <http://www.gnu.org/licenses/>.
 
-# scapy.contrib.description = IGMPv3
+# scapy.contrib.description = Internet Group Management Protocol v3 (IGMPv3)
 # scapy.contrib.status = loads
 
 from __future__ import print_function
-from scapy.packet import *
-from scapy.fields import *
+from scapy.packet import Packet, bind_layers
+from scapy.fields import BitField, ByteEnumField, ByteField, FieldLenField, \
+    FieldListField, IPField, PacketListField, ShortField, XShortField
 from scapy.compat import orb
-from scapy.layers.inet import *
+from scapy.layers.inet import IP
 from scapy.contrib.igmp import IGMP
+from scapy.config import conf
 
 """ Based on the following references
  http://www.iana.org/assignments/igmp-type-numbers
  http://www.rfc-editor.org/rfc/pdfrfc/rfc3376.txt.pdf
+
 """
 
 # See RFC3376, Section 4. Message Formats for definitions of proper IGMPv3 message format  # noqa: E501
@@ -39,6 +42,7 @@ from scapy.contrib.igmp import IGMP
 
 class IGMPv3(IGMP):
     """IGMP Message Class for v3.
+
     This class is derived from class Packet.
     The fields defined below are a
     direct interpretation of the v3 Membership Query Message.
@@ -50,8 +54,11 @@ class IGMPv3(IGMP):
       c.srcaddrs = ['1.2.3.4', '5.6.7.8']
       c.srcaddrs += ['192.168.10.24']
     At this point, 'c.numsrc' is three (3)
+
     'chksum' is automagically calculated before the packet is sent.
+
     'mrcode' is also the Advertisement Interval field
+
     """
     name = "IGMPv3"
     igmpv3types = {0x11: "Membership Query",
@@ -67,6 +74,7 @@ class IGMPv3(IGMP):
     def encode_maxrespcode(self):
         """Encode and replace the mrcode value to its IGMPv3 encoded time value if needed,  # noqa: E501
         as specified in rfc3376#section-4.1.1.
+
         If value < 128, return the value specified. If >= 128, encode as a floating  # noqa: E501
         point value. Value can be 0 - 31744.
         """
@@ -117,6 +125,7 @@ class IGMPv3mq(Packet):
 
 class IGMPv3gr(Packet):
     """IGMP Group Record for IGMPv3 Membership Report
+
     This class is derived from class Packet and should be added in the records
     of an instantiation of class IGMPv3mr.
     """

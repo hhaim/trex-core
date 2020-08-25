@@ -12,6 +12,8 @@ Not implemented:
 Lengths auto-fill at "crafting"
 """
 
+# TRex Change
+
 from scapy.layers.netflow import *
 import os
 import csv

@@ -3,6 +3,8 @@ from scapy.all import *
 from scapy.layers.dot11 import *
 import hashlib
 
+# TRex Change
+
 #######################
 # Based on RFC 5415
 #######################
@@ -272,10 +274,21 @@ class Dot11_swapped(Dot11):
         BitField('proto', 0, 2),
         ShortField('ID',0),
         MACField('addr1', ETHER_ANY),
-        Dot11Addr2MACField('addr2', ETHER_ANY),
-        Dot11Addr3MACField('addr3', ETHER_ANY),
-        Dot11SCField('SC', 0),
-        Dot11Addr4MACField('addr4', ETHER_ANY) 
+        ConditionalField(
+            MACField("addr2", ETHER_ANY),
+            lambda pkt: (pkt.type != 1 or
+                         pkt.subtype in [0x8, 0x9, 0xa, 0xb, 0xe, 0xf]),
+        ),
+        ConditionalField(
+            MACField("addr3", ETHER_ANY),
+            lambda pkt: pkt.type in [0, 2],
+        ),
+        ConditionalField(LEShortField("SC", 0), lambda pkt: pkt.type != 1),
+        ConditionalField(
+            MACField("addr4", ETHER_ANY),
+            lambda pkt: (pkt.type == 2 and
+                         pkt.FCfield & 3 == 3),  # from-DS+to-DS
+        )
         ]
 
 
