@@ -845,8 +845,7 @@ class ICMP(Packet):
         if self.type in [3, 4, 5, 11, 12]:
             return IPerror
         else:
-            # TRex Change
-            return Raw
+            return None
 
     def mysummary(self):
         if isinstance(self.underlayer, IP):

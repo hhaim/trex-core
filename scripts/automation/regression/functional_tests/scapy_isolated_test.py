@@ -161,3 +161,32 @@ class CScapy_Test():
         from scapy.contrib.ipfix import IPFIX
         p = IPFIX()
         p.show2()
+
+    @isolate_env
+    def test_scapy_icmp_bes(self):
+        from scapy.all import Ether, IP, ICMP
+
+        p = Ether()/IP(src='1.1.1.1', dst='2.2.2.2')/ICMP()/('x'*1)
+        p1 = Ether()/IP(src='1.1.1.1', dst='2.2.2.2')/ICMP()
+        #p.show()
+        bytesP = bytes(p)
+        bytesP1 = bytes(p1)
+
+        #print(bytesP)
+        #print("*"*50)
+        recPkt = Ether(bytesP)
+        comd = recPkt.command()
+        print(comd)
+
+        recPkt1 = Ether(bytesP1)
+        comd1 = recPkt1.command()
+        print(comd1)
+
+        #print('+'*100)
+        binaryPkt = b'$\x8a\x07\x14\xfcY$\x8a\x07\x14\xfcX\x08\x00E\x00\x05\xce\x00\x01\x00\x00@\x01o)\x01\x01\x01\x01\x02\x02\x02\x02\x08\x00\x1c\xd8\xcc\x18\x00\x00xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        #binaryPkt = b'$\x8a\x07\x14\xfcY$\x8a\x07\x14\xfcX\x08\x00E\x00\x05\xce\x00\x01\x00\x00@\x01o)\x01\x01\x01\x01\x02\x02\x02\x02\x08\x00\x1c\xd8\xcc\x18\x00\x00aaaaa'
+        print(Ether(binaryPkt).command())
+        #print(Ether(bytesP).command())
+        #print(Ether(binaryPkt).command())
+
+ 
