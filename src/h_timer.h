@@ -384,7 +384,7 @@ private:
 
 
 
-#define HNA_TIMER_LEVELS  (2)
+#define HNA_TIMER_LEVELS  (3)
 #define HNA_MAX_LEVEL1_EVENTS (64) /* small bursts */
 
 typedef enum {
@@ -497,7 +497,7 @@ public:
         reset();
     }
 
-    RC_HTW_t Create(uint32_t wheel_size,uint8_t level1_div);
+    RC_HTW_t Create(uint32_t wheel_size,uint8_t level1_div,uint8_t max_levels=2);
 
     RC_HTW_t Delete();
 
@@ -593,6 +593,7 @@ private:
     uint16_t            m_cnt_div;      /* div of time for level1 
                                         in case of tick of 20msec and 20usec sub-tick we need 1000 div 
                                         */
+    uint8_t             m_max_levels;
     CNATimerExData      m_exd_timer[HNA_TIMER_LEVELS];               
 } ;
 

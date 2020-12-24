@@ -852,7 +852,7 @@ TEST_F(gt_r_timer, timer22) {
         .m_restart_tick  = 55,
         .m_total_ticks   = 1000,
         .m_verbose=0,
-        .m_dont_assert =0
+        .m_dont_assert =1
     };
     test.Create(cfg);
     test.start_test();
@@ -873,7 +873,7 @@ TEST_F(gt_r_timer, timer23) {
                 .m_restart_tick  = (uint32_t)j,
                 .m_total_ticks   = 1000,
                 .m_verbose=0,
-                .m_dont_assert =0
+                .m_dont_assert =1
             };
 
             cfg.m_total_ticks= (uint32_t)(i*2+j*10);
@@ -1116,7 +1116,7 @@ TEST_F(gt_r_timer, timer32) {
 }
 
 void my_test_on_tick_cb19(void *userdata,CHTimerObj *tmr){
-#if 0
+#if 1
     CNATimerWheel  *  timer;
     timer = (CNATimerWheel  *)userdata;
 
@@ -1204,9 +1204,7 @@ TEST_F(gt_r_timer, timer34) {
 
 
         for (i=0; i<2500; i++) {
-            uint32_t left;
-            m_timer.on_tick_level0((void *)&m_timer,my_test_on_tick_cb19);     // call the callback of first level 
-            m_timer.on_tick_level_count(1,(void *)&m_timer,my_test_on_tick_cb19,32,left); // call the callback of second level 
+            m_timer.on_tick_level((void *)&m_timer,my_test_on_tick_cb19,32);     // call the callback of first level 
         }
         delete []m_events;
         delete []m_events_long;

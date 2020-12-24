@@ -344,7 +344,7 @@ void CNATimerWheel::on_tick_level(void *userdata,
 
     on_tick_level0(userdata,cb);
     int i;
-    for (i=1; i<HNA_TIMER_LEVELS; i++){
+    for (i=1; i<m_max_levels; i++){
        on_tick_level_count(i,userdata,cb,min_events,left);
     }
 }
@@ -463,7 +463,7 @@ RC_HTW_t CNATimerWheel::timer_start_rest(CHTimerObj  *tmr,
     int index=1;
     uint32 level_err = (m_wheel_level1_err+1);
     uint32 level_shift = m_wheel_level1_shift;
-    while ( index < HNA_TIMER_LEVELS ) {
+    while ( index < m_max_levels ) {
         htw_ticks_t nticks = (ticks+(level_err-1))>>level_shift; // ticks in the new level
         if (nticks < m_wheel_size) {
             if (nticks<2) {
@@ -481,8 +481,8 @@ RC_HTW_t CNATimerWheel::timer_start_rest(CHTimerObj  *tmr,
 
     level_shift -= m_wheel_level1_shift;
     tmr->m_ticks_left = ticks - ((m_wheel_size-1)<<level_shift);
-    tmr->m_wheel = HNA_TIMER_LEVELS-1;
-    m_timer_w[HNA_TIMER_LEVELS-1].timer_start(tmr,m_wheel_size-1);
+    tmr->m_wheel = m_max_levels-1;
+    m_timer_w[m_max_levels-1].timer_start(tmr,m_wheel_size-1);
 
     return (RC_HTW_OK);
 }
@@ -517,7 +517,8 @@ void CNATimerWheel::set_level1_cnt_div(){
 
 
 RC_HTW_t CNATimerWheel::Create(uint32_t wheel_size,
-                               uint8_t level1_div){
+                               uint8_t level1_div,
+                               uint8_t max_levels){
     RC_HTW_t res;
     int i;
     for (i=0; i<HNA_TIMER_LEVELS; i++) {
@@ -535,6 +536,9 @@ RC_HTW_t CNATimerWheel::Create(uint32_t wheel_size,
     m_wheel_size  = wheel_size;
     m_wheel_level1_shift = m_wheel_shift - utl_log2_shift((uint32_t)level1_div);
     m_wheel_level1_err  = ((1<<(m_wheel_level1_shift))-1);
+    m_max_levels = max_levels;
+    assert(m_max_levels<=HNA_TIMER_LEVELS);
+    assert(m_max_levels>1);
     assert(m_wheel_shift>utl_log2_shift((uint32_t)level1_div));
 
     return(RC_HTW_OK);
