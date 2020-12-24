@@ -397,6 +397,20 @@ typedef enum {
 
 typedef uint8_t na_htw_state_num_t;
 
+class CNATimerExData {
+
+public:
+    uint32_t            m_cnt_state; /* the state of level1 for cnt mode */
+    uint32_t            m_cnt_per_iter; /* per iteration events */
+    uint32_t            m_cnt_div; // the level tick factor 
+
+    void reset(){
+        m_cnt_state =0;
+        m_cnt_per_iter=0;
+        m_cnt_div=0;
+    }  
+};
+
 
 /* 
 
@@ -417,7 +431,7 @@ level 1: 20msec -- 1.3sec     res=1.3msec
 level 1 could be disabled and in all cases the evets are processed in spread mode (there won't be a burst)
 
 
-use-case 0 - two levels 
+use-case 0 - HNA_TIMER_LEVELS levels, count mode 
 =========
 
 two levels, spread level #2 
@@ -427,15 +441,14 @@ level_1
 
  
 tw.Create(1024,16)
-tw.set_level1_cnt_div(); // claculate the spread factor 
+tw.set_level1_cnt_div(); // calculate the spread factor 
 
 
 
 On tick - process the two levels 
 ---
 
-tw.on_tick_level0((void *)&m_timer,cb);     << no spread 
-tw.on_tick_level_count(1,(void *)&m_timer,cb,32,left);   << spread 
+tw.on_tick_level((void *)&m_timer,cb,32);     
 
    
 tw.Delete();
@@ -529,6 +542,11 @@ public:
                                   uint32_t & left);
 
 
+    /* tick for count mode */
+    void on_tick_level(void *userdata,
+                       htw_on_tick_cb_t cb,
+                       uint16_t min_events);
+
     bool is_any_events_left(){
         return(m_total_events>0?true:false);
     }
@@ -575,8 +593,7 @@ private:
     uint16_t            m_cnt_div;      /* div of time for level1 
                                         in case of tick of 20msec and 20usec sub-tick we need 1000 div 
                                         */
-    uint16_t            m_cnt_state; /* the state of level1 for cnt mode */
-    uint32_t            m_cnt_per_iter; /* per iteration events */
+    CNATimerExData      m_exd_timer[HNA_TIMER_LEVELS];               
 } ;
 
 

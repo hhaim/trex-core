@@ -784,6 +784,9 @@ void CNATimerWheelTest1::start_test(){
        printf(" %d == %d \n",m_expected_total_ticks,m_total_ticks);
     }
     if (!m_cfg.m_dont_assert){
+        if ( (((m_expected_total_ticks==m_total_ticks) || ((m_expected_total_ticks+1) ==m_total_ticks))) ==false ){
+           printf(" ERROR !!! ");
+        }
       //assert( (m_expected_total_ticks==m_total_ticks) || ((m_expected_total_ticks+1) ==m_total_ticks) );
     } 
 }
@@ -813,7 +816,7 @@ TEST_F(gt_r_timer, timer20) {
         .m_start_tick    = 2,
         .m_restart_tick  = 2,
         .m_total_ticks   = 1024,
-        .m_verbose=0
+        .m_verbose=1,
     };
     test.Create(cfg);
     test.start_test();
