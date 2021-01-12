@@ -3,8 +3,6 @@
 
 cflags += ['-DRTE_LIBRTE_IXGBE_BYPASS']
 
-allow_experimental_apis = true
-
 subdir('base')
 objs = [base_objs]
 
@@ -32,4 +30,4 @@ endif
 
 includes += include_directories('base')
 
-install_headers('rte_pmd_ixgbe.h')
+headers = files('rte_pmd_ixgbe.h')

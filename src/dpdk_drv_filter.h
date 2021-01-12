@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <rte_ip.h>
 #include <rte_flow.h>
+#include <rte_ethdev_driver.h>
 #include "trex_defs.h"
 #include "dpdk_port_map.h"
 

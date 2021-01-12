@@ -8,23 +8,18 @@
 #include <stdio.h>
 
 #include <rte_pci.h>
+#include <rte_debug.h>
 #include <rte_atomic.h>
 #include <rte_log.h>
 #include <rte_kvargs.h>
 #include <rte_devargs.h>
+#include <rte_bitops.h>
 
 #include "mlx5_prm.h"
+#include "mlx5_devx_cmds.h"
 
-
-/*
- * Compilation workaround for PPC64 when AltiVec is fully enabled, e.g. std=c11.
- * Otherwise there would be a type conflict between stdbool and altivec.
- */
-#if defined(__PPC64__) && !defined(__APPLE_ALTIVEC__)
-#undef bool
-/* redefine as in stdbool.h */
-#define bool _Bool
-#endif
+/* Reported driver name. */
+#define MLX5_DRIVER_NAME "mlx5_pci"
 
 /* Bit-field manipulation. */
 #define BITFIELD_DECLARE(bf, type, size) \
@@ -136,8 +131,11 @@ enum {
 	PCI_DEVICE_ID_MELLANOX_CONNECTX6 = 0x101b,
 	PCI_DEVICE_ID_MELLANOX_CONNECTX6VF = 0x101c,
 	PCI_DEVICE_ID_MELLANOX_CONNECTX6DX = 0x101d,
-	PCI_DEVICE_ID_MELLANOX_CONNECTX6DXVF = 0x101e,
+	PCI_DEVICE_ID_MELLANOX_CONNECTXVF = 0x101e,
 	PCI_DEVICE_ID_MELLANOX_CONNECTX6DXBF = 0xa2d6,
+	PCI_DEVICE_ID_MELLANOX_CONNECTX6LX = 0x101f,
+	PCI_DEVICE_ID_MELLANOX_CONNECTX7 = 0x1021,
+	PCI_DEVICE_ID_MELLANOX_CONNECTX7BF = 0Xa2dc,
 };
 
 /* Maximum number of simultaneous unicast MAC addresses. */
@@ -154,6 +152,7 @@ enum mlx5_nl_phys_port_name_type {
 	MLX5_PHYS_PORT_NAME_TYPE_LEGACY, /* before kernel ver < 5.0 */
 	MLX5_PHYS_PORT_NAME_TYPE_UPLINK, /* p0, kernel ver >= 5.0 */
 	MLX5_PHYS_PORT_NAME_TYPE_PFVF, /* pf0vf0, kernel ver >= 5.0 */
+	MLX5_PHYS_PORT_NAME_TYPE_PFHPF, /* pf0, kernel ver >= 5.7, HPF rep */
 	MLX5_PHYS_PORT_NAME_TYPE_UNKNOWN, /* Unrecognized. */
 };
 
@@ -198,25 +197,75 @@ check_cqe(volatile struct mlx5_cqe *cqe, const uint16_t cqes_n,
 
 	if (unlikely((op_owner != (!!(idx))) || (op_code == MLX5_CQE_INVALID)))
 		return MLX5_CQE_STATUS_HW_OWN;
-	rte_cio_rmb();
+	rte_io_rmb();
 	if (unlikely(op_code == MLX5_CQE_RESP_ERR ||
 		     op_code == MLX5_CQE_REQ_ERR))
 		return MLX5_CQE_STATUS_ERR;
 	return MLX5_CQE_STATUS_SW_OWN;
 }
 
+__rte_internal
 int mlx5_dev_to_pci_addr(const char *dev_path, struct rte_pci_addr *pci_addr);
+__rte_internal
+int mlx5_get_ifname_sysfs(const char *ibdev_path, char *ifname);
+
 
 #define MLX5_CLASS_ARG_NAME "class"
 
 enum mlx5_class {
-	MLX5_CLASS_NET,
-	MLX5_CLASS_VDPA,
 	MLX5_CLASS_INVALID,
+	MLX5_CLASS_NET = RTE_BIT64(0),
+	MLX5_CLASS_VDPA = RTE_BIT64(1),
+	MLX5_CLASS_REGEX = RTE_BIT64(2),
 };
 
-enum mlx5_class mlx5_class_get(struct rte_devargs *devargs);
+#define MLX5_DBR_SIZE RTE_CACHE_LINE_SIZE
+#define MLX5_DBR_PER_PAGE 64
+/* Must be >= CHAR_BIT * sizeof(uint64_t) */
+#define MLX5_DBR_PAGE_SIZE (MLX5_DBR_PER_PAGE * MLX5_DBR_SIZE)
+/* Page size must be >= 512. */
+#define MLX5_DBR_BITMAP_SIZE (MLX5_DBR_PER_PAGE / (CHAR_BIT * sizeof(uint64_t)))
+
+struct mlx5_devx_dbr_page {
+	/* Door-bell records, must be first member in structure. */
+	uint8_t dbrs[MLX5_DBR_PAGE_SIZE];
+	LIST_ENTRY(mlx5_devx_dbr_page) next; /* Pointer to the next element. */
+	void *umem;
+	uint32_t dbr_count; /* Number of door-bell records in use. */
+	/* 1 bit marks matching door-bell is in use. */
+	uint64_t dbr_bitmap[MLX5_DBR_BITMAP_SIZE];
+};
+
+/* devX creation object */
+struct mlx5_devx_obj {
+	void *obj; /* The DV object. */
+	int id; /* The object ID. */
+};
+
+/* UMR memory buffer used to define 1 entry in indirect mkey. */
+struct mlx5_klm {
+	uint32_t byte_count;
+	uint32_t mkey;
+	uint64_t address;
+};
+
+LIST_HEAD(mlx5_dbr_page_list, mlx5_devx_dbr_page);
+
+__rte_internal
 void mlx5_translate_port_name(const char *port_name_in,
 			      struct mlx5_switch_info *port_info_out);
+void mlx5_glue_constructor(void);
+__rte_internal
+int64_t mlx5_get_dbr(void *ctx,  struct mlx5_dbr_page_list *head,
+		     struct mlx5_devx_dbr_page **dbr_page);
+__rte_internal
+int32_t mlx5_release_dbr(struct mlx5_dbr_page_list *head, uint32_t umem_id,
+			 uint64_t offset);
+__rte_internal
+void *mlx5_devx_alloc_uar(void *ctx, int mapping);
+extern uint8_t haswell_broadwell_cpu;
+
+__rte_internal
+void mlx5_common_init(void);
 
 #endif /* RTE_PMD_MLX5_COMMON_H_ */

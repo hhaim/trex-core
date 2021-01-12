@@ -2,329 +2,344 @@
  * Copyright 2019 Mellanox Technologies, Ltd
  */
 
-#include <dlfcn.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 
 #include <rte_errno.h>
+#include <rte_mempool.h>
+#include <rte_malloc.h>
 
 #include "mlx5_common.h"
+#include "mlx5_common_os.h"
 #include "mlx5_common_utils.h"
-#include "mlx5_glue.h"
-
+#include "mlx5_malloc.h"
+#include "mlx5_common_pci.h"
 
 int mlx5_common_logtype;
 
+uint8_t haswell_broadwell_cpu;
+
+/* In case this is an x86_64 intel processor to check if
+ * we should use relaxed ordering.
+ */
+#ifdef RTE_ARCH_X86_64
+/**
+ * This function returns processor identification and feature information
+ * into the registers.
+ *
+ * @param eax, ebx, ecx, edx
+ *		Pointers to the registers that will hold cpu information.
+ * @param level
+ *		The main category of information returned.
+ */
+static inline void mlx5_cpu_id(unsigned int level,
+				unsigned int *eax, unsigned int *ebx,
+				unsigned int *ecx, unsigned int *edx)
+{
+	__asm__("cpuid\n\t"
+		: "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+		: "0" (level));
+}
+#endif
+
+RTE_INIT_PRIO(mlx5_log_init, LOG)
+{
+	mlx5_common_logtype = rte_log_register("pmd.common.mlx5");
+	if (mlx5_common_logtype >= 0)
+		rte_log_set_level(mlx5_common_logtype, RTE_LOG_NOTICE);
+}
+
+static bool mlx5_common_initialized;
 
 /**
- * Get PCI information by sysfs device path.
- *
- * @param dev_path
- *   Pointer to device sysfs folder name.
- * @param[out] pci_addr
- *   PCI bus address output buffer.
- *
- * @return
- *   0 on success, a negative errno value otherwise and rte_errno is set.
+ * One time innitialization routine for run-time dependency on glue library
+ * for multiple PMDs. Each mlx5 PMD that depends on mlx5_common module,
+ * must invoke in its constructor.
  */
-int
-mlx5_dev_to_pci_addr(const char *dev_path,
-		     struct rte_pci_addr *pci_addr)
+void
+mlx5_common_init(void)
 {
-	FILE *file;
-	char line[32];
-	MKSTR(path, "%s/device/uevent", dev_path);
+	if (mlx5_common_initialized)
+		return;
 
-	file = fopen(path, "rb");
-	if (file == NULL) {
-		rte_errno = errno;
-		return -rte_errno;
+	mlx5_glue_constructor();
+	mlx5_common_pci_init();
+	mlx5_common_initialized = true;
+}
+
+/**
+ * This function is responsible of initializing the variable
+ *  haswell_broadwell_cpu by checking if the cpu is intel
+ *  and reading the data returned from mlx5_cpu_id().
+ *  since haswell and broadwell cpus don't have improved performance
+ *  when using relaxed ordering we want to check the cpu type before
+ *  before deciding whether to enable RO or not.
+ *  if the cpu is haswell or broadwell the variable will be set to 1
+ *  otherwise it will be 0.
+ */
+RTE_INIT_PRIO(mlx5_is_haswell_broadwell_cpu, LOG)
+{
+#ifdef RTE_ARCH_X86_64
+	unsigned int broadwell_models[4] = {0x3d, 0x47, 0x4F, 0x56};
+	unsigned int haswell_models[4] = {0x3c, 0x3f, 0x45, 0x46};
+	unsigned int i, model, family, brand_id, vendor;
+	unsigned int signature_intel_ebx = 0x756e6547;
+	unsigned int extended_model;
+	unsigned int eax = 0;
+	unsigned int ebx = 0;
+	unsigned int ecx = 0;
+	unsigned int edx = 0;
+	int max_level;
+
+	mlx5_cpu_id(0, &eax, &ebx, &ecx, &edx);
+	vendor = ebx;
+	max_level = eax;
+	if (max_level < 1) {
+		haswell_broadwell_cpu = 0;
+		return;
 	}
-	while (fgets(line, sizeof(line), file) == line) {
-		size_t len = strlen(line);
-		int ret;
-
-		/* Truncate long lines. */
-		if (len == (sizeof(line) - 1))
-			while (line[(len - 1)] != '\n') {
-				ret = fgetc(file);
-				if (ret == EOF)
-					break;
-				line[(len - 1)] = ret;
-			}
-		/* Extract information. */
-		if (sscanf(line,
-			   "PCI_SLOT_NAME="
-			   "%" SCNx32 ":%" SCNx8 ":%" SCNx8 ".%" SCNx8 "\n",
-			   &pci_addr->domain,
-			   &pci_addr->bus,
-			   &pci_addr->devid,
-			   &pci_addr->function) == 4) {
-			ret = 0;
-			break;
+	mlx5_cpu_id(1, &eax, &ebx, &ecx, &edx);
+	model = (eax >> 4) & 0x0f;
+	family = (eax >> 8) & 0x0f;
+	brand_id = ebx & 0xff;
+	extended_model = (eax >> 12) & 0xf0;
+	/* Check if the processor is Haswell or Broadwell */
+	if (vendor == signature_intel_ebx) {
+		if (family == 0x06)
+			model += extended_model;
+		if (brand_id == 0 && family == 0x6) {
+			for (i = 0; i < RTE_DIM(broadwell_models); i++)
+				if (model == broadwell_models[i]) {
+					haswell_broadwell_cpu = 1;
+					return;
+				}
+			for (i = 0; i < RTE_DIM(haswell_models); i++)
+				if (model == haswell_models[i]) {
+					haswell_broadwell_cpu = 1;
+					return;
+				}
 		}
 	}
-	fclose(file);
-	return 0;
+#endif
+	haswell_broadwell_cpu = 0;
 }
 
-static int
-mlx5_class_check_handler(__rte_unused const char *key, const char *value,
-			 void *opaque)
+/**
+ * Allocate page of door-bells and register it using DevX API.
+ *
+ * @param [in] ctx
+ *   Pointer to the device context.
+ *
+ * @return
+ *   Pointer to new page on success, NULL otherwise.
+ */
+static struct mlx5_devx_dbr_page *
+mlx5_alloc_dbr_page(void *ctx)
 {
-	enum mlx5_class *ret = opaque;
+	struct mlx5_devx_dbr_page *page;
 
-	if (strcmp(value, "vdpa") == 0) {
-		*ret = MLX5_CLASS_VDPA;
-	} else if (strcmp(value, "net") == 0) {
-		*ret = MLX5_CLASS_NET;
-	} else {
-		DRV_LOG(ERR, "Invalid mlx5 class %s. Maybe typo in device"
-			" class argument setting?", value);
-		*ret = MLX5_CLASS_INVALID;
+	/* Allocate space for door-bell page and management data. */
+	page = mlx5_malloc(MLX5_MEM_RTE | MLX5_MEM_ZERO,
+			   sizeof(struct mlx5_devx_dbr_page),
+			   RTE_CACHE_LINE_SIZE, SOCKET_ID_ANY);
+	if (!page) {
+		DRV_LOG(ERR, "cannot allocate dbr page");
+		return NULL;
 	}
-	return 0;
+	/* Register allocated memory. */
+	page->umem = mlx5_glue->devx_umem_reg(ctx, page->dbrs,
+					      MLX5_DBR_PAGE_SIZE, 0);
+	if (!page->umem) {
+		DRV_LOG(ERR, "cannot umem reg dbr page");
+		mlx5_free(page);
+		return NULL;
+	}
+	return page;
 }
 
-enum mlx5_class
-mlx5_class_get(struct rte_devargs *devargs)
+/**
+ * Find the next available door-bell, allocate new page if needed.
+ *
+ * @param [in] ctx
+ *   Pointer to device context.
+ * @param [in] head
+ *   Pointer to the head of dbr pages list.
+ * @param [out] dbr_page
+ *   Door-bell page containing the page data.
+ *
+ * @return
+ *   Door-bell address offset on success, a negative error value otherwise.
+ */
+int64_t
+mlx5_get_dbr(void *ctx,  struct mlx5_dbr_page_list *head,
+	     struct mlx5_devx_dbr_page **dbr_page)
 {
-	struct rte_kvargs *kvlist;
-	const char *key = MLX5_CLASS_ARG_NAME;
-	enum mlx5_class ret = MLX5_CLASS_NET;
+	struct mlx5_devx_dbr_page *page = NULL;
+	uint32_t i, j;
 
-	if (devargs == NULL)
-		return ret;
-	kvlist = rte_kvargs_parse(devargs->args, NULL);
-	if (kvlist == NULL)
-		return ret;
-	if (rte_kvargs_count(kvlist, key))
-		rte_kvargs_process(kvlist, key, mlx5_class_check_handler, &ret);
-	rte_kvargs_free(kvlist);
+	LIST_FOREACH(page, head, next)
+		if (page->dbr_count < MLX5_DBR_PER_PAGE)
+			break;
+	if (!page) { /* No page with free door-bell exists. */
+		page = mlx5_alloc_dbr_page(ctx);
+		if (!page) /* Failed to allocate new page. */
+			return (-1);
+		LIST_INSERT_HEAD(head, page, next);
+	}
+	/* Loop to find bitmap part with clear bit. */
+	for (i = 0;
+	     i < MLX5_DBR_BITMAP_SIZE && page->dbr_bitmap[i] == UINT64_MAX;
+	     i++)
+		; /* Empty. */
+	/* Find the first clear bit. */
+	MLX5_ASSERT(i < MLX5_DBR_BITMAP_SIZE);
+	j = rte_bsf64(~page->dbr_bitmap[i]);
+	page->dbr_bitmap[i] |= (UINT64_C(1) << j);
+	page->dbr_count++;
+	*dbr_page = page;
+	return (i * CHAR_BIT * sizeof(uint64_t) + j) * MLX5_DBR_SIZE;
+}
+
+/**
+ * Release a door-bell record.
+ *
+ * @param [in] head
+ *   Pointer to the head of dbr pages list.
+ * @param [in] umem_id
+ *   UMEM ID of page containing the door-bell record to release.
+ * @param [in] offset
+ *   Offset of door-bell record in page.
+ *
+ * @return
+ *   0 on success, a negative error value otherwise.
+ */
+int32_t
+mlx5_release_dbr(struct mlx5_dbr_page_list *head, uint32_t umem_id,
+		 uint64_t offset)
+{
+	struct mlx5_devx_dbr_page *page = NULL;
+	int ret = 0;
+
+	LIST_FOREACH(page, head, next)
+		/* Find the page this address belongs to. */
+		if (mlx5_os_get_umem_id(page->umem) == umem_id)
+			break;
+	if (!page)
+		return -EINVAL;
+	page->dbr_count--;
+	if (!page->dbr_count) {
+		/* Page not used, free it and remove from list. */
+		LIST_REMOVE(page, next);
+		if (page->umem)
+			ret = -mlx5_glue->devx_umem_dereg(page->umem);
+		mlx5_free(page);
+	} else {
+		/* Mark in bitmap that this door-bell is not in use. */
+		offset /= MLX5_DBR_SIZE;
+		int i = offset / 64;
+		int j = offset % 64;
+
+		page->dbr_bitmap[i] &= ~(UINT64_C(1) << j);
+	}
 	return ret;
 }
 
 /**
- * Extract port name, as a number, from sysfs or netlink information.
+ * Allocate the User Access Region with DevX on specified device.
  *
- * @param[in] port_name_in
- *   String representing the port name.
- * @param[out] port_info_out
- *   Port information, including port name as a number and port name
- *   type if recognized
- *
- * @return
- *   port_name field set according to recognized name format.
- */
-void
-mlx5_translate_port_name(const char *port_name_in,
-			 struct mlx5_switch_info *port_info_out)
-{
-	char pf_c1, pf_c2, vf_c1, vf_c2;
-	char *end;
-	int sc_items;
-
-	/*
-	 * Check for port-name as a string of the form pf0vf0
-	 * (support kernel ver >= 5.0 or OFED ver >= 4.6).
-	 */
-	sc_items = sscanf(port_name_in, "%c%c%d%c%c%d",
-			  &pf_c1, &pf_c2, &port_info_out->pf_num,
-			  &vf_c1, &vf_c2, &port_info_out->port_name);
-	if (sc_items == 6 &&
-	    pf_c1 == 'p' && pf_c2 == 'f' &&
-	    vf_c1 == 'v' && vf_c2 == 'f') {
-		port_info_out->name_type = MLX5_PHYS_PORT_NAME_TYPE_PFVF;
-		return;
-	}
-	/*
-	 * Check for port-name as a string of the form p0
-	 * (support kernel ver >= 5.0, or OFED ver >= 4.6).
-	 */
-	sc_items = sscanf(port_name_in, "%c%d",
-			  &pf_c1, &port_info_out->port_name);
-	if (sc_items == 2 && pf_c1 == 'p') {
-		port_info_out->name_type = MLX5_PHYS_PORT_NAME_TYPE_UPLINK;
-		return;
-	}
-	/* Check for port-name as a number (support kernel ver < 5.0 */
-	errno = 0;
-	port_info_out->port_name = strtol(port_name_in, &end, 0);
-	if (!errno &&
-	    (size_t)(end - port_name_in) == strlen(port_name_in)) {
-		port_info_out->name_type = MLX5_PHYS_PORT_NAME_TYPE_LEGACY;
-		return;
-	}
-	port_info_out->name_type = MLX5_PHYS_PORT_NAME_TYPE_UNKNOWN;
-	return;
-}
-
-#ifdef RTE_IBVERBS_LINK_DLOPEN
-
-/**
- * Suffix RTE_EAL_PMD_PATH with "-glue".
- *
- * This function performs a sanity check on RTE_EAL_PMD_PATH before
- * suffixing its last component.
- *
- * @param buf[out]
- *   Output buffer, should be large enough otherwise NULL is returned.
- * @param size
- *   Size of @p out.
+ * @param [in] ctx
+ *   Infiniband device context to perform allocation on.
+ * @param [in] mapping
+ *   MLX5DV_UAR_ALLOC_TYPE_BF - allocate as cached memory with write-combining
+ *				attributes (if supported by the host), the
+ *				writes to the UAR registers must be followed
+ *				by write memory barrier.
+ *   MLX5DV_UAR_ALLOC_TYPE_NC - allocate as non-cached nenory, all writes are
+ *				promoted to the registers immediately, no
+ *				memory barriers needed.
+ *   mapping < 0 - the first attempt is performed with MLX5DV_UAR_ALLOC_TYPE_BF,
+ *		   if this fails the next attempt with MLX5DV_UAR_ALLOC_TYPE_NC
+ *		   is performed. The drivers specifying negative values should
+ *		   always provide the write memory barrier operation after UAR
+ *		   register writings.
+ * If there is no definitions for the MLX5DV_UAR_ALLOC_TYPE_xx (older rdma
+ * library headers), the caller can specify 0.
  *
  * @return
- *   Pointer to @p buf or @p NULL in case suffix cannot be appended.
+ *   UAR object pointer on success, NULL otherwise and rte_errno is set.
  */
-static char *
-mlx5_glue_path(char *buf, size_t size)
+void *
+mlx5_devx_alloc_uar(void *ctx, int mapping)
 {
-	static const char *const bad[] = { "/", ".", "..", NULL };
-	const char *path = RTE_EAL_PMD_PATH;
-	size_t len = strlen(path);
-	size_t off;
-	int i;
+	void *uar;
+	uint32_t retry, uar_mapping;
+	void *base_addr;
 
-	while (len && path[len - 1] == '/')
-		--len;
-	for (off = len; off && path[off - 1] != '/'; --off)
-		;
-	for (i = 0; bad[i]; ++i)
-		if (!strncmp(path + off, bad[i], (int)(len - off)))
-			goto error;
-	i = snprintf(buf, size, "%.*s-glue", (int)len, path);
-	if (i == -1 || (size_t)i >= size)
-		goto error;
-	return buf;
-error:
-	RTE_LOG(ERR, PMD, "unable to append \"-glue\" to last component of"
-		" RTE_EAL_PMD_PATH (\"" RTE_EAL_PMD_PATH "\"), please"
-		" re-configure DPDK");
-	return NULL;
-}
+	for (retry = 0; retry < MLX5_ALLOC_UAR_RETRY; ++retry) {
+#ifdef MLX5DV_UAR_ALLOC_TYPE_NC
+		/* Control the mapping type according to the settings. */
+		uar_mapping = (mapping < 0) ?
+			      MLX5DV_UAR_ALLOC_TYPE_NC : mapping;
+#else
+		/*
+		 * It seems we have no way to control the memory mapping type
+		 * for the UAR, the default "Write-Combining" type is supposed.
+		 */
+		uar_mapping = 0;
+		RTE_SET_USED(mapping);
 #endif
-
-/**
- * Initialization routine for run-time dependency on rdma-core.
- */
-RTE_INIT_PRIO(mlx5_glue_init, CLASS)
-{
-	void *handle = NULL;
-
-	/* Initialize common log type. */
-	mlx5_common_logtype = rte_log_register("pmd.common.mlx5");
-	if (mlx5_common_logtype >= 0)
-		rte_log_set_level(mlx5_common_logtype, RTE_LOG_NOTICE);
-	/*
-	 * RDMAV_HUGEPAGES_SAFE tells ibv_fork_init() we intend to use
-	 * huge pages. Calling ibv_fork_init() during init allows
-	 * applications to use fork() safely for purposes other than
-	 * using this PMD, which is not supported in forked processes.
-	 */
-	setenv("RDMAV_HUGEPAGES_SAFE", "1", 1);
-	/* Match the size of Rx completion entry to the size of a cacheline. */
-	if (RTE_CACHE_LINE_SIZE == 128)
-		setenv("MLX5_CQE_SIZE", "128", 0);
-	/*
-	 * MLX5_DEVICE_FATAL_CLEANUP tells ibv_destroy functions to
-	 * cleanup all the Verbs resources even when the device was removed.
-	 */
-	setenv("MLX5_DEVICE_FATAL_CLEANUP", "1", 1);
-	/* The glue initialization was done earlier by mlx5 common library. */
-#ifdef RTE_IBVERBS_LINK_DLOPEN
-	char glue_path[sizeof(RTE_EAL_PMD_PATH) - 1 + sizeof("-glue")];
-	const char *path[] = {
-		/*
-		 * A basic security check is necessary before trusting
-		 * MLX5_GLUE_PATH, which may override RTE_EAL_PMD_PATH.
-		 */
-		(geteuid() == getuid() && getegid() == getgid() ?
-		 getenv("MLX5_GLUE_PATH") : NULL),
-		/*
-		 * When RTE_EAL_PMD_PATH is set, use its glue-suffixed
-		 * variant, otherwise let dlopen() look up libraries on its
-		 * own.
-		 */
-		(*RTE_EAL_PMD_PATH ?
-		 mlx5_glue_path(glue_path, sizeof(glue_path)) : ""),
-	};
-	unsigned int i = 0;
-	void **sym;
-	const char *dlmsg;
-
-	while (!handle && i != RTE_DIM(path)) {
-		const char *end;
-		size_t len;
-		int ret;
-
-		if (!path[i]) {
-			++i;
-			continue;
+		uar = mlx5_glue->devx_alloc_uar(ctx, uar_mapping);
+#ifdef MLX5DV_UAR_ALLOC_TYPE_NC
+		if (!uar &&
+		    mapping < 0 &&
+		    uar_mapping == MLX5DV_UAR_ALLOC_TYPE_BF) {
+			/*
+			 * In some environments like virtual machine the
+			 * Write Combining mapped might be not supported and
+			 * UAR allocation fails. We tried "Non-Cached" mapping
+			 * for the case.
+			 */
+			DRV_LOG(WARNING, "Failed to allocate DevX UAR (BF)");
+			uar_mapping = MLX5DV_UAR_ALLOC_TYPE_NC;
+			uar = mlx5_glue->devx_alloc_uar(ctx, uar_mapping);
+		} else if (!uar &&
+			   mapping < 0 &&
+			   uar_mapping == MLX5DV_UAR_ALLOC_TYPE_NC) {
+			/*
+			 * If Verbs/kernel does not support "Non-Cached"
+			 * try the "Write-Combining".
+			 */
+			DRV_LOG(WARNING, "Failed to allocate DevX UAR (NC)");
+			uar_mapping = MLX5DV_UAR_ALLOC_TYPE_BF;
+			uar = mlx5_glue->devx_alloc_uar(ctx, uar_mapping);
 		}
-		end = strpbrk(path[i], ":;");
-		if (!end)
-			end = path[i] + strlen(path[i]);
-		len = end - path[i];
-		ret = 0;
-		do {
-			char name[ret + 1];
-
-			ret = snprintf(name, sizeof(name), "%.*s%s" MLX5_GLUE,
-				       (int)len, path[i],
-				       (!len || *(end - 1) == '/') ? "" : "/");
-			if (ret == -1)
-				break;
-			if (sizeof(name) != (size_t)ret + 1)
-				continue;
-			DRV_LOG(DEBUG, "Looking for rdma-core glue as "
-				"\"%s\"", name);
-			handle = dlopen(name, RTLD_LAZY);
-			break;
-		} while (1);
-		path[i] = end + 1;
-		if (!*end)
-			++i;
-	}
-	if (!handle) {
-		rte_errno = EINVAL;
-		dlmsg = dlerror();
-		if (dlmsg)
-			DRV_LOG(WARNING, "Cannot load glue library: %s", dlmsg);
-		goto glue_error;
-	}
-	sym = dlsym(handle, "mlx5_glue");
-	if (!sym || !*sym) {
-		rte_errno = EINVAL;
-		dlmsg = dlerror();
-		if (dlmsg)
-			DRV_LOG(ERR, "Cannot resolve glue symbol: %s", dlmsg);
-		goto glue_error;
-	}
-	mlx5_glue = *sym;
-#endif /* RTE_IBVERBS_LINK_DLOPEN */
-#ifdef RTE_LIBRTE_MLX5_DEBUG
-	/* Glue structure must not contain any NULL pointers. */
-	{
-		unsigned int i;
-
-		for (i = 0; i != sizeof(*mlx5_glue) / sizeof(void *); ++i)
-			MLX5_ASSERT(((const void *const *)mlx5_glue)[i]);
-	}
 #endif
-	if (strcmp(mlx5_glue->version, MLX5_GLUE_VERSION)) {
-		rte_errno = EINVAL;
-		DRV_LOG(ERR, "rdma-core glue \"%s\" mismatch: \"%s\" is "
-			"required", mlx5_glue->version, MLX5_GLUE_VERSION);
-		goto glue_error;
+		if (!uar) {
+			DRV_LOG(ERR, "Failed to allocate DevX UAR (BF/NC)");
+			rte_errno = ENOMEM;
+			goto exit;
+		}
+		base_addr = mlx5_os_get_devx_uar_base_addr(uar);
+		if (base_addr)
+			break;
+		/*
+		 * The UARs are allocated by rdma_core within the
+		 * IB device context, on context closure all UARs
+		 * will be freed, should be no memory/object leakage.
+		 */
+		DRV_LOG(WARNING, "Retrying to allocate DevX UAR");
+		uar = NULL;
 	}
-	mlx5_glue->fork_init();
-	return;
-glue_error:
-	if (handle)
-		dlclose(handle);
-	DRV_LOG(WARNING, "Cannot initialize MLX5 common due to missing"
-		" run-time dependency on rdma-core libraries (libibverbs,"
-		" libmlx5)");
-	mlx5_glue = NULL;
-	return;
+	/* Check whether we finally succeeded with valid UAR allocation. */
+	if (!uar) {
+		DRV_LOG(ERR, "Failed to allocate DevX UAR (NULL base)");
+		rte_errno = ENOMEM;
+	}
+	/*
+	 * Return void * instead of struct mlx5dv_devx_uar *
+	 * is for compatibility with older rdma-core library headers.
+	 */
+exit:
+	return uar;
 }

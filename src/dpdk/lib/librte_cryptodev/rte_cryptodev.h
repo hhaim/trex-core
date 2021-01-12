@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause
- * Copyright(c) 2015-2017 Intel Corporation.
+ * Copyright(c) 2015-2020 Intel Corporation.
  */
 
 #ifndef _RTE_CRYPTODEV_H_
@@ -23,6 +23,8 @@ extern "C" {
 #include "rte_dev.h"
 #include <rte_common.h>
 #include <rte_config.h>
+
+#include "rte_cryptodev_trace_fp.h"
 
 extern const char **rte_cyptodev_names;
 
@@ -230,7 +232,8 @@ rte_cryptodev_sym_capability_get(uint8_t dev_id,
  *   - Return description of the asymmetric crypto capability if exist.
  *   - Return NULL if the capability not exist.
  */
-const struct rte_cryptodev_asymmetric_xform_capability * __rte_experimental
+__rte_experimental
+const struct rte_cryptodev_asymmetric_xform_capability *
 rte_cryptodev_asym_capability_get(uint8_t dev_id,
 		const struct rte_cryptodev_asym_capability_idx *idx);
 
@@ -299,7 +302,8 @@ rte_cryptodev_sym_capability_check_aead(
  *   - Return 1 if the op type is supported
  *   - Return 0 if unsupported
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_xform_capability_check_optype(
 	const struct rte_cryptodev_asymmetric_xform_capability *capability,
 		enum rte_crypto_asym_op_type op_type);
@@ -314,7 +318,8 @@ rte_cryptodev_asym_xform_capability_check_optype(
  *   - Return 0 if the parameters are in range of the capability.
  *   - Return -1 if the parameters are out of range of the capability.
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_xform_capability_check_modlen(
 	const struct rte_cryptodev_asymmetric_xform_capability *capability,
 		uint16_t modlen);
@@ -375,7 +380,8 @@ rte_cryptodev_get_aead_algo_enum(enum rte_crypto_aead_algorithm *algo_enum,
  * - Return -1 if string is not valid
  * - Return 0 if the string is valid
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_get_xform_enum(enum rte_crypto_asym_xform_type *xform_enum,
 		const char *xform_string);
 
@@ -442,7 +448,18 @@ rte_cryptodev_asym_get_xform_enum(enum rte_crypto_asym_xform_type *xform_enum,
 /**< Support RSA Private Key OP with exponent */
 #define RTE_CRYPTODEV_FF_RSA_PRIV_OP_KEY_QT		(1ULL << 18)
 /**< Support RSA Private Key OP with CRT (quintuple) Keys */
-
+#define RTE_CRYPTODEV_FF_DIGEST_ENCRYPTED		(1ULL << 19)
+/**< Support encrypted-digest operations where digest is appended to data */
+#define RTE_CRYPTODEV_FF_ASYM_SESSIONLESS		(1ULL << 20)
+/**< Support asymmetric session-less operations */
+#define	RTE_CRYPTODEV_FF_SYM_CPU_CRYPTO			(1ULL << 21)
+/**< Support symmetric cpu-crypto processing */
+#define RTE_CRYPTODEV_FF_SYM_SESSIONLESS		(1ULL << 22)
+/**< Support symmetric session-less operations */
+#define RTE_CRYPTODEV_FF_NON_BYTE_ALIGNED_DATA		(1ULL << 23)
+/**< Support operations on data which is not byte aligned */
+#define RTE_CRYPTODEV_FF_SYM_RAW_DP			(1ULL << 24)
+/**< Support accelerator specific symmetric raw data-path APIs */
 
 /**
  * Get the name of a crypto device feature flag
@@ -612,6 +629,13 @@ struct rte_cryptodev_config {
 	int socket_id;			/**< Socket to allocate resources on */
 	uint16_t nb_queue_pairs;
 	/**< Number of queue pairs to configure on device */
+	uint64_t ff_disable;
+	/**< Feature flags to be disabled. Only the following features are
+	 * allowed to be disabled,
+	 *  - RTE_CRYPTODEV_FF_SYMMETRIC_CRYPTO
+	 *  - RTE_CRYPTODEV_FF_ASYMMETRIC_CRYPTO
+	 *  - RTE_CRYTPODEV_FF_SECURITY
+	 */
 };
 
 /**
@@ -694,6 +718,23 @@ rte_cryptodev_close(uint8_t dev_id);
 extern int
 rte_cryptodev_queue_pair_setup(uint8_t dev_id, uint16_t queue_pair_id,
 		const struct rte_cryptodev_qp_conf *qp_conf, int socket_id);
+
+/**
+ * Get the status of queue pairs setup on a specific crypto device
+ *
+ * @param	dev_id		Crypto device identifier.
+ * @param	queue_pair_id	The index of the queue pairs to set up. The
+ *				value must be in the range [0, nb_queue_pair
+ *				- 1] previously supplied to
+ *				rte_cryptodev_configure().
+ * @return
+ *   - 0: qp was not configured
+ *	 - 1: qp was configured
+ *	 - -EINVAL: device was not configured
+ */
+__rte_experimental
+int
+rte_cryptodev_get_qp_status(uint8_t dev_id, uint16_t queue_pair_id);
 
 /**
  * Get the number of queue pairs on a specific crypto device
@@ -907,6 +948,7 @@ rte_cryptodev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
 	nb_ops = (*dev->dequeue_burst)
 			(dev->data->queue_pairs[qp_id], ops, nb_ops);
 
+	rte_cryptodev_trace_dequeue_burst(dev_id, qp_id, (void **)ops, nb_ops);
 	return nb_ops;
 }
 
@@ -947,6 +989,7 @@ rte_cryptodev_enqueue_burst(uint8_t dev_id, uint16_t qp_id,
 {
 	struct rte_cryptodev *dev = &rte_cryptodevs[dev_id];
 
+	rte_cryptodev_trace_enqueue_burst(dev_id, qp_id, (void **)ops, nb_ops);
 	return (*dev->enqueue_burst)(
 			dev->data->queue_pairs[qp_id], ops, nb_ops);
 }
@@ -1002,7 +1045,8 @@ struct rte_cryptodev_asym_session {
  *  - On success return size of the session
  *  - On failure returns 0
  */
-struct rte_mempool * __rte_experimental
+__rte_experimental
+struct rte_mempool *
 rte_cryptodev_sym_session_pool_create(const char *name, uint32_t nb_elts,
 	uint32_t elt_size, uint32_t cache_size, uint16_t priv_size,
 	int socket_id);
@@ -1028,7 +1072,8 @@ rte_cryptodev_sym_session_create(struct rte_mempool *mempool);
  *  - On success return pointer to asym-session
  *  - On failure returns NULL
  */
-struct rte_cryptodev_asym_session * __rte_experimental
+__rte_experimental
+struct rte_cryptodev_asym_session *
 rte_cryptodev_asym_session_create(struct rte_mempool *mempool);
 
 /**
@@ -1058,7 +1103,8 @@ rte_cryptodev_sym_session_free(struct rte_cryptodev_sym_session *sess);
  *  - -EINVAL if session is NULL.
  *  - -EBUSY if not all device private data has been freed.
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_session_free(struct rte_cryptodev_asym_session *sess);
 
 /**
@@ -1098,7 +1144,8 @@ rte_cryptodev_sym_session_init(uint8_t dev_id,
  *  - -ENOTSUP if crypto device does not support the crypto transform.
  *  - -ENOMEM if the private session could not be allocated.
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_session_init(uint8_t dev_id,
 			struct rte_cryptodev_asym_session *sess,
 			struct rte_crypto_asym_xform *xforms,
@@ -1132,7 +1179,8 @@ rte_cryptodev_sym_session_clear(uint8_t dev_id,
  *  - 0 if successful.
  *  - -EINVAL if device is invalid or session is NULL.
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_asym_session_clear(uint8_t dev_id,
 			struct rte_cryptodev_asym_session *sess);
 
@@ -1157,7 +1205,8 @@ rte_cryptodev_sym_get_header_session_size(void);
  *   the private data size defined within sess.
  *   - If sess is NULL, return 0.
  */
-unsigned int __rte_experimental
+__rte_experimental
+unsigned int
 rte_cryptodev_sym_get_existing_header_session_size(
 		struct rte_cryptodev_sym_session *sess);
 
@@ -1167,7 +1216,8 @@ rte_cryptodev_sym_get_existing_header_session_size(
  * @return
  *   Size of the asymmetric header session.
  */
-unsigned int __rte_experimental
+__rte_experimental
+unsigned int
 rte_cryptodev_asym_get_header_session_size(void);
 
 /**
@@ -1194,7 +1244,8 @@ rte_cryptodev_sym_get_private_session_size(uint8_t dev_id);
  *   - Size of the asymmetric private data, if successful
  *   - 0 if device is invalid or does not have private session
  */
-unsigned int __rte_experimental
+__rte_experimental
+unsigned int
 rte_cryptodev_asym_get_private_session_size(uint8_t dev_id);
 
 /**
@@ -1229,7 +1280,8 @@ const char *rte_cryptodev_driver_name_get(uint8_t driver_id);
  *  - On success, zero.
  *  - On failure, a negative value.
  */
-int __rte_experimental
+__rte_experimental
+int
 rte_cryptodev_sym_session_set_user_data(
 					struct rte_cryptodev_sym_session *sess,
 					void *data,
@@ -1245,9 +1297,438 @@ rte_cryptodev_sym_session_set_user_data(
  *  - On success return pointer to user data.
  *  - On failure returns NULL.
  */
-void * __rte_experimental
+__rte_experimental
+void *
 rte_cryptodev_sym_session_get_user_data(
 					struct rte_cryptodev_sym_session *sess);
+
+/**
+ * Perform actual crypto processing (encrypt/digest or auth/decrypt)
+ * on user provided data.
+ *
+ * @param	dev_id	The device identifier.
+ * @param	sess	Cryptodev session structure
+ * @param	ofs	Start and stop offsets for auth and cipher operations
+ * @param	vec	Vectorized operation descriptor
+ *
+ * @return
+ *  - Returns number of successfully processed packets.
+ */
+__rte_experimental
+uint32_t
+rte_cryptodev_sym_cpu_crypto_process(uint8_t dev_id,
+	struct rte_cryptodev_sym_session *sess, union rte_crypto_sym_ofs ofs,
+	struct rte_crypto_sym_vec *vec);
+
+/**
+ * Get the size of the raw data-path context buffer.
+ *
+ * @param	dev_id		The device identifier.
+ *
+ * @return
+ *   - If the device supports raw data-path APIs, return the context size.
+ *   - If the device does not support the APIs, return -1.
+ */
+__rte_experimental
+int
+rte_cryptodev_get_raw_dp_ctx_size(uint8_t dev_id);
+
+/**
+ * Union of different crypto session types, including session-less xform
+ * pointer.
+ */
+union rte_cryptodev_session_ctx {
+	struct rte_cryptodev_sym_session *crypto_sess;
+	struct rte_crypto_sym_xform *xform;
+	struct rte_security_session *sec_sess;
+};
+
+/**
+ * Enqueue a vectorized operation descriptor into the device queue but the
+ * driver may or may not start processing until rte_cryptodev_raw_enqueue_done()
+ * is called.
+ *
+ * @param	qp		Driver specific queue pair data.
+ * @param	drv_ctx		Driver specific context data.
+ * @param	vec		Vectorized operation descriptor.
+ * @param	ofs		Start and stop offsets for auth and cipher
+ *				operations.
+ * @param	user_data	The array of user data for dequeue later.
+ * @param	enqueue_status	Driver written value to specify the
+ *				enqueue status. Possible values:
+ *				- 1: The number of operations returned are
+ *				     enqueued successfully.
+ *				- 0: The number of operations returned are
+ *				     cached into the queue but are not processed
+ *				     until rte_cryptodev_raw_enqueue_done() is
+ *				     called.
+ *				- negative integer: Error occurred.
+ * @return
+ *   - The number of operations in the descriptor successfully enqueued or
+ *     cached into the queue but not enqueued yet, depends on the
+ *     "enqueue_status" value.
+ */
+typedef uint32_t (*cryptodev_sym_raw_enqueue_burst_t)(
+	void *qp, uint8_t *drv_ctx, struct rte_crypto_sym_vec *vec,
+	union rte_crypto_sym_ofs ofs, void *user_data[], int *enqueue_status);
+
+/**
+ * Enqueue single raw data vector into the device queue but the driver may or
+ * may not start processing until rte_cryptodev_raw_enqueue_done() is called.
+ *
+ * @param	qp		Driver specific queue pair data.
+ * @param	drv_ctx		Driver specific context data.
+ * @param	data_vec	The buffer data vector.
+ * @param	n_data_vecs	Number of buffer data vectors.
+ * @param	ofs		Start and stop offsets for auth and cipher
+ *				operations.
+ * @param	iv		IV virtual and IOVA addresses
+ * @param	digest		digest virtual and IOVA addresses
+ * @param	aad_or_auth_iv	AAD or auth IV virtual and IOVA addresses,
+ *				depends on the algorithm used.
+ * @param	user_data	The user data.
+ * @return
+ *   - 1: The data vector is enqueued successfully.
+ *   - 0: The data vector is cached into the queue but is not processed
+ *        until rte_cryptodev_raw_enqueue_done() is called.
+ *   - negative integer: failure.
+ */
+typedef int (*cryptodev_sym_raw_enqueue_t)(
+	void *qp, uint8_t *drv_ctx, struct rte_crypto_vec *data_vec,
+	uint16_t n_data_vecs, union rte_crypto_sym_ofs ofs,
+	struct rte_crypto_va_iova_ptr *iv,
+	struct rte_crypto_va_iova_ptr *digest,
+	struct rte_crypto_va_iova_ptr *aad_or_auth_iv,
+	void *user_data);
+
+/**
+ * Inform the cryptodev queue pair to start processing or finish dequeuing all
+ * enqueued/dequeued operations.
+ *
+ * @param	qp		Driver specific queue pair data.
+ * @param	drv_ctx		Driver specific context data.
+ * @param	n		The total number of processed operations.
+ * @return
+ *   - On success return 0.
+ *   - On failure return negative integer.
+ */
+typedef int (*cryptodev_sym_raw_operation_done_t)(void *qp, uint8_t *drv_ctx,
+	uint32_t n);
+
+/**
+ * Typedef that the user provided for the driver to get the dequeue count.
+ * The function may return a fixed number or the number parsed from the user
+ * data stored in the first processed operation.
+ *
+ * @param	user_data	Dequeued user data.
+ * @return
+ *  - The number of operations to be dequeued.
+ **/
+typedef uint32_t (*rte_cryptodev_raw_get_dequeue_count_t)(void *user_data);
+
+/**
+ * Typedef that the user provided to deal with post dequeue operation, such
+ * as filling status.
+ *
+ * @param	user_data	Dequeued user data.
+ * @param	index		Index number of the processed descriptor.
+ * @param	is_op_success	Operation status provided by the driver.
+ **/
+typedef void (*rte_cryptodev_raw_post_dequeue_t)(void *user_data,
+	uint32_t index, uint8_t is_op_success);
+
+/**
+ * Dequeue a burst of symmetric crypto processing.
+ *
+ * @param	qp			Driver specific queue pair data.
+ * @param	drv_ctx			Driver specific context data.
+ * @param	get_dequeue_count	User provided callback function to
+ *					obtain dequeue operation count.
+ * @param	post_dequeue		User provided callback function to
+ *					post-process a dequeued operation.
+ * @param	out_user_data		User data pointer array to be retrieve
+ *					from device queue. In case of
+ *					*is_user_data_array* is set there
+ *					should be enough room to store all
+ *					user data.
+ * @param	is_user_data_array	Set 1 if every dequeued user data will
+ *					be written into out_user_data array.
+ *					Set 0 if only the first user data will
+ *					be written into out_user_data array.
+ * @param	n_success		Driver written value to specific the
+ *					total successful operations count.
+ * @param	dequeue_status		Driver written value to specify the
+ *					dequeue status. Possible values:
+ *					- 1: Successfully dequeued the number
+ *					     of operations returned. The user
+ *					     data previously set during enqueue
+ *					     is stored in the "out_user_data".
+ *					- 0: The number of operations returned
+ *					     are completed and the user data is
+ *					     stored in the "out_user_data", but
+ *					     they are not freed from the queue
+ *					     until
+ *					     rte_cryptodev_raw_dequeue_done()
+ *					     is called.
+ *					- negative integer: Error occurred.
+ * @return
+ *   - The number of operations dequeued or completed but not freed from the
+ *     queue, depends on "dequeue_status" value.
+ */
+typedef uint32_t (*cryptodev_sym_raw_dequeue_burst_t)(void *qp,
+	uint8_t *drv_ctx,
+	rte_cryptodev_raw_get_dequeue_count_t get_dequeue_count,
+	rte_cryptodev_raw_post_dequeue_t post_dequeue,
+	void **out_user_data, uint8_t is_user_data_array,
+	uint32_t *n_success, int *dequeue_status);
+
+/**
+ * Dequeue a symmetric crypto processing.
+ *
+ * @param	qp			Driver specific queue pair data.
+ * @param	drv_ctx			Driver specific context data.
+ * @param	dequeue_status		Driver written value to specify the
+ *					dequeue status. Possible values:
+ *					- 1: Successfully dequeued a operation.
+ *					     The user data is returned.
+ *					- 0: The first operation in the queue
+ *					     is completed and the user data
+ *					     previously set during enqueue is
+ *					     returned, but it is not freed from
+ *					     the queue until
+ *					     rte_cryptodev_raw_dequeue_done() is
+ *					     called.
+ *					- negative integer: Error occurred.
+ * @param	op_status		Driver written value to specify
+ *					operation status.
+ * @return
+ *   - The user data pointer retrieved from device queue or NULL if no
+ *     operation is ready for dequeue.
+ */
+typedef void * (*cryptodev_sym_raw_dequeue_t)(
+		void *qp, uint8_t *drv_ctx, int *dequeue_status,
+		enum rte_crypto_op_status *op_status);
+
+/**
+ * Context data for raw data-path API crypto process. The buffer of this
+ * structure is to be allocated by the user application with the size equal
+ * or bigger than rte_cryptodev_get_raw_dp_ctx_size() returned value.
+ */
+struct rte_crypto_raw_dp_ctx {
+	void *qp_data;
+
+	cryptodev_sym_raw_enqueue_t enqueue;
+	cryptodev_sym_raw_enqueue_burst_t enqueue_burst;
+	cryptodev_sym_raw_operation_done_t enqueue_done;
+	cryptodev_sym_raw_dequeue_t dequeue;
+	cryptodev_sym_raw_dequeue_burst_t dequeue_burst;
+	cryptodev_sym_raw_operation_done_t dequeue_done;
+
+	/* Driver specific context data */
+	__extension__ uint8_t drv_ctx_data[];
+};
+
+/**
+ * Configure raw data-path context data.
+ *
+ * NOTE:
+ * After the context data is configured, the user should call
+ * rte_cryptodev_raw_attach_session() before using it in
+ * rte_cryptodev_raw_enqueue/dequeue function call.
+ *
+ * @param	dev_id		The device identifier.
+ * @param	qp_id		The index of the queue pair from which to
+ *				retrieve processed packets. The value must be
+ *				in the range [0, nb_queue_pair - 1] previously
+ *				supplied to rte_cryptodev_configure().
+ * @param	ctx		The raw data-path context data.
+ * @param	sess_type	session type.
+ * @param	session_ctx	Session context data.
+ * @param	is_update	Set 0 if it is to initialize the ctx.
+ *				Set 1 if ctx is initialized and only to update
+ *				session context data.
+ * @return
+ *   - On success return 0.
+ *   - On failure return negative integer.
+ */
+__rte_experimental
+int
+rte_cryptodev_configure_raw_dp_ctx(uint8_t dev_id, uint16_t qp_id,
+	struct rte_crypto_raw_dp_ctx *ctx,
+	enum rte_crypto_op_sess_type sess_type,
+	union rte_cryptodev_session_ctx session_ctx,
+	uint8_t is_update);
+
+/**
+ * Enqueue a vectorized operation descriptor into the device queue but the
+ * driver may or may not start processing until rte_cryptodev_raw_enqueue_done()
+ * is called.
+ *
+ * @param	ctx		The initialized raw data-path context data.
+ * @param	vec		Vectorized operation descriptor.
+ * @param	ofs		Start and stop offsets for auth and cipher
+ *				operations.
+ * @param	user_data	The array of user data for dequeue later.
+ * @param	enqueue_status	Driver written value to specify the
+ *				enqueue status. Possible values:
+ *				- 1: The number of operations returned are
+ *				     enqueued successfully.
+ *				- 0: The number of operations returned are
+ *				     cached into the queue but are not processed
+ *				     until rte_cryptodev_raw_enqueue_done() is
+ *				     called.
+ *				- negative integer: Error occurred.
+ * @return
+ *   - The number of operations in the descriptor successfully enqueued or
+ *     cached into the queue but not enqueued yet, depends on the
+ *     "enqueue_status" value.
+ */
+__rte_experimental
+uint32_t
+rte_cryptodev_raw_enqueue_burst(struct rte_crypto_raw_dp_ctx *ctx,
+	struct rte_crypto_sym_vec *vec, union rte_crypto_sym_ofs ofs,
+	void **user_data, int *enqueue_status);
+
+/**
+ * Enqueue single raw data vector into the device queue but the driver may or
+ * may not start processing until rte_cryptodev_raw_enqueue_done() is called.
+ *
+ * @param	ctx		The initialized raw data-path context data.
+ * @param	data_vec	The buffer data vector.
+ * @param	n_data_vecs	Number of buffer data vectors.
+ * @param	ofs		Start and stop offsets for auth and cipher
+ *				operations.
+ * @param	iv		IV virtual and IOVA addresses
+ * @param	digest		digest virtual and IOVA addresses
+ * @param	aad_or_auth_iv	AAD or auth IV virtual and IOVA addresses,
+ *				depends on the algorithm used.
+ * @param	user_data	The user data.
+ * @return
+ *   - 1: The data vector is enqueued successfully.
+ *   - 0: The data vector is cached into the queue but is not processed
+ *        until rte_cryptodev_raw_enqueue_done() is called.
+ *   - negative integer: failure.
+ */
+__rte_experimental
+static __rte_always_inline int
+rte_cryptodev_raw_enqueue(struct rte_crypto_raw_dp_ctx *ctx,
+	struct rte_crypto_vec *data_vec, uint16_t n_data_vecs,
+	union rte_crypto_sym_ofs ofs,
+	struct rte_crypto_va_iova_ptr *iv,
+	struct rte_crypto_va_iova_ptr *digest,
+	struct rte_crypto_va_iova_ptr *aad_or_auth_iv,
+	void *user_data)
+{
+	return (*ctx->enqueue)(ctx->qp_data, ctx->drv_ctx_data, data_vec,
+		n_data_vecs, ofs, iv, digest, aad_or_auth_iv, user_data);
+}
+
+/**
+ * Start processing all enqueued operations from last
+ * rte_cryptodev_configure_raw_dp_ctx() call.
+ *
+ * @param	ctx	The initialized raw data-path context data.
+ * @param	n	The number of operations cached.
+ * @return
+ *   - On success return 0.
+ *   - On failure return negative integer.
+ */
+__rte_experimental
+int
+rte_cryptodev_raw_enqueue_done(struct rte_crypto_raw_dp_ctx *ctx,
+		uint32_t n);
+
+/**
+ * Dequeue a burst of symmetric crypto processing.
+ *
+ * @param	ctx			The initialized raw data-path context
+ *					data.
+ * @param	get_dequeue_count	User provided callback function to
+ *					obtain dequeue operation count.
+ * @param	post_dequeue		User provided callback function to
+ *					post-process a dequeued operation.
+ * @param	out_user_data		User data pointer array to be retrieve
+ *					from device queue. In case of
+ *					*is_user_data_array* is set there
+ *					should be enough room to store all
+ *					user data.
+ * @param	is_user_data_array	Set 1 if every dequeued user data will
+ *					be written into out_user_data array.
+ *					Set 0 if only the first user data will
+ *					be written into out_user_data array.
+ * @param	n_success		Driver written value to specific the
+ *					total successful operations count.
+ * @param	dequeue_status		Driver written value to specify the
+ *					dequeue status. Possible values:
+ *					- 1: Successfully dequeued the number
+ *					     of operations returned. The user
+ *					     data previously set during enqueue
+ *					     is stored in the "out_user_data".
+ *					- 0: The number of operations returned
+ *					     are completed and the user data is
+ *					     stored in the "out_user_data", but
+ *					     they are not freed from the queue
+ *					     until
+ *					     rte_cryptodev_raw_dequeue_done()
+ *					     is called.
+ *					- negative integer: Error occurred.
+ * @return
+ *   - The number of operations dequeued or completed but not freed from the
+ *     queue, depends on "dequeue_status" value.
+ */
+__rte_experimental
+uint32_t
+rte_cryptodev_raw_dequeue_burst(struct rte_crypto_raw_dp_ctx *ctx,
+	rte_cryptodev_raw_get_dequeue_count_t get_dequeue_count,
+	rte_cryptodev_raw_post_dequeue_t post_dequeue,
+	void **out_user_data, uint8_t is_user_data_array,
+	uint32_t *n_success, int *dequeue_status);
+
+/**
+ * Dequeue a symmetric crypto processing.
+ *
+ * @param	ctx			The initialized raw data-path context
+ *					data.
+ * @param	dequeue_status		Driver written value to specify the
+ *					dequeue status. Possible values:
+ *					- 1: Successfully dequeued a operation.
+ *					     The user data is returned.
+ *					- 0: The first operation in the queue
+ *					     is completed and the user data
+ *					     previously set during enqueue is
+ *					     returned, but it is not freed from
+ *					     the queue until
+ *					     rte_cryptodev_raw_dequeue_done() is
+ *					     called.
+ *					- negative integer: Error occurred.
+ * @param	op_status		Driver written value to specify
+ *					operation status.
+ * @return
+ *   - The user data pointer retrieved from device queue or NULL if no
+ *     operation is ready for dequeue.
+ */
+__rte_experimental
+static __rte_always_inline void *
+rte_cryptodev_raw_dequeue(struct rte_crypto_raw_dp_ctx *ctx,
+		int *dequeue_status, enum rte_crypto_op_status *op_status)
+{
+	return (*ctx->dequeue)(ctx->qp_data, ctx->drv_ctx_data, dequeue_status,
+			op_status);
+}
+
+/**
+ * Inform the queue pair dequeue operations is finished.
+ *
+ * @param	ctx	The initialized raw data-path context data.
+ * @param	n	The number of operations.
+ * @return
+ *   - On success return 0.
+ *   - On failure return negative integer.
+ */
+__rte_experimental
+int
+rte_cryptodev_raw_dequeue_done(struct rte_crypto_raw_dp_ctx *ctx,
+		uint32_t n);
 
 #ifdef __cplusplus
 }

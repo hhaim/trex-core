@@ -5450,20 +5450,24 @@ COLD_FUNC void CPhyEthIF::conf_multi_rx() {
 
 COLD_FUNC void CPhyEthIF::conf_hardware_astf_rss() {
 
-    const struct rte_eth_dev_info *dev_info = m_port_attr->get_dev_info();
+    
+    //const struct rte_eth_dev_info *dev_info = m_port_attr->get_dev_info();
 
-    uint8_t hash_key_size;
+    //uint8_t hash_key_size;
     #ifdef RSS_DEBUG
     printf("reta_size : %d \n", dev_info->reta_size);
     printf("hash_key  : %d \n", dev_info->hash_key_size);
     #endif
 
-    if ( dev_info->hash_key_size==0 ) {
+    #if 0
+    (if ( dev_info->hash_key_size==0 ) {
         hash_key_size = 40; /* for mlx5 */
     } else {
         hash_key_size = dev_info->hash_key_size;
     }
-
+    return 0
+    #endif
+#if 0
     if (!rte_eth_dev_filter_supported(m_repid, RTE_ETH_FILTER_HASH)) {
         // Setup HW to use the TOEPLITZ hash function as an RSS hash function
         struct rte_eth_hash_filter_info info = {};
@@ -5499,6 +5503,7 @@ COLD_FUNC void CPhyEthIF::conf_hardware_astf_rss() {
         lp_rss->rss_key =  (uint8_t*)&server_rss_key[0];
     }
     lp_rss->rss_key_len = hash_key_size;
+#endif
     
 }
 
@@ -6150,14 +6155,14 @@ COLD_FUNC int  update_dpdk_args(void){
     SET_ARGS((char *)"xx");
     CPreviewMode *lpp=&lpop->preview;
 
-    if ( lpp->get_bnxt_so_mode() ){
+    /*if ( lpp->get_bnxt_so_mode() ){
         std::string &bnxt_so_str = get_bnxt_so_string();
         bnxt_so_str = "libbnxt-64" + std::string(g_image_postfix) + ".so";
         SET_ARGS("-d");
         SET_ARGS(bnxt_so_str.c_str());
-    }
+    }*/
 
-    if ( lpp->get_ntacc_so_mode() ){
+    /*if ( lpp->get_ntacc_so_mode() ){
         std::string &ntacc_so_str = get_ntacc_so_string();
         ntacc_so_str = "libntacc-64" + std::string(g_image_postfix) + ".so";
         SET_ARGS("-d");
@@ -6176,7 +6181,7 @@ COLD_FUNC int  update_dpdk_args(void){
         mlx4_so_str = "libmlx4-64" + std::string(g_image_postfix) + ".so";
         SET_ARGS("-d");
         SET_ARGS(mlx4_so_str.c_str());
-    }
+    }*/
 
     if ( lpop->m_is_lowend ) { // assign all threads to core 0
         g_cores_str[0] = '(';
@@ -6605,8 +6610,8 @@ COLD_FUNC int main_test(int argc , char * argv[]){
     }
 
     if ( CGlobalInfo::m_options.preview.getOnlyLatency() ){
-        rte_eal_mp_remote_launch(latency_one_lcore, NULL, CALL_MASTER);
-        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+        rte_eal_mp_remote_launch(latency_one_lcore, NULL, CALL_MAIN);
+        RTE_LCORE_FOREACH_WORKER(lcore_id) {
             if (rte_eal_wait_lcore(lcore_id) < 0)
                 return -1;
         }
@@ -6621,8 +6626,8 @@ COLD_FUNC int main_test(int argc , char * argv[]){
         return (0);
     }
 
-    rte_eal_mp_remote_launch(slave_one_lcore, NULL, CALL_MASTER);
-    RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+    rte_eal_mp_remote_launch(slave_one_lcore, NULL, CALL_MAIN);
+    RTE_LCORE_FOREACH_WORKER(lcore_id) {
         if (rte_eal_wait_lcore(lcore_id) < 0)
             return -1;
     }
@@ -6951,9 +6956,10 @@ COLD_FUNC int TrexDpdkPlatformApi::add_rx_flow_stat_rule(uint8_t port_id, uint16
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
         return 0;
     }
-    CPhyEthIF * lp=g_trex.m_ports[port_id];
+    //CPhyEthIF * lp=g_trex.m_ports[port_id];
 
-    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_ADD, l3_type, l4_proto, ipv6_next_h, id);
+    //return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_ADD, l3_type, l4_proto, ipv6_next_h, id);
+    return 0;
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16_t l3_type, uint8_t l4_proto
@@ -6962,10 +6968,10 @@ COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16
         return 0;
     }
 
-    CPhyEthIF * lp=g_trex.m_ports[port_id];
+    //CPhyEthIF * lp=g_trex.m_ports[port_id];
 
-
-    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_DELETE, l3_type, l4_proto, ipv6_next_h, id);
+    //return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_DELETE, l3_type, l4_proto, ipv6_next_h, id);
+    return 0;
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::get_active_pgids(flow_stat_active_t_new &result) const {

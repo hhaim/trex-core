@@ -77,10 +77,11 @@ int CTRexExtendedDriverIce::get_rx_stats(CPhyEthIF * _if, uint32_t *pkts, uint32
 
 int CTRexExtendedDriverIce::dump_fdir_global_stats(CPhyEthIF * _if, FILE *fd)
 {
-    repid_t repid=_if->get_repid();
-    struct rte_eth_fdir_stats stat;
-    int ret;
+    //repid_t repid=_if->get_repid();
+    //struct rte_eth_fdir_stats stat;
+    //int ret;
 
+#if 0
     ret = rte_eth_dev_filter_ctrl(repid, RTE_ETH_FILTER_FDIR, RTE_ETH_FILTER_STATS, (void*)&stat);
     if (ret == 0) {
         if (fd)
@@ -91,6 +92,9 @@ int CTRexExtendedDriverIce::dump_fdir_global_stats(CPhyEthIF * _if, FILE *fd)
             fprintf(fd, "Failed reading fdir statistics\n");
         return -1;
     }
+#endif
+    return 0;
+
 }
 
 bool CTRexExtendedDriverIce::get_extended_stats(CPhyEthIF * _if, CPhyEthIFStats *stats) {
