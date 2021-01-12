@@ -298,11 +298,11 @@ ice_program_hw_rx_queue(struct ice_rx_queue *rxq)
 	PMD_DRV_LOG(DEBUG, "Port (%u) - Rx queue (%u) is set with RXDID : %u",
 		    rxq->port_id, rxq->queue_id, rxdid);
 
-	if (!(pf->supported_rxdid & BIT(rxdid))) {
-		PMD_DRV_LOG(ERR, "currently package doesn't support RXDID (%u)",
-			    rxdid);
+	/*if (!(pf->supported_rxdid & BIT(rxdid))) {
+		PMD_DRV_LOG(ERR, "currently package doesn't support RXDID (%u) (%u)",
+			    rxdid,pf->supported_rxdid);
 		return -EINVAL;
-	}
+	}*/
 
 	ice_select_rxd_to_pkt_fields_handler(rxq, rxdid);
 
