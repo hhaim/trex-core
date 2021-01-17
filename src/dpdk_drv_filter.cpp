@@ -36,8 +36,8 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 	struct rte_flow_action_queue queue = { .index = rx_q };
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
-	struct rte_flow_item_vlan vlan_spec;
-	struct rte_flow_item_vlan vlan_mask;
+	//struct rte_flow_item_vlan vlan_spec;
+	//struct rte_flow_item_vlan vlan_mask;
 	struct rte_flow_item_ipv4 ipv4_spec;
 	struct rte_flow_item_ipv4 ipv4_mask;
 
@@ -85,6 +85,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 	 * since in this example we just want to get the
 	 * ipv4 we also set this level to allow all.
 	 */
+#if 0
 	memset(&vlan_spec, 0, sizeof(struct rte_flow_item_vlan));
 	memset(&vlan_mask, 0, sizeof(struct rte_flow_item_vlan));
 	pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_VLAN;
@@ -92,6 +93,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 	pattern[pattern_index].mask = &vlan_mask;
 
     pattern_index++;
+#endif
 
     if (ipv6){
         memset(&ipv6_spec, 0, sizeof(struct rte_flow_item_ipv6));
@@ -136,6 +138,9 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	struct rte_flow *flow = NULL;
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_item_ipv4 ipv4_spec;
+	struct rte_flow_item_ipv4 ipv4_mask;
+
 
 	int res;
 
@@ -167,12 +172,26 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
 	eth_spec.type = 0;
 	eth_mask.type = 0;
+	//eth_spec.type = RTE_BE16(0x0000);
+	//eth_mask.type = RTE_BE16(0x4000);
+
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;
 
 	/* the final level must be always type end */
-	pattern[1].type = RTE_FLOW_ITEM_TYPE_END;
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
+    memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
+    memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
+
+    ipv4_spec.hdr.type_of_service = ~0x1;
+    ipv4_mask.hdr.type_of_service = ~0x1;
+
+    pattern[1].spec = &ipv4_spec;
+    pattern[1].mask = &ipv4_mask;
+
+	/* the final level must be always type end */
+	pattern[2].type = RTE_FLOW_ITEM_TYPE_END;
 
 	res = rte_flow_validate(port_id, &attr, pattern, action, error);
 	if (!res)
@@ -191,6 +210,7 @@ static struct rte_flow * filter_pass_all_to_rx(uint8_t port_id,
     struct rte_flow_action_queue queue = { .index = rx_q };
 	struct rte_flow_item_eth eth_spec;
 	struct rte_flow_item_eth eth_mask;
+
 
 	int res;
 
@@ -211,7 +231,8 @@ static struct rte_flow * filter_pass_all_to_rx(uint8_t port_id,
 
     action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
     action[0].conf = &queue;
-    action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+
 
 	/*
 	 * set the first level of the pattern (eth).
@@ -220,8 +241,9 @@ static struct rte_flow * filter_pass_all_to_rx(uint8_t port_id,
 	 */
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
-	eth_spec.type = 0;
-	eth_mask.type = 0;
+	eth_spec.type = RTE_BE16(0x0000);
+	eth_mask.type = RTE_BE16(0x4000);
+
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;
