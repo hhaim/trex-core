@@ -21,15 +21,15 @@
 
 #include "trex_driver_base.h"
 #include "trex_driver_defines.h"
-#include "trex_driver_bnxt.h"
-#include "trex_driver_i40e.h"
-#include "trex_driver_igb.h"
-#include "trex_driver_ixgbe.h"
-#include "trex_driver_mlx5.h"
+//#include "trex_driver_bnxt.h"
+//#include "trex_driver_i40e.h"
+//#include "trex_driver_igb.h"
+//#include "trex_driver_ixgbe.h"
+//#include "trex_driver_mlx5.h"
 #include "trex_driver_ice.h"
-#include "trex_driver_ntacc.h"
-#include "trex_driver_vic.h"
-#include "trex_driver_virtual.h"
+//#include "trex_driver_ntacc.h"
+//#include "trex_driver_vic.h"
+//#include "trex_driver_virtual.h"
 
 
 
@@ -135,31 +135,31 @@ CTRexExtendedDriverBase* CTRexExtendedDriverDb::get_drv() {
 }
 
 CTRexExtendedDriverDb::CTRexExtendedDriverDb() {
-    register_driver(std::string("net_bnxt"),CTRexExtendedDriverBnxt::create);
-    register_driver(std::string("net_ixgbe"),CTRexExtendedDriverBase10G::create);
-    register_driver(std::string("net_e1000_igb"),CTRexExtendedDriverBase1G::create);
-    register_driver(std::string("net_i40e"),CTRexExtendedDriverBase40G::create);
-    register_driver(std::string("net_enic"),CTRexExtendedDriverBaseVIC::create);
-    register_driver(std::string("net_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
+    //register_driver(std::string("net_bnxt"),CTRexExtendedDriverBnxt::create);
+    //register_driver(std::string("net_ixgbe"),CTRexExtendedDriverBase10G::create);
+    //register_driver(std::string("net_e1000_igb"),CTRexExtendedDriverBase1G::create);
+    //register_driver(std::string("net_i40e"),CTRexExtendedDriverBase40G::create);
+    //register_driver(std::string("net_enic"),CTRexExtendedDriverBaseVIC::create);
+    //register_driver(std::string("net_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
     register_driver(std::string("net_ice"),CTRexExtendedDriverIce::create);
-    register_driver(std::string("net_mlx4"),CTRexExtendedDriverMlnx4::create);
-    register_driver(std::string("net_ntacc"), CTRexExtendedDriverBaseNtAcc::create);
+   // register_driver(std::string("net_mlx4"),CTRexExtendedDriverMlnx4::create);
+    //register_driver(std::string("net_ntacc"), CTRexExtendedDriverBaseNtAcc::create);
 
 
     /* virtual devices */
-    register_driver(std::string("net_e1000_em"), CTRexExtendedDriverBaseE1000::create);
-    register_driver(std::string("net_vmxnet3"), CTRexExtendedDriverVmxnet3::create);
-    register_driver(std::string("net_virtio"), CTRexExtendedDriverVirtio::create);
-    register_driver(std::string("net_ena"),CTRexExtendedDriverVirtio::create);
-    register_driver(std::string("net_i40e_vf"), CTRexExtendedDriverI40evf::create);
-    register_driver(std::string("net_ixgbe_vf"), CTRexExtendedDriverIxgbevf::create);
+    //register_driver(std::string("net_e1000_em"), CTRexExtendedDriverBaseE1000::create);
+    //register_driver(std::string("net_vmxnet3"), CTRexExtendedDriverVmxnet3::create);
+    //register_driver(std::string("net_virtio"), CTRexExtendedDriverVirtio::create);
+    //register_driver(std::string("net_ena"),CTRexExtendedDriverVirtio::create);
+    //register_driver(std::string("net_i40e_vf"), CTRexExtendedDriverI40evf::create);
+    //register_driver(std::string("net_ixgbe_vf"), CTRexExtendedDriverIxgbevf::create);
 
     /* raw socket */
-    register_driver(std::string("net_af_packet"), CTRexExtendedDriverAfPacket::create);
-    register_driver(std::string("net_memif"),CTRexExtendedDriverMemif::create);
-    register_driver(std::string("net_tap"),
-                    CTRexExtendedDriverAfPacket::create);
-    register_driver(std::string("net_failsafe"),CTRexExtendedDriverAzure::create);
+    //register_driver(std::string("net_af_packet"), CTRexExtendedDriverAfPacket::create);
+    //register_driver(std::string("net_memif"),CTRexExtendedDriverMemif::create);
+    //register_driver(std::string("net_tap"),
+    //                CTRexExtendedDriverAfPacket::create);
+    //register_driver(std::string("net_failsafe"),CTRexExtendedDriverAzure::create);
 
     m_driver_was_set=false;
     m_dummy_selector_created=false;
@@ -270,13 +270,13 @@ int CTRexExtendedDriverDummySelector::configure_rx_filter_rules(CPhyEthIF *_if) 
     }
 }
 
-int CTRexExtendedDriverDummySelector::add_del_rx_flow_stat_rule(CPhyEthIF *_if, enum rte_filter_op op, uint16_t l3, uint8_t l4, uint8_t ipv6_next_h, uint16_t id) {
+/*int CTRexExtendedDriverDummySelector::add_del_rx_flow_stat_rule(CPhyEthIF *_if, enum rte_filter_op op, uint16_t l3, uint8_t l4, uint8_t ipv6_next_h, uint16_t id) {
     if ( _if->is_dummy() ) {
         return 0;
     } else {
         return m_real_drv->add_del_rx_flow_stat_rule(_if, op, l3, l4, ipv6_next_h, id);
     }
-}
+}*/
 
 int CTRexExtendedDriverDummySelector::stop_queue(CPhyEthIF * _if, uint16_t q_num) {
     if ( _if->is_dummy() ) {

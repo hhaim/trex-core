@@ -5464,17 +5464,6 @@ COLD_FUNC void CPhyEthIF::conf_hardware_astf_rss() {
         hash_key_size = dev_info->hash_key_size;
     }
 
-    if (!rte_eth_dev_filter_supported(m_repid, RTE_ETH_FILTER_HASH)) {
-        // Setup HW to use the TOEPLITZ hash function as an RSS hash function
-        struct rte_eth_hash_filter_info info = {};
-        info.info_type = RTE_ETH_HASH_FILTER_GLOBAL_CONFIG;
-        info.info.global_conf.hash_func = RTE_ETH_HASH_FUNCTION_TOEPLITZ;
-        if (rte_eth_dev_filter_ctrl(m_repid, RTE_ETH_FILTER_HASH,
-                                    RTE_ETH_FILTER_SET, &info) < 0) {
-            printf(" ERROR cannot set hash function on a port %d \n",m_repid);
-            exit(1);
-        }
-    }
     /* set reta_mask, for now it is ok to set one value to all ports */
     uint8_t reta_mask=(uint8_t)(min(dev_info->reta_size,(uint16_t)256)-1);
     if (CGlobalInfo::m_options.m_reta_mask==0){
@@ -6150,6 +6139,7 @@ COLD_FUNC int  update_dpdk_args(void){
     SET_ARGS((char *)"xx");
     CPreviewMode *lpp=&lpop->preview;
 
+#if 0
     if ( lpp->get_bnxt_so_mode() ){
         std::string &bnxt_so_str = get_bnxt_so_string();
         bnxt_so_str = "libbnxt-64" + std::string(g_image_postfix) + ".so";
@@ -6177,6 +6167,7 @@ COLD_FUNC int  update_dpdk_args(void){
         SET_ARGS("-d");
         SET_ARGS(mlx4_so_str.c_str());
     }
+#endif    
 
     if ( lpop->m_is_lowend ) { // assign all threads to core 0
         g_cores_str[0] = '(';
@@ -6605,8 +6596,8 @@ COLD_FUNC int main_test(int argc , char * argv[]){
     }
 
     if ( CGlobalInfo::m_options.preview.getOnlyLatency() ){
-        rte_eal_mp_remote_launch(latency_one_lcore, NULL, CALL_MASTER);
-        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+        rte_eal_mp_remote_launch(latency_one_lcore, NULL, CALL_MAIN);
+        RTE_LCORE_FOREACH_WORKER(lcore_id) {
             if (rte_eal_wait_lcore(lcore_id) < 0)
                 return -1;
         }
@@ -6621,8 +6612,8 @@ COLD_FUNC int main_test(int argc , char * argv[]){
         return (0);
     }
 
-    rte_eal_mp_remote_launch(slave_one_lcore, NULL, CALL_MASTER);
-    RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+    rte_eal_mp_remote_launch(slave_one_lcore, NULL, CALL_MAIN);
+    RTE_LCORE_FOREACH_WORKER(lcore_id) {
         if (rte_eal_wait_lcore(lcore_id) < 0)
             return -1;
     }
@@ -6951,9 +6942,13 @@ COLD_FUNC int TrexDpdkPlatformApi::add_rx_flow_stat_rule(uint8_t port_id, uint16
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
         return 0;
     }
+    #ifdef FIX_DPDK_RULE
     CPhyEthIF * lp=g_trex.m_ports[port_id];
 
     return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_ADD, l3_type, l4_proto, ipv6_next_h, id);
+    #else 
+    return 0;
+    #endif 
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16_t l3_type, uint8_t l4_proto
@@ -6961,11 +6956,15 @@ COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
         return 0;
     }
+    #ifdef FIX_DPDK_RULE
 
     CPhyEthIF * lp=g_trex.m_ports[port_id];
 
 
     return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_DELETE, l3_type, l4_proto, ipv6_next_h, id);
+    #else 
+    return 0; 
+    #endif  
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::get_active_pgids(flow_stat_active_t_new &result) const {

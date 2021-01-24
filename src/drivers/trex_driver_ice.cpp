@@ -77,20 +77,7 @@ int CTRexExtendedDriverIce::get_rx_stats(CPhyEthIF * _if, uint32_t *pkts, uint32
 
 int CTRexExtendedDriverIce::dump_fdir_global_stats(CPhyEthIF * _if, FILE *fd)
 {
-    repid_t repid=_if->get_repid();
-    struct rte_eth_fdir_stats stat;
-    int ret;
-
-    ret = rte_eth_dev_filter_ctrl(repid, RTE_ETH_FILTER_FDIR, RTE_ETH_FILTER_STATS, (void*)&stat);
-    if (ret == 0) {
-        if (fd)
-            fprintf(fd, "Num filters on guarant poll:%d, best effort poll:%d\n", stat.guarant_cnt, stat.best_cnt);
-        return (stat.guarant_cnt + stat.best_cnt);
-    } else {
-        if (fd)
-            fprintf(fd, "Failed reading fdir statistics\n");
-        return -1;
-    }
+    return 0;
 }
 
 bool CTRexExtendedDriverIce::get_extended_stats(CPhyEthIF * _if, CPhyEthIFStats *stats) {
