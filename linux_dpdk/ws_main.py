@@ -979,7 +979,7 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                 'drivers/net/ice/ice_switch_filter.c',
                 'drivers/net/ice/ice_fdir_filter.c',
                 'drivers/net/ice/ice_hash.c',
-                'drivers/net/ice/ice_rxtx_vec_avx2.c',
+                #'drivers/net/ice/ice_rxtx_vec_avx2.c',
                 #'drivers/net/ice/ice_rxtx_vec_avx512.c',
                 'drivers/net/ice/ice_generic_flow.c',
 

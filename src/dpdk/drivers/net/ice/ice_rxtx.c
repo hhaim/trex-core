@@ -4095,3 +4095,29 @@ ice_fdir_programming(struct ice_pf *pf, struct ice_fltr_desc *fdir_desc)
 
 
 }
+
+#ifndef CC_AVX2_SUPPORT
+uint16_t
+ice_recv_pkts_vec_avx2(void __rte_unused *rx_queue,
+			struct rte_mbuf __rte_unused **rx_pkts,
+			uint16_t __rte_unused nb_pkts)
+{
+	return ice_recv_pkts_vec(rx_queue,rx_pkts,nb_pkts);
+}
+
+uint16_t
+ice_recv_scattered_pkts_vec_avx2(void __rte_unused *rx_queue,
+			struct rte_mbuf __rte_unused **rx_pkts,
+			uint16_t __rte_unused nb_pkts)
+{
+	return ice_recv_scattered_pkts_vec(rx_queue,rx_pkts,nb_pkts);
+}
+
+uint16_t
+ice_xmit_pkts_vec_avx2(void __rte_unused * tx_queue,
+			  struct rte_mbuf __rte_unused **tx_pkts,
+			  uint16_t __rte_unused nb_pkts)
+{
+	return ice_xmit_pkts_vec(tx_queue,tx_pkts,nb_pkts);
+}
+#endif /* ifndef CC_AVX2_SUPPORT */

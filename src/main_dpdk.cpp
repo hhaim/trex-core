@@ -6199,7 +6199,7 @@ COLD_FUNC int  update_dpdk_args(void){
         SET_ARGS(g_loglevel_str);
     }
 
-    SET_ARGS("--master-lcore");
+    SET_ARGS("--main-lcore");
 
     snprintf(g_master_id_str, sizeof(g_master_id_str), "%u", lpsock->get_master_phy_id());
     SET_ARGS(g_master_id_str);
@@ -6229,7 +6229,7 @@ COLD_FUNC int  update_dpdk_args(void){
 
         for (int i=0; i<(int)dif.size(); i++) {
             if ( dif[i] != "dummy" ) {
-                SET_ARGS("-w");
+                SET_ARGS("-a");
                 /* dpdk devargs */
                 for (std::string &opts : cg->m_dpdk_devargs) {
                     dif[i] += "," + opts;
