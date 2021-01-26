@@ -29,6 +29,7 @@ CTRexExtendedDriverIce::CTRexExtendedDriverIce() {
     for ( int i=0; i<TREX_MAX_PORTS; i++ ) {
         m_port_xstats[i] = {0};
     }
+    m_filter_manager.set_hw_mode(fhtINTEL_NO_DOT1Q);
 }
 
 TRexPortAttr* CTRexExtendedDriverIce::create_port_attr(tvpid_t tvpid,repid_t repid) {
