@@ -1059,6 +1059,10 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
 
                  ])
 
+dpdk_src_x86_64_ext = SrcGroup(dir='src',
+        src_list=['drivers/trex_ixgbe_fdir.c']
+)
+
 
 dpdk_src_aarch64 = SrcGroup(dir='src/dpdk/',
         src_list=[
@@ -1437,7 +1441,8 @@ if march == 'x86_64':
     bp_dpdk = SrcGroups([
                   dpdk_src,
                   i40e_dpdk_src,
-                  dpdk_src_x86_64
+                  dpdk_src_x86_64,
+                  dpdk_src_x86_64_ext
                   ]);
 
     # BPF + JIT

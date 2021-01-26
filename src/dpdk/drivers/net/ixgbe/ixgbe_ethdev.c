@@ -48,6 +48,8 @@
 #include "base/ixgbe_phy.h"
 #include "ixgbe_regs.h"
 
+int trex_ixgbe_fdir_configure(struct rte_eth_dev *dev);
+
 /*
  * High threshold controlling when to start sending XOFF frames. Must be at
  * least 8 bytes less than receive packet buffer size. This value is in units
@@ -2638,7 +2640,7 @@ ixgbe_dev_start(struct rte_eth_dev *dev)
 	ixgbe_configure_dcb(dev);
 
 	if (dev->data->dev_conf.fdir_conf.mode != RTE_FDIR_MODE_NONE) {
-		err = ixgbe_fdir_configure(dev);
+		err = trex_ixgbe_fdir_configure(dev);
 		if (err)
 			goto error;
 	}
