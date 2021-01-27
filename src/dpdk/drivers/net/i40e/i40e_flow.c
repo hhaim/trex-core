@@ -3299,14 +3299,14 @@ i40e_flow_parse_fdir_filter(struct rte_eth_dev *dev,
 
 	if (pf->fdir.fdir_vsi == NULL) {
 		/* Enable fdir when fdir flow is added at first time. */
-		ret = i40e_fdir_setup(pf);
+		ret = trex_i40e_fdir_setup(pf);
 		if (ret != I40E_SUCCESS) {
 			rte_flow_error_set(error, ENOTSUP,
 					   RTE_FLOW_ERROR_TYPE_HANDLE,
 					   NULL, "Failed to setup fdir.");
 			return -rte_errno;
 		}
-		ret = i40e_fdir_configure(dev);
+		ret = trex_i40e_fdir_configure(dev);
 		if (ret < 0) {
 			rte_flow_error_set(error, ENOTSUP,
 					   RTE_FLOW_ERROR_TYPE_HANDLE,

@@ -79,7 +79,7 @@ static struct fdir_hw_id_params_t fdir_hw_id_rule_params[512];
 // So, the rule will apply if packet has either the correct ttl or IP ID, depending if we are in statfull or stateless.
 void CTRexExtendedDriverBase40G::add_del_rules(enum trex_rte_filter_op op, repid_t  repid, uint16_t type, uint8_t ttl
                                                , uint16_t ip_id, uint8_t l4_proto, int queue, uint16_t stat_idx) {
-    int ret=1;
+    int ret=0;
     static int filter_soft_id = 0;
 
     if ( ret != 0 ){

@@ -105,6 +105,7 @@ void i40e_trex_fdir_reg_init(repid_t repid, int mode)
 	I40E_WRITE_REG(hw, I40E_GLQF_FD_MSK(0, 34), 0x000DFF00);
 	I40E_WRITE_REG(hw, I40E_GLQF_FD_MSK(0,44), 0x000C00FF);
 	I40E_WRITE_FLUSH(hw);
+    //i40e_trex_dump_fdir_regs(hw);
 }
 
 int i40e_trex_get_pf_id(repid_t repid, uint8_t *pf_id) {

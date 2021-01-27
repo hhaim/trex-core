@@ -42,7 +42,6 @@
 #include "i40e_hash.h"
 
 
-int trex_i40e_fdir_configure(struct rte_eth_dev *dev);
 
 #define ETH_I40E_FLOATING_VEB_ARG	"enable_floating_veb"
 #define ETH_I40E_FLOATING_VEB_LIST_ARG	"floating_veb_list"
@@ -1887,7 +1886,7 @@ i40e_dev_configure(struct rte_eth_dev *dev)
 	 * removed.
 	 */
 	if (dev->data->dev_conf.fdir_conf.mode == RTE_FDIR_MODE_PERFECT) {
-		ret = i40e_fdir_setup(pf);
+		ret = trex_i40e_fdir_setup(pf);
 		if (ret != I40E_SUCCESS) {
 			PMD_DRV_LOG(ERR, "Failed to setup flow director.");
 			return -ENOTSUP;
@@ -9822,7 +9821,7 @@ i40e_ethertype_filter_set(struct i40e_pf *pf,
 	}
 
 	if (!add && !node) {
-		PMD_DRV_LOG(ERR, "There's no corresponding ethertype filter!");
+		//PMD_DRV_LOG(ERR, "There's no corresponding ethertype filter!");
 		return -EINVAL;
 	}
 
