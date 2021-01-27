@@ -94,7 +94,7 @@ void CTRexExtendedDriverBase40G::add_del_rules(enum trex_rte_filter_op op, repid
 
 #if 0
     printf("40g::%s rules: port:%d type:%d ttl:%d ip_id:%x l4:%d q:%d hw index:%d\n"
-           , (op == RTE_ETH_FILTER_ADD) ?  "add" : "del"
+           , (op == TREX_RTE_ETH_FILTER_ADD) ?  "add" : "del"
            , repid, type, ttl, ip_id, l4_proto, queue, stat_idx);
 #endif
 
@@ -299,6 +299,7 @@ void CTRexExtendedDriverBase40G::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats
 // bytes and prev_bytes are not used. X710 fdir filters do not support byte count.
 int CTRexExtendedDriverBase40G::get_rx_stats(CPhyEthIF * _if, uint32_t *pkts, uint32_t *prev_pkts
                                              ,uint32_t *bytes, uint32_t *prev_bytes, int min, int max) {
+
     uint32_t hw_stats[MAX_FLOW_STATS_XL710];
     repid_t repid = _if->get_repid();
 

@@ -270,13 +270,13 @@ int CTRexExtendedDriverDummySelector::configure_rx_filter_rules(CPhyEthIF *_if) 
     }
 }
 
-/*int CTRexExtendedDriverDummySelector::add_del_rx_flow_stat_rule(CPhyEthIF *_if, enum rte_filter_op op, uint16_t l3, uint8_t l4, uint8_t ipv6_next_h, uint16_t id) {
+int CTRexExtendedDriverDummySelector::add_del_rx_flow_stat_rule(CPhyEthIF *_if, enum trex_rte_filter_op op, uint16_t l3, uint8_t l4, uint8_t ipv6_next_h, uint16_t id) {
     if ( _if->is_dummy() ) {
         return 0;
     } else {
         return m_real_drv->add_del_rx_flow_stat_rule(_if, op, l3, l4, ipv6_next_h, id);
     }
-}*/
+}
 
 int CTRexExtendedDriverDummySelector::stop_queue(CPhyEthIF * _if, uint16_t q_num) {
     if ( _if->is_dummy() ) {

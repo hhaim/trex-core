@@ -6942,13 +6942,9 @@ COLD_FUNC int TrexDpdkPlatformApi::add_rx_flow_stat_rule(uint8_t port_id, uint16
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
         return 0;
     }
-    #ifdef FIX_DPDK_RULE
     CPhyEthIF * lp=g_trex.m_ports[port_id];
 
-    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_ADD, l3_type, l4_proto, ipv6_next_h, id);
-    #else 
-    return 0;
-    #endif 
+    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, TREX_RTE_ETH_FILTER_ADD, l3_type, l4_proto, ipv6_next_h, id);
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16_t l3_type, uint8_t l4_proto
@@ -6956,15 +6952,10 @@ COLD_FUNC int TrexDpdkPlatformApi::del_rx_flow_stat_rule(uint8_t port_id, uint16
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
         return 0;
     }
-    #ifdef FIX_DPDK_RULE
 
     CPhyEthIF * lp=g_trex.m_ports[port_id];
 
-
-    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, RTE_ETH_FILTER_DELETE, l3_type, l4_proto, ipv6_next_h, id);
-    #else 
-    return 0; 
-    #endif  
+    return get_ex_drv()->add_del_rx_flow_stat_rule(lp, TREX_RTE_ETH_FILTER_DELETE, l3_type, l4_proto, ipv6_next_h, id);
 }
 
 COLD_FUNC int TrexDpdkPlatformApi::get_active_pgids(flow_stat_active_t_new &result) const {
