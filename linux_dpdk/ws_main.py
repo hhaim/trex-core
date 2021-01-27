@@ -732,7 +732,7 @@ main_src = SrcGroup(dir='src',
 
              'drivers/trex_driver_base.cpp',
              #'drivers/trex_driver_bnxt.cpp',
-             #'drivers/trex_driver_i40e.cpp',
+             'drivers/trex_driver_i40e.cpp',
              'drivers/trex_driver_igb.cpp',
              'drivers/trex_driver_ixgbe.cpp',
              #'drivers/trex_driver_mlx5.cpp',

@@ -1865,3 +1865,9 @@ int trex_ixgbe_rte_eth_dev_filter_ctrl(uint16_t port_id,
 
 	return ret;
 }
+
+int trex_i40e_rte_eth_dev_filter_ctrl(uint16_t port_id, 
+                                      enum trex_rte_filter_type filter_type,
+			                          enum trex_rte_filter_op filter_op, void *arg){
+	return (0);
+}
