@@ -1060,7 +1060,8 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                  ])
 
 dpdk_src_x86_64_ext = SrcGroup(dir='src',
-        src_list=['drivers/trex_ixgbe_fdir.c']
+        src_list=['drivers/trex_ixgbe_fdir.c',
+                  'drivers/trex_i40e_fdir.c']
 )
 
 

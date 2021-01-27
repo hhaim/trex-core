@@ -24,6 +24,8 @@
 
 #include "main_dpdk.h"
 #include "dpdk_drv_filter.h"
+#include "trex_rte_eth_ctrl.h"
+
 
 class CTrexDpdkParamsOverride {
  public:

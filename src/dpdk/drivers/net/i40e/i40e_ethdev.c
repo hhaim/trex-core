@@ -41,6 +41,9 @@
 #include "rte_pmd_i40e.h"
 #include "i40e_hash.h"
 
+
+int trex_i40e_fdir_configure(struct rte_eth_dev *dev);
+
 #define ETH_I40E_FLOATING_VEB_ARG	"enable_floating_veb"
 #define ETH_I40E_FLOATING_VEB_LIST_ARG	"floating_veb_list"
 #define ETH_I40E_SUPPORT_MULTI_DRIVER	"support-multi-driver"
@@ -1889,7 +1892,7 @@ i40e_dev_configure(struct rte_eth_dev *dev)
 			PMD_DRV_LOG(ERR, "Failed to setup flow director.");
 			return -ENOTSUP;
 		}
-		ret = i40e_fdir_configure(dev);
+		ret = trex_i40e_fdir_configure(dev);
 		if (ret < 0) {
 			PMD_DRV_LOG(ERR, "failed to configure fdir.");
 			goto err;

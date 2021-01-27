@@ -1258,6 +1258,7 @@ struct rte_fdir_conf {
 	enum rte_fdir_status_mode status;  /**< How to report FDIR hash. */
 	/** RX queue of packets matching a "drop" filter in perfect mode. */
 	uint8_t drop_queue;
+	
 	struct rte_eth_fdir_masks mask;
 	struct rte_eth_fdir_flex_conf flex_conf;
 	
@@ -1265,7 +1266,6 @@ struct rte_fdir_conf {
 	
 	#ifdef TREX_PATCH
     uint8_t flexbytes_offset;
-
 	#endif
 };
 
