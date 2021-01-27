@@ -82,6 +82,21 @@
 
 #define IXGBE_FDIRIP6M_INNER_MAC_SHIFT 4
 
+static inline int
+trex_ixgbe_ethertype_filter_lookup(struct ixgbe_filter_info *filter_info,
+			      uint16_t ethertype)
+{
+	int i;
+
+	for (i = 0; i < IXGBE_MAX_ETQF_FILTERS; i++) {
+		if (filter_info->ethertype_filters[i].ethertype == ethertype &&
+		    (filter_info->ethertype_mask & (1 << i)))
+			return i;
+	}
+	return -1;
+}
+
+
 
 static int fdir_erase_filter_82599(struct ixgbe_hw *hw, uint32_t fdirhash);
 static int fdir_set_input_mask(struct rte_eth_dev *dev,
@@ -1642,7 +1657,7 @@ trex_ixgbe_add_del_ethertype_filter(struct rte_eth_dev *dev,
 		return -EINVAL;
 	}
 
-	ret = ixgbe_ethertype_filter_lookup(filter_info, filter->ether_type);
+	ret = trex_ixgbe_ethertype_filter_lookup(filter_info, filter->ether_type);
 	if (ret >= 0 && add) {
 		PMD_DRV_LOG(ERR, "ethertype (0x%04x) filter exists.",
 			    filter->ether_type);
@@ -1758,9 +1773,9 @@ trex_ixgbe_get_ethertype_filter(struct rte_eth_dev *dev,
 	uint32_t etqf, etqs;
 	int ret;
 
-	ret = ixgbe_ethertype_filter_lookup(filter_info, filter->ether_type);
+	ret = trex_ixgbe_ethertype_filter_lookup(filter_info, filter->ether_type);
 	if (ret < 0) {
-		PMD_DRV_LOG(ERR, "ethertype (0x%04x) filter doesn't exist.",
+		PMD_DRV_LOG(INFO, "ethertype (0x%04x) filter doesn't exist.",
 			    filter->ether_type);
 		return -ENOENT;
 	}
