@@ -133,9 +133,9 @@
 #define MLX5_SHUT_UP_BF_DEFAULT "1"
 #endif
 
-#ifndef HAVE_MLX5DV_MMAP_GET_NC_PAGES_CMD
-#define MLX5_MMAP_GET_NC_PAGES_CMD 3
-#endif
+//#ifndef HAVE_MLX5DV_MMAP_GET_NC_PAGES_CMD
+//#define MLX5_MMAP_GET_NC_PAGES_CMD 3
+//#endif
 
 /* Log 2 of the default number of strides per WQE for Multi-Packet RQ. */
 #define MLX5_MPRQ_STRIDE_NUM_N 6U

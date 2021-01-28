@@ -19,7 +19,7 @@
 #include "mlx5_devx_cmds.h"
 
 /* Reported driver name. */
-#define MLX5_DRIVER_NAME "mlx5_pci"
+#define MLX5_DRIVER_NAME "net_mlx5"
 
 /* Bit-field manipulation. */
 #define BITFIELD_DECLARE(bf, type, size) \

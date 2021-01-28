@@ -266,6 +266,35 @@ def configure_dummy_mlx5 (ctx):
         #define HAVE_SUPPORTED_56000baseLR4_Full 1
         #endif
 
+
+        #ifndef HAVE_ETHTOOL_LINK_MODE_25G
+        #define HAVE_ETHTOOL_LINK_MODE_25G 1
+        #endif /* HAVE_ETHTOOL_LINK_MODE_25G */
+
+        #ifndef HAVE_ETHTOOL_LINK_MODE_50G
+        #define HAVE_ETHTOOL_LINK_MODE_50G 1
+        #endif /* HAVE_ETHTOOL_LINK_MODE_50G */
+
+        #ifndef HAVE_ETHTOOL_LINK_MODE_100G
+        #define HAVE_ETHTOOL_LINK_MODE_100G 1
+        #endif /* HAVE_ETHTOOL_LINK_MODE_100G */
+
+        #ifndef HAVE_INFINIBAND_VERBS_H
+        #define HAVE_INFINIBAND_VERBS_H 1
+        #endif /* HAVE_INFINIBAND_VERBS_H */
+
+
+	    #define ETHTOOL_LINK_MODE_25000baseCR_Full_BIT 31
+        #define ETHTOOL_LINK_MODE_25000baseKR_Full_BIT 32
+        #define ETHTOOL_LINK_MODE_25000baseSR_Full_BIT 33
+        #define ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT 34
+        #define ETHTOOL_LINK_MODE_50000baseKR2_Full_BIT 35
+        #define ETHTOOL_LINK_MODE_100000baseKR4_Full_BIT 36
+        #define ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT 37
+        #define ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT  38 
+        #define ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT 39
+
+
         '''
     
     f = open(autoconf_path, "w")
@@ -381,6 +410,17 @@ def configure_mlx5 (ctx):
         'func', 'mlx5dv_dump_dr_domain'],
         [ 'HAVE_DEVLINK', 'linux/devlink.h',
         'define', 'DEVLINK_GENL_NAME' ],
+        [ 'HAVE_MLX5_DR_CREATE_ACTION_ASO', 'infiniband/mlx5dv.h',
+        'type','mlx5dv_dr_action_create_aso' ],
+        [ 'HAVE_INFINIBAND_VERBS_H', 'infiniband/verbs.h',
+        'define', 'INFINIBAND_VERBS_H' ],
+        [ 'HAVE_MLX5_DR_CREATE_ACTION_DEST_ARRAY', 'infiniband/mlx5dv.h',
+        'type','mlx5dv_dr_action_create_dest_array'],
+        [ 'HAVE_MLX5DV_DR_MEM_RECLAIM', 'infiniband/mlx5dv.h',
+        'type','mlx5dv_dr_domain_set_reclaim_device_memory'],
+        [ 'HAVE_MLX5_DR_CREATE_ACTION_FLOW_SAMPLE', 'infiniband/mlx5dv.h',
+        'type','mlx5dv_dr_action_create_flow_sampler'],
+
     ]
     autoconf_script = 'src/dpdk/auto-config-h.sh'
     autoconf_command = os.path.join(top, autoconf_script)
@@ -735,7 +775,7 @@ main_src = SrcGroup(dir='src',
              'drivers/trex_driver_i40e.cpp',
              'drivers/trex_driver_igb.cpp',
              'drivers/trex_driver_ixgbe.cpp',
-             #'drivers/trex_driver_mlx5.cpp',
+             'drivers/trex_driver_mlx5.cpp',
              'drivers/trex_driver_ice.cpp',
              #'drivers/trex_driver_ntacc.cpp',
              'drivers/trex_driver_vic.cpp',
@@ -1224,6 +1264,7 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                 'lib/librte_eal/unix/eal_unix_timer.c',
                 'lib/librte_eal/unix/eal_unix_memory.c',
                 'lib/librte_eal/unix/eal_file.c',
+                'lib/librte_eal/unix/rte_thread.c',
 
                  'lib/librte_eal/linux/eal.c',
                  'lib/librte_eal/linux/eal_alarm.c',
@@ -1552,7 +1593,7 @@ common_flags = ['-DWIN_UCODE_SIM',
                 '-D__STDC_CONSTANT_MACROS',
                 '-D_GNU_SOURCE',
                 '-DALLOW_INTERNAL_API',
-                '-DABI_VERSION="001"',
+                '-DABI_VERSION="21.1"',
                 '-DALLOW_EXPERIMENTAL_API',
                 #'-D_GLIBCXX_USE_CXX11_ABI=0', # see libstdc++ ABI changes for string and list
                 #'-DTREX_PERF', # used when using TRex and PERF for performance measurement
@@ -1578,7 +1619,7 @@ if march == 'x86_64':
                     '-DTREX_USE_BPFJIT',
                     '-D_GNU_SOURCE',
                     '-DALLOW_INTERNAL_API',
-                    '-DABI_VERSION="001"',
+                    '-DABI_VERSION="21.1"',
                     '-DALLOW_EXPERIMENTAL_API',
 
                    ]
@@ -1592,7 +1633,7 @@ if march == 'x86_64':
                       '-DTREX_USE_BPFJIT',
                       '-DALLOW_INTERNAL_API',
                       '-DALLOW_EXPERIMENTAL_API',
-                      '-DABI_VERSION="001"',
+                      '-DABI_VERSION="21.1"',
 
                       ];
 
@@ -1765,7 +1806,7 @@ bpf_includes_path = '../external_libs/bpf ../external_libs/bpf/bpfjit'
 
 
 if march == 'x86_64':
-    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk_2102_x86_64/rte_config.h','-DALLOW_INTERNAL_API','-DABI_VERSION="001"'];
+    DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DX722_SUPPORT', '-DX722_A0_SUPPORT', '-DVF_DRIVER', '-DINTEGRATED_VF', '-include', '../src/pal/linux_dpdk/dpdk_2102_x86_64/rte_config.h','-DALLOW_INTERNAL_API','-DABI_VERSION="21.1"'];
 elif march == 'aarch64':
     DPDK_FLAGS=['-DTAP_MAX_QUEUES=16','-D_GNU_SOURCE', '-DPF_DRIVER', '-DVF_DRIVER', '-DINTEGRATED_VF', '-DRTE_FORCE_INTRINSICS', '-include', '../src/pal/linux_dpdk/dpdk_2102_aarch64/rte_config.h'];
 elif march == 'ppc64le':
@@ -2106,7 +2147,7 @@ def build_prog (bld, build_obj):
                   **bld.env.mlx5_kw
                 )
 
-        if bld.env.NO_MLX != 'mlx4':
+        if False: #bld.env.NO_MLX != 'mlx4':
             bld.shlib(
             features='c',
             includes = dpdk_includes_path +

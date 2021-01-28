@@ -25,7 +25,7 @@
 #include "trex_driver_i40e.h"
 #include "trex_driver_igb.h"
 #include "trex_driver_ixgbe.h"
-//#include "trex_driver_mlx5.h"
+#include "trex_driver_mlx5.h"
 #include "trex_driver_ice.h"
 //#include "trex_driver_ntacc.h"
 #include "trex_driver_vic.h"
@@ -140,7 +140,7 @@ CTRexExtendedDriverDb::CTRexExtendedDriverDb() {
     register_driver(std::string("net_e1000_igb"),CTRexExtendedDriverBase1G::create);
     register_driver(std::string("net_i40e"),CTRexExtendedDriverBase40G::create);
     register_driver(std::string("net_enic"),CTRexExtendedDriverBaseVIC::create);
-    //register_driver(std::string("net_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
+    register_driver(std::string("net_mlx5"),CTRexExtendedDriverBaseMlnx5G::create);
     register_driver(std::string("net_ice"),CTRexExtendedDriverIce::create);
    // register_driver(std::string("net_mlx4"),CTRexExtendedDriverMlnx4::create);
     //register_driver(std::string("net_ntacc"), CTRexExtendedDriverBaseNtAcc::create);

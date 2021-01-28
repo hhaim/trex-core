@@ -6153,6 +6153,7 @@ COLD_FUNC int  update_dpdk_args(void){
         SET_ARGS("-d");
         SET_ARGS(ntacc_so_str.c_str());
     }
+#endif
 
     if ( lpp->get_mlx5_so_mode() ){
         std::string &mlx5_so_str = get_mlx5_so_string();
@@ -6167,7 +6168,6 @@ COLD_FUNC int  update_dpdk_args(void){
         SET_ARGS("-d");
         SET_ARGS(mlx4_so_str.c_str());
     }
-#endif    
 
     if ( lpop->m_is_lowend ) { // assign all threads to core 0
         g_cores_str[0] = '(';

@@ -748,6 +748,7 @@ mlx5_dev_interrupt_device_fatal(struct mlx5_dev_ctx_shared *sh)
 void
 mlx5_dev_interrupt_handler(void *cb_arg)
 {
+#if 0	
 	struct mlx5_dev_ctx_shared *sh = cb_arg;
 	struct ibv_async_event event;
 
@@ -818,6 +819,7 @@ mlx5_dev_interrupt_handler(void *cb_arg)
 			dev->data->port_id, event.event_type);
 		mlx5_glue->ack_async_event(&event);
 	}
+#endif
 }
 
 /*
