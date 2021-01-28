@@ -1350,8 +1350,6 @@ enic_get_action_cap(struct enic *enic)
 static void
 enic_dump_actions(const struct filter_action_v2 *ea)
 {
-	ENICPMD_LOG(INFO, "%x:%x:%x:%x \n", ea->type,ea->rq_idx,ea->flags,ea->filter_id);
-
 	if (ea->type == FILTER_ACTION_RQ_STEERING) {
 		ENICPMD_LOG(INFO, "Action(V1), queue: %u\n", ea->rq_idx);
 	} else if (ea->type == FILTER_ACTION_V2) {
@@ -1637,13 +1635,9 @@ enic_flow_add_filter(struct enic *enic, struct filter_v2 *enic_filter,
 		return NULL;
 	}
 
-	printf(" add rule \n");
-	enic_filter->u.generic_1.position =1;
-	enic_dump_flow(enic_action, enic_filter);
 
 	/* entry[in] is the queue id, entry[out] is the filter Id for delete */
 	entry = enic_action->rq_idx;
-	printf(" entry : %d \n",entry );
 	err = vnic_dev_classifier(enic->vdev, CLSF_ADD, &entry, enic_filter,
 				  enic_action);
 	if (err) {
@@ -1653,7 +1647,6 @@ enic_flow_add_filter(struct enic *enic, struct filter_v2 *enic_filter,
 		return NULL;
 	}
 
-	printf(" -->>> OK \n");
 	flow->enic_filter_id = entry;
 	flow->enic_filter = *enic_filter;
 	return flow;
