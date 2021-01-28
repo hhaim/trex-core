@@ -1350,6 +1350,8 @@ enic_get_action_cap(struct enic *enic)
 static void
 enic_dump_actions(const struct filter_action_v2 *ea)
 {
+	ENICPMD_LOG(INFO, "%x:%x:%x:%x \n", ea->type,ea->rq_idx,ea->flags,ea->filter_id);
+
 	if (ea->type == FILTER_ACTION_RQ_STEERING) {
 		ENICPMD_LOG(INFO, "Action(V1), queue: %u\n", ea->rq_idx);
 	} else if (ea->type == FILTER_ACTION_V2) {
@@ -1380,8 +1382,11 @@ enic_dump_filter(const struct filter_v2 *filt)
 	case FILTER_DPDK_1:
 		/* FIXME: this should be a loop */
 		gp = &filt->u.generic_1;
-		ENICPMD_LOG(INFO, "Filter: vlan: 0x%04x, mask: 0x%04x\n",
-		       gp->val_vlan, gp->mask_vlan);
+		//ENICPMD_LOG(INFO, "Filter: vlan: 0x%04x, mask: 0x%04x\n",
+		       //gp->val_vlan, gp->mask_vlan);
+		ENICPMD_LOG(INFO, "Filter: vlan: 0x%04x, mask: 0x%04x (0x%04x: 0x%04x) %d\n",
+		       gp->val_vlan, gp->mask_vlan,gp->val_flags, gp->mask_flags ,gp->position );
+
 
 		if (gp->mask_flags & FILTER_GENERIC_1_IPV4)
 			sprintf(ip4, "%s ",
@@ -1632,10 +1637,13 @@ enic_flow_add_filter(struct enic *enic, struct filter_v2 *enic_filter,
 		return NULL;
 	}
 
+	printf(" add rule \n");
+	enic_filter->u.generic_1.position =1;
 	enic_dump_flow(enic_action, enic_filter);
 
 	/* entry[in] is the queue id, entry[out] is the filter Id for delete */
 	entry = enic_action->rq_idx;
+	printf(" entry : %d \n",entry );
 	err = vnic_dev_classifier(enic->vdev, CLSF_ADD, &entry, enic_filter,
 				  enic_action);
 	if (err) {
@@ -1645,6 +1653,7 @@ enic_flow_add_filter(struct enic *enic, struct filter_v2 *enic_filter,
 		return NULL;
 	}
 
+	printf(" -->>> OK \n");
 	flow->enic_filter_id = entry;
 	flow->enic_filter = *enic_filter;
 	return flow;

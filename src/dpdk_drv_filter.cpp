@@ -57,6 +57,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 	 */
 	memset(&attr, 0, sizeof(struct rte_flow_attr));
 	attr.ingress = 1;
+    //attr.priority =1;
 
 	/*
 	 * create the action sequence.
@@ -121,7 +122,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
         memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
         memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
         ipv4_spec.hdr.type_of_service = 0x1;
-        ipv4_mask.hdr.type_of_service = 0xff; 
+        ipv4_mask.hdr.type_of_service = 0x1; 
         pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_IPV4;
         pattern[pattern_index].spec = &ipv4_spec;
         pattern[pattern_index].mask = &ipv4_mask;
