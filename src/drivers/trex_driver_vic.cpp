@@ -23,7 +23,9 @@
 #include "trex_driver_defines.h"
 
 CTRexExtendedDriverBaseVIC::CTRexExtendedDriverBaseVIC() {
-      m_cap = tdCAP_ALL |TREX_DRV_CAP_MAC_ADDR_CHG;
+    //m_cap = tdCAP_ALL |TREX_DRV_CAP_MAC_ADDR_CHG;
+    m_cap = tdCAP_ONE_QUE | tdCAP_MULTI_QUE  | TREX_DRV_CAP_MAC_ADDR_CHG ;
+
 }
 
 TRexPortAttr* CTRexExtendedDriverBaseVIC::create_port_attr(tvpid_t tvpid,repid_t repid) {
