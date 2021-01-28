@@ -30,6 +30,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
                                                bool ipv6,
                                                dpdk_filter_hw_nic_t hw_mode,
                                                struct rte_flow_error *error){
+    printf(" filter_tos_flow_to_rq \n");
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[MAX_PATTERN_NUM];
 	struct rte_flow_action action[MAX_PATTERN_NUM];
@@ -76,6 +77,8 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
     eth_spec.type = 0;
     eth_mask.type = 0;
+    //eth_spec.type = RTE_BE16(0x0800); 
+    //eth_mask.type = RTE_BE16(0xFFFF);
 
     
 	pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_ETH;
@@ -118,7 +121,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
         memset(&ipv4_spec, 0, sizeof(struct rte_flow_item_ipv4));
         memset(&ipv4_mask, 0, sizeof(struct rte_flow_item_ipv4));
         ipv4_spec.hdr.type_of_service = 0x1;
-        ipv4_mask.hdr.type_of_service = 0x1; 
+        ipv4_mask.hdr.type_of_service = 0xff; 
         pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_IPV4;
         pattern[pattern_index].spec = &ipv4_spec;
         pattern[pattern_index].mask = &ipv4_mask;
@@ -138,6 +141,8 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 static struct rte_flow * filter_drop_all(uint8_t port_id,
                                         dpdk_filter_hw_nic_t hw_mode,
                                          struct rte_flow_error *error){
+    printf(" filter_drop_all \n");
+
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[MAX_PATTERN_NUM];
 	struct rte_flow_action action[MAX_PATTERN_NUM];
@@ -198,7 +203,10 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 static struct rte_flow * filter_pass_all_to_rx(uint8_t port_id,
                                                uint8_t rx_q,
                                                dpdk_filter_hw_nic_t hw_mode,
+
                                                struct rte_flow_error *error){
+    printf(" filter_pass_all_to_rx \n");
+
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[MAX_PATTERN_NUM];
 	struct rte_flow_action action[MAX_PATTERN_NUM];

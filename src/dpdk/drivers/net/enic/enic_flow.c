@@ -1632,6 +1632,8 @@ enic_flow_add_filter(struct enic *enic, struct filter_v2 *enic_filter,
 		return NULL;
 	}
 
+	enic_dump_flow(enic_action, enic_filter);
+
 	/* entry[in] is the queue id, entry[out] is the filter Id for delete */
 	entry = enic_action->rq_idx;
 	err = vnic_dev_classifier(enic->vdev, CLSF_ADD, &entry, enic_filter,

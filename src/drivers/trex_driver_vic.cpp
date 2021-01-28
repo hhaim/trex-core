@@ -24,6 +24,7 @@
 
 CTRexExtendedDriverBaseVIC::CTRexExtendedDriverBaseVIC() {
       m_cap = tdCAP_ALL |TREX_DRV_CAP_MAC_ADDR_CHG;
+      m_filter_manager.set_hw_mode(fhtINTEL_NO_DOT1Q);
 }
 
 TRexPortAttr* CTRexExtendedDriverBaseVIC::create_port_attr(tvpid_t tvpid,repid_t repid) {
