@@ -47,6 +47,7 @@ void CTRexExtendedDriverBaseVIC::update_configuration(port_cfg_t * cfg){
     }
 }
 
+#if 0
 void CTRexExtendedDriverBaseVIC::add_del_rules(enum rte_filter_op op, repid_t  repid, uint16_t type
                                                , uint16_t id, uint8_t l4_proto, uint8_t tos, int queue) {
     int ret=rte_eth_dev_filter_supported(repid, RTE_ETH_FILTER_FDIR);
@@ -98,6 +99,9 @@ void CTRexExtendedDriverBaseVIC::add_del_rules(enum rte_filter_op op, repid_t  r
                  ret, repid);
     }
 }
+#endif 
+
+#if 0
 
 int CTRexExtendedDriverBaseVIC::add_del_eth_type_rule(repid_t  repid, enum rte_filter_op op, uint16_t eth_type) {
     int ret;
@@ -111,7 +115,9 @@ int CTRexExtendedDriverBaseVIC::add_del_eth_type_rule(repid_t  repid, enum rte_f
 
     return ret;
 }
+#endif 
 
+#if 0
 int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules_statefull(CPhyEthIF * _if) {
     repid_t  repid = _if->get_repid();
 
@@ -143,8 +149,9 @@ int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules_statefull(CPhyEthIF * 
 
     return 0;
 }
+#endif 
 
-
+#if 0
 int CTRexExtendedDriverBaseVIC::set_rcv_all(CPhyEthIF * _if, bool set_on) {
     repid_t repid=_if->get_repid();
 
@@ -159,6 +166,7 @@ int CTRexExtendedDriverBaseVIC::set_rcv_all(CPhyEthIF * _if, bool set_on) {
     return 0;
 
 }
+#endif
 
 void CTRexExtendedDriverBaseVIC::clear_extended_stats(CPhyEthIF * _if){
     repid_t repid=_if->get_repid();
@@ -172,6 +180,8 @@ bool CTRexExtendedDriverBaseVIC::get_extended_stats(CPhyEthIF * _if,CPhyEthIFSta
 
 int CTRexExtendedDriverBaseVIC::verify_fw_ver(tvpid_t   tvpid) {
 
+    return(0);
+#if 0
     repid_t repid = CTVPort(tvpid).get_repid();
 
     if (!get_dpdk_mode()->is_hardware_filter_needed()) {
@@ -196,8 +206,10 @@ int CTRexExtendedDriverBaseVIC::verify_fw_ver(tvpid_t   tvpid) {
     printf("If this is an unsupported card, or you do not want to upgrade, you can use --software command line arg\n");
     printf("This will work without hardware support (meaning reduced performance)\n");
     exit(1);
+#endif     
 }
 
+#if 0
 int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules(CPhyEthIF * _if) {
 
     if (get_is_stateless()) {
@@ -207,6 +219,7 @@ int CTRexExtendedDriverBaseVIC::configure_rx_filter_rules(CPhyEthIF * _if) {
         return configure_rx_filter_rules_statefull(_if);
     }
 }
+#endif
 
 void CTRexExtendedDriverBaseVIC::reset_rx_stats(CPhyEthIF * _if, uint32_t *stats, int min, int len) {
 }
