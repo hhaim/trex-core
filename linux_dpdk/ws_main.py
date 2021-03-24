@@ -152,6 +152,7 @@ def options(opt):
     opt.add_option('--no-ver', action = 'store_true', help = "Don't update version file.")
     opt.add_option('--no-old', action = 'store_true', help = "Don't build old targets.")
     opt.add_option('--private', dest='private', action = 'store_true', help = "private publish, do not replace latest/be_latest image with this image")
+    opt.add_option('--tap', dest='tap', default=False, action = 'store_true', help = "Add tap dpdk driver for Azure use-cases")
 
     co = opt.option_groups['configure options']
     co.add_option('--sanitized', dest='sanitized', default=False, action='store_true',
@@ -473,6 +474,42 @@ def configure_dummy_mlx5 (ctx):
 
 
 @conf
+def configure_tap (ctx):
+    ctx.start_msg('Configuring tap autoconf')
+    autoconf_file = 'src/dpdk/drivers/net/tap/tap_autoconf.h'
+    autoconf_path = os.path.join(top, autoconf_file)
+    os.system('rm -rf %s' % autoconf_path)
+    has_sym_args = [
+        [ 'HAVE_TC_FLOWER', 'linux/pkt_cls.h',
+        'enum', 'TCA_FLOWER_UNSPEC' ],
+
+        [ 'HAVE_TC_VLAN_ID', 'linux/pkt_cls.h',
+        'enum', 'TCA_FLOWER_KEY_VLAN_PRIO' ],
+
+        [ 'HAVE_TC_BPF', 'linux/pkt_cls.h',
+        'enum', 'TCA_BPF_UNSPEC' ],
+
+        [ 'HAVE_TC_BPF_FD', 'linux/pkt_cls.h',
+	    'enum','TCA_BPF_FD' ],
+
+        [ 'HAVE_TC_ACT_BPF', 'linux/tc_act/tc_bpf.h',
+	    'enum','TCA_ACT_BPF_UNSPEC' ],
+
+        [ 'HAVE_TC_ACT_BPF_FD', 'linux/tc_act/tc_bpf.h',
+	    'enum','TCA_ACT_BPF_FD' ],
+    ]
+    autoconf_script = 'src/dpdk/auto-config-h.sh'
+    autoconf_command = os.path.join(top, autoconf_script)
+    for arg in has_sym_args:
+        result, output = getstatusoutput("%s %s '%s' '%s' '%s' '%s' > /dev/null" %
+            (autoconf_command, autoconf_path, arg[0], arg[1], arg[2], arg[3]))
+        if result != 0:
+            ctx.end_msg('failed\n%s\n' % output, 'YELLOW')
+            break
+    if result == 0:
+        ctx.end_msg('done', 'GREEN')
+
+@conf
 def configure_mlx5 (ctx):
     ctx.start_msg('Configuring MLX5 autoconf')
     autoconf_file = 'src/dpdk/drivers/common/mlx5/mlx5_autoconf.h'
@@ -638,7 +675,6 @@ def check_ofed(ctx):
     ofed_ver= 42
     ofed_ver_show= '4.2'
 
-    return True
     if not os.path.isfile(ofed_info):
         ctx.end_msg('not found', 'YELLOW')
         return False
@@ -788,6 +824,8 @@ def configure(conf):
     configure_sanitized(conf, with_sanitized)
             
     conf.env.NO_MLX = no_mlx
+    conf.env.TAP = conf.options.tap
+
     if no_mlx != 'all':
         ofed_ok = conf.check_ofed(mandatory = False)
         conf.env.OFED_OK = ofed_ok
@@ -807,6 +845,9 @@ def configure(conf):
     conf.env.NO_BNXT = no_bnxt
     if not no_bnxt:
         Logs.pprint('YELLOW', 'Building bnxt PMD')
+
+    if conf.env.TAP:
+        conf.configure_tap(mandatory = False)
 
     conf.env.WITH_NTACC = with_ntacc
     conf.env.WITH_BIRD = with_bird
@@ -1279,14 +1320,6 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                  'drivers/net/failsafe/failsafe_flow.c',
                  'drivers/net/failsafe/failsafe_intr.c',
 
-                 #tap 
-
-                 'drivers/net/tap/rte_eth_tap.c',
-                 'drivers/net/tap/tap_flow.c',
-                 'drivers/net/tap/tap_netlink.c',
-                 'drivers/net/tap/tap_tcmsgs.c',
-                 'drivers/net/tap/tap_bpf_api.c',
-                 'drivers/net/tap/tap_intr.c',
 
                  #vdev_netvsc
                  'drivers/net/vdev_netvsc/vdev_netvsc.c',
@@ -1305,6 +1338,18 @@ dpdk_src_x86_64_ext = SrcGroup(dir='src',
         src_list=['drivers/trex_ixgbe_fdir.c',
                   'drivers/trex_i40e_fdir.c']
 )
+
+
+dpdk_src_x86_64_tap = SrcGroup(dir='src/dpdk/',
+        src_list=[
+                 #tap 
+                 'drivers/net/tap/rte_eth_tap.c',
+                 'drivers/net/tap/tap_flow.c',
+                 'drivers/net/tap/tap_netlink.c',
+                 'drivers/net/tap/tap_tcmsgs.c',
+                 'drivers/net/tap/tap_bpf_api.c',
+                 'drivers/net/tap/tap_intr.c',
+                ])
 
 
 dpdk_src_aarch64 = SrcGroup(dir='src/dpdk/',
@@ -1675,40 +1720,6 @@ memif_dpdk_src = SrcGroup(
         'memif_socket.c',
         'rte_eth_memif.c',
     ]);
-
-if march == 'x86_64':
-    bp_dpdk = SrcGroups([
-                  dpdk_src,
-                  i40e_dpdk_src,
-                  dpdk_src_x86_64,
-                  dpdk_src_x86_64_ext
-                  ]);
-
-    # BPF + JIT
-    bpf = SrcGroups([
-                bpf_src,
-                bpfjit_src]);
-
-elif march == 'aarch64':
-    bp_dpdk = SrcGroups([
-                  dpdk_src,
-                  dpdk_src_aarch64
-                  ]);
-
-    # software BPF
-    bpf = SrcGroups([bpf_src]);
-
-elif march == 'ppc64le':
-    bp_dpdk = SrcGroups([
-                  dpdk_src,
-                  i40e_dpdk_src,
-                  dpdk_src_ppc64le
-                  ]);
-
-    # BPF + JIT
-    bpf = SrcGroups([
-                bpf_src,
-                bpfjit_src]);
 
 
 libmnl =SrcGroups([
@@ -2295,6 +2306,45 @@ def build_prog (bld, build_obj):
         if H_DPDK_CONFIG not in DPDK_FLAGS:
             DPDK_FLAGS.extend(['-include', H_DPDK_CONFIG])
         lib_ext.append('numa')
+
+    if march == 'x86_64':
+        bp_dpdk = SrcGroups([
+                    dpdk_src,
+                    i40e_dpdk_src,
+                    dpdk_src_x86_64,
+                    dpdk_src_x86_64_ext
+                    ]);
+        
+        if bld.env.TAP:
+            bp_dpdk.list_group.append(dpdk_src_x86_64_tap)
+
+        # BPF + JIT
+        bpf = SrcGroups([
+                    bpf_src,
+                    bpfjit_src]);
+
+    elif march == 'aarch64':
+        bp_dpdk = SrcGroups([
+                    dpdk_src,
+                    dpdk_src_aarch64
+                    ]);
+
+        # software BPF
+        bpf = SrcGroups([bpf_src]);
+
+    elif march == 'ppc64le':
+        bp_dpdk = SrcGroups([
+                    dpdk_src,
+                    i40e_dpdk_src,
+                    dpdk_src_ppc64le
+                    ]);
+
+        # BPF + JIT
+        bpf = SrcGroups([
+                    bpf_src,
+                    bpfjit_src]);
+
+
 
     bld.objects(
       features='c ',
