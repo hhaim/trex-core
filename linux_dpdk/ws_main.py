@@ -638,6 +638,7 @@ def check_ofed(ctx):
     ofed_ver= 42
     ofed_ver_show= '4.2'
 
+    return True
     if not os.path.isfile(ofed_info):
         ctx.end_msg('not found', 'YELLOW')
         return False
@@ -1290,6 +1291,14 @@ dpdk_src_x86_64 = SrcGroup(dir='src/dpdk/',
                  #vdev_netvsc
                  'drivers/net/vdev_netvsc/vdev_netvsc.c',
 
+                 #netvsc
+                 'drivers/net/netvsc/hn_ethdev.c',
+                 'drivers/net/netvsc/hn_rxtx.c',
+                 'drivers/net/netvsc/hn_rndis.c',
+                 'drivers/net/netvsc/hn_nvs.c',
+                 'drivers/net/netvsc/hn_vf.c',
+
+
                  ])
 
 dpdk_src_x86_64_ext = SrcGroup(dir='src',
@@ -1333,6 +1342,12 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'drivers/bus/pci/linux/pci_vfio.c',
                  'drivers/bus/vdev/vdev.c',
                  'drivers/bus/vdev/vdev_params.c',
+                 'drivers/bus/vmbus/vmbus_common.c',
+                 'drivers/bus/vmbus/vmbus_channel.c',
+                 'drivers/bus/vmbus/vmbus_bufring.c',
+                 'drivers/bus/vmbus/vmbus_common_uio.c',
+                 'drivers/bus/vmbus/linux/vmbus_bus.c',
+                 'drivers/bus/vmbus/linux/vmbus_uio.c',
 
                  'drivers/mempool/ring/rte_mempool_ring.c',
                  #'drivers/mempool/stack/rte_mempool_stack.c', # requires dpdk/lib/librte_stack/rte_stack.h
@@ -1476,6 +1491,7 @@ dpdk_src = SrcGroup(dir='src/dpdk/',
                  'lib/librte_eal/linux/eal_timer.c',
                  'lib/librte_eal/linux/eal_vfio_mp_sync.c',
                  'lib/librte_eal/linux/eal_vfio.c',
+                 'lib/librte_eal/linux/eal_dev.c',
 
                  'lib/librte_ethdev/rte_ethdev.c',
                  'lib/librte_ethdev/rte_flow.c',
@@ -1947,7 +1963,9 @@ dpdk_includes_path =''' ../src/
 
                         ../src/dpdk/drivers/bus/pci/
                         ../src/dpdk/drivers/bus/vdev/
+                        ../src/dpdk/drivers/bus/vmbus/
                         ../src/dpdk/drivers/bus/pci/linux/
+                        ../src/dpdk/drivers/bus/vmbus/linux/
                         ../external_libs/dpdk_linux_tap_cross/
 
                     ''';
@@ -2149,8 +2167,6 @@ class build_option:
             flags += ['-DNDEBUG'];
         else:
             flags += ['-UNDEBUG'];
-        if bld.env.OFED_OK:
-            flags += ['-DHAVE_IBV_MLX4_WQE_LSO_SEG=1']
         return (flags)
 
     def get_bnxt_flags(self):
