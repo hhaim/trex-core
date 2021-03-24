@@ -490,13 +490,13 @@ def configure_tap (ctx):
         'enum', 'TCA_BPF_UNSPEC' ],
 
         [ 'HAVE_TC_BPF_FD', 'linux/pkt_cls.h',
-	    'enum','TCA_BPF_FD' ],
+        'enum','TCA_BPF_FD' ],
 
         [ 'HAVE_TC_ACT_BPF', 'linux/tc_act/tc_bpf.h',
-	    'enum','TCA_ACT_BPF_UNSPEC' ],
+        'enum','TCA_ACT_BPF_UNSPEC' ],
 
         [ 'HAVE_TC_ACT_BPF_FD', 'linux/tc_act/tc_bpf.h',
-	    'enum','TCA_ACT_BPF_FD' ],
+        'enum','TCA_ACT_BPF_FD' ],
     ]
     autoconf_script = 'src/dpdk/auto-config-h.sh'
     autoconf_command = os.path.join(top, autoconf_script)
