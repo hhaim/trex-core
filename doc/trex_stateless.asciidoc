@@ -4001,7 +4001,7 @@ You can simulate the profile using the STL simulator:
 
 ==== Tutorial: Latency using hardware assist 
 
-This feature is a combination of software and hardware NIC’s IEEE 1588 support. 
+This feature is a combination of software and hardware NIC’s IEEE 1588 support. It is disable by default and should be enabled by this compilation flag RTE_LIBRTE_IEEE1588. When enabled there is a 30%-10% performance impcat on i40e and mlx5 drivers.
 In HW terminology it is also referred as TimeSync feature. NIC can take timestamps of sent and received latency packets. 
 Using DPDK APIs we can read these timestamps from the NIC HW register. Using the 2-step mechanism of IEEE 1588 (PTP) protocol we send the accurate timestamp (t1) which is read from the NIC in a Follow Up packet rather than in the same packet. Received timestamp (t2) is still taken on the first packet (SYNC) itself. In this way with a combination of software(PTP protocol, DPDK APIs) and HW support (leveraging IEEE 1588 support) more accurate latency and jitter measurements can be obtatined.
 
