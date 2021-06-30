@@ -1388,11 +1388,9 @@ COLD_FUNC void CPhyEthIF::start(){
             if ( !(CGlobalInfo::m_options.preview.getLatencyIEEE1588Disable())) {
                 ret = rte_eth_timesync_enable(m_repid);
                 if (ret == 0 ) {
-                    printf("TIMESYNC ENABLED %u \n",m_repid);
                     clock_gettime(CLOCK_REALTIME, &tp);
                     ret = rte_eth_timesync_write_time(m_repid, &tp);
                     if (ret == 0) {
-                        printf("TIMESYNC Write time success \n");
                     } else {
                         printf("TIMESYNC Write FAILED \n",m_repid);
                     }
