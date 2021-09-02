@@ -916,6 +916,7 @@ enum ice_prof_type {
 	ICE_PROF_TUN_GRE = 0x4,
 	ICE_PROF_TUN_PPPOE = 0x8,
 	ICE_PROF_TUN_ALL = 0xE,
+	ICE_PROF_ANY = 0x10,
 	ICE_PROF_ALL = 0xFF,
 };
 

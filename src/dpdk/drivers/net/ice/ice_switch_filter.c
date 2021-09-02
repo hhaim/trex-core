@@ -247,6 +247,8 @@ ice_pattern_match_item ice_switch_pattern_dist_list[] = {
 			ICE_SW_INSET_MAC_PPPOE_IPV4, ICE_INSET_NONE},
 	{pattern_eth_qinq_pppoes_ipv6,
 			ICE_SW_INSET_MAC_PPPOE_IPV6, ICE_INSET_NONE},
+	{pattern_any,
+			ICE_INSET_NONE,	ICE_INSET_NONE},
 };
 
 static struct
@@ -349,6 +351,8 @@ ice_pattern_match_item ice_switch_pattern_perm_list[] = {
 			ICE_SW_INSET_MAC_PPPOE_IPV4, ICE_INSET_NONE},
 	{pattern_eth_qinq_pppoes_ipv6,
 			ICE_SW_INSET_MAC_PPPOE_IPV6, ICE_INSET_NONE},
+	{pattern_any,
+			ICE_INSET_NONE,	ICE_INSET_NONE},
 };
 
 static int
@@ -505,6 +509,10 @@ ice_switch_inset_get(const struct rte_flow_item pattern[],
 		item_type = item->type;
 
 		switch (item_type) {
+		case RTE_FLOW_ITEM_TYPE_ANY:
+			*tun_type = ICE_ANY;
+			break;
+
 		case RTE_FLOW_ITEM_TYPE_ETH:
 			eth_spec = item->spec;
 			eth_mask = item->mask;
@@ -1628,6 +1636,7 @@ static bool
 ice_is_profile_rule(enum ice_sw_tunnel_type tun_type)
 {
 	switch (tun_type) {
+	case ICE_ANY:
 	case ICE_SW_TUN_PROFID_IPV6_ESP:
 	case ICE_SW_TUN_PROFID_IPV6_AH:
 	case ICE_SW_TUN_PROFID_MAC_IPV6_L2TPV3:

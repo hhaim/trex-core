@@ -65,6 +65,12 @@ enum rte_flow_item_type pattern_empty[] = {
 	RTE_FLOW_ITEM_TYPE_END,
 };
 
+/* any */
+enum rte_flow_item_type pattern_any[] = {
+	RTE_FLOW_ITEM_TYPE_ANY,
+	RTE_FLOW_ITEM_TYPE_END,
+};
+
 /* L2 */
 enum rte_flow_item_type pattern_ethertype[] = {
 	RTE_FLOW_ITEM_TYPE_ETH,
@@ -2152,6 +2158,7 @@ static struct ice_ptype_match ice_ptype_map[] = {
 	{pattern_eth_ipv4_nvgre_eth_ipv4_udp,		ICE_MAC_IPV4_TUN_IPV4_UDP_PAY},
 	{pattern_eth_ipv4_nvgre_eth_ipv4_tcp,		ICE_MAC_IPV4_TUN_IPV4_TCP},
 	{pattern_empty,					0},
+	{pattern_any,					0},
 };
 
 static bool
