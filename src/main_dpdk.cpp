@@ -1395,10 +1395,8 @@ COLD_FUNC void CPhyEthIF::start(){
                     ret = rte_eth_timesync_write_time(m_repid, &tp);
                     if (ret == 0) {
                     } else {
-                        printf("TIMESYNC Write FAILED \n",m_repid);
                     }
                 } else {
-                    printf("TIMESYNC ENABLE FAILED \n",m_repid);
                 }
             }
             return;
