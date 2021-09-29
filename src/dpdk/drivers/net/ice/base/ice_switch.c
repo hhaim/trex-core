@@ -7235,19 +7235,22 @@ ice_create_recipe_group(struct ice_hw *hw, struct ice_sw_recipe *rm,
  * @fv_list: pointer to a list that holds the returned field vectors
  */
 static enum ice_status
-ice_get_fv(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
+ice_get_fv(struct ice_hw *hw, enum ice_sw_tunnel_type tun_type,
+	   struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
 	   ice_bitmap_t *bm, struct LIST_HEAD_TYPE *fv_list)
 {
 	enum ice_status status;
-	u8 *prot_ids;
+	u8 *prot_ids = NULL;
 	u16 i;
 
-	if (!lkups_cnt)
+	if (!lkups_cnt && tun_type != ICE_ANY)
 		return ICE_SUCCESS;
 
-	prot_ids = (u8 *)ice_calloc(hw, lkups_cnt, sizeof(*prot_ids));
-	if (!prot_ids)
-		return ICE_ERR_NO_MEMORY;
+	if (lkups_cnt) {
+		prot_ids = (u8 *)ice_calloc(hw, lkups_cnt, sizeof(*prot_ids));
+		if (!prot_ids)
+			return ICE_ERR_NO_MEMORY;
+	}
 
 	for (i = 0; i < lkups_cnt; i++)
 		if (!ice_prot_type_to_id(lkups[i].type, &prot_ids[i])) {
@@ -7256,10 +7259,12 @@ ice_get_fv(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
 		}
 
 	/* Find field vectors that include all specified protocol types */
-	status = ice_get_sw_fv_list(hw, prot_ids, lkups_cnt, bm, fv_list);
+	status = ice_get_sw_fv_list(hw, tun_type, prot_ids,
+				    lkups_cnt, bm, fv_list);
 
 free_mem:
-	ice_free(hw, prot_ids);
+	if (lkups_cnt)
+		ice_free(hw, prot_ids);
 	return status;
 }
 
@@ -7340,6 +7345,9 @@ ice_get_compat_fv_bitmap(struct ice_hw *hw, struct ice_adv_rule_info *rinfo,
 	ice_zero_bitmap(bm, ICE_MAX_NUM_PROFILES);
 
 	switch (rinfo->tun_type) {
+	case ICE_ANY:
+		prof_type = ICE_PROF_ANY;
+		break;
 	case ICE_NON_TUN:
 	case ICE_NON_TUN_QINQ:
 		prof_type = ICE_PROF_NON_TUN;
@@ -7495,6 +7503,7 @@ ice_get_compat_fv_bitmap(struct ice_hw *hw, struct ice_adv_rule_info *rinfo,
 bool ice_is_prof_rule(enum ice_sw_tunnel_type type)
 {
 	switch (type) {
+	case ICE_ANY:
 	case ICE_SW_TUN_PROFID_IPV6_ESP:
 	case ICE_SW_TUN_PROFID_IPV6_AH:
 	case ICE_SW_TUN_PROFID_MAC_IPV6_L2TPV3:
@@ -7579,7 +7588,8 @@ ice_add_adv_recipe(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 	 */
 	ice_get_compat_fv_bitmap(hw, rinfo, fv_bitmap);
 
-	status = ice_get_fv(hw, lkups, lkups_cnt, fv_bitmap, &rm->fv_list);
+	status = ice_get_fv(hw, rinfo->tun_type, lkups, lkups_cnt,
+			    fv_bitmap, &rm->fv_list);
 	if (status)
 		goto err_unroll;
 
@@ -8314,15 +8324,10 @@ ice_adv_add_update_vsi_list(struct ice_hw *hw,
 	enum ice_status status;
 	u16 vsi_list_id = 0;
 
-	if (cur_fltr->sw_act.fltr_act == ICE_FWD_TO_Q ||
-	    cur_fltr->sw_act.fltr_act == ICE_FWD_TO_QGRP ||
-	    cur_fltr->sw_act.fltr_act == ICE_DROP_PACKET)
-		return ICE_ERR_NOT_IMPL;
-
-	if ((new_fltr->sw_act.fltr_act == ICE_FWD_TO_Q ||
-	     new_fltr->sw_act.fltr_act == ICE_FWD_TO_QGRP) &&
-	    (cur_fltr->sw_act.fltr_act == ICE_FWD_TO_VSI ||
-	     cur_fltr->sw_act.fltr_act == ICE_FWD_TO_VSI_LIST))
+	if ((cur_fltr->sw_act.fltr_act != ICE_FWD_TO_VSI &&
+	     cur_fltr->sw_act.fltr_act != ICE_FWD_TO_VSI_LIST) ||
+	    (new_fltr->sw_act.fltr_act != ICE_FWD_TO_VSI &&
+	     new_fltr->sw_act.fltr_act != ICE_FWD_TO_VSI_LIST))
 		return ICE_ERR_NOT_IMPL;
 
 	if (m_entry->vsi_count < 2 && !m_entry->vsi_list_info) {

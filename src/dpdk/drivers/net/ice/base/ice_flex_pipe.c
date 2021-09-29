@@ -1711,23 +1711,30 @@ static enum ice_prof_type
 ice_get_sw_prof_type(struct ice_hw *hw, struct ice_fv *fv)
 {
 	u16 i;
+	bool is_any = false;
 
 	for (i = 0; i < hw->blk[ICE_BLK_SW].es.fvw; i++) {
+		if (fv->ew[i].off != ICE_NAN_OFFSET)
+			is_any = true;
+
 		/* UDP tunnel will have UDP_OF protocol ID and VNI offset */
 		if (fv->ew[i].prot_id == (u8)ICE_PROT_UDP_OF &&
 		    fv->ew[i].off == ICE_VNI_OFFSET)
-			return ICE_PROF_TUN_UDP;
+			return ICE_PROF_TUN_UDP | ICE_PROF_ANY;
 
 		/* GRE tunnel will have GRE protocol */
 		if (fv->ew[i].prot_id == (u8)ICE_PROT_GRE_OF)
-			return ICE_PROF_TUN_GRE;
+			return ICE_PROF_TUN_GRE | ICE_PROF_ANY;
 
 		/* PPPOE tunnel will have PPPOE protocol */
 		if (fv->ew[i].prot_id == (u8)ICE_PROT_PPPOE)
-			return ICE_PROF_TUN_PPPOE;
+			return ICE_PROF_TUN_PPPOE | ICE_PROF_ANY;
 	}
 
-	return ICE_PROF_NON_TUN;
+	if (is_any)
+		return ICE_PROF_NON_TUN | ICE_PROF_ANY;
+	else
+		return ICE_PROF_NON_TUN;
 }
 
 /**
@@ -1764,7 +1771,6 @@ ice_get_sw_fv_bitmap(struct ice_hw *hw, enum ice_prof_type req_profs,
 		if (fv) {
 			/* Determine field vector type */
 			prof_type = ice_get_sw_prof_type(hw, fv);
-
 			if (req_profs & prof_type)
 				ice_set_bit((u16)offset, bm);
 		}
@@ -1787,8 +1793,9 @@ ice_get_sw_fv_bitmap(struct ice_hw *hw, enum ice_prof_type req_profs,
  * allocated for every list entry.
  */
 enum ice_status
-ice_get_sw_fv_list(struct ice_hw *hw, u8 *prot_ids, u16 ids_cnt,
-		   ice_bitmap_t *bm, struct LIST_HEAD_TYPE *fv_list)
+ice_get_sw_fv_list(struct ice_hw *hw, enum ice_sw_tunnel_type tun_type,
+		   u8 *prot_ids, u16 ids_cnt, ice_bitmap_t *bm,
+		   struct LIST_HEAD_TYPE *fv_list)
 {
 	struct ice_sw_fv_list_entry *fvl;
 	struct ice_sw_fv_list_entry *tmp;
@@ -1799,7 +1806,7 @@ ice_get_sw_fv_list(struct ice_hw *hw, u8 *prot_ids, u16 ids_cnt,
 
 	ice_memset(&state, 0, sizeof(state), ICE_NONDMA_MEM);
 
-	if (!ids_cnt || !hw->seg)
+	if (tun_type != ICE_ANY && (!ids_cnt || !hw->seg))
 		return ICE_ERR_PARAM;
 
 	ice_seg = hw->seg;
@@ -1819,28 +1826,38 @@ ice_get_sw_fv_list(struct ice_hw *hw, u8 *prot_ids, u16 ids_cnt,
 		if (!ice_is_bit_set(bm, (u16)offset))
 			continue;
 
-		for (i = 0; i < ids_cnt; i++) {
-			int j;
+		if (tun_type == ICE_ANY) {
+			fvl = (struct ice_sw_fv_list_entry *)
+			       ice_malloc(hw, sizeof(*fvl));
+			if (!fvl)
+				goto err;
+			fvl->fv_ptr = fv;
+			fvl->profile_id = offset;
+			LIST_ADD(&fvl->list_entry, fv_list);
+		} else {
+			for (i = 0; i < ids_cnt; i++) {
+				int j;
 
-			/* This code assumes that if a switch field vector line
-			 * has a matching protocol, then this line will contain
-			 * the entries necessary to represent every field in
-			 * that protocol header.
-			 */
-			for (j = 0; j < hw->blk[ICE_BLK_SW].es.fvw; j++)
-				if (fv->ew[j].prot_id == prot_ids[i])
+				/* This code assumes that if a switch field vector
+				 * line has a matching protocol, then this line
+				 * will contain the entries necessary to represent
+				 * every field in that protocol header.
+				 */
+				for (j = 0; j < hw->blk[ICE_BLK_SW].es.fvw; j++)
+					if (fv->ew[j].prot_id == prot_ids[i])
+						break;
+				if (j >= hw->blk[ICE_BLK_SW].es.fvw)
 					break;
-			if (j >= hw->blk[ICE_BLK_SW].es.fvw)
-				break;
-			if (i + 1 == ids_cnt) {
-				fvl = (struct ice_sw_fv_list_entry *)
-					ice_malloc(hw, sizeof(*fvl));
-				if (!fvl)
-					goto err;
-				fvl->fv_ptr = fv;
-				fvl->profile_id = offset;
-				LIST_ADD(&fvl->list_entry, fv_list);
-				break;
+				if (i + 1 == ids_cnt) {
+					fvl = (struct ice_sw_fv_list_entry *)
+						ice_malloc(hw, sizeof(*fvl));
+					if (!fvl)
+						goto err;
+					fvl->fv_ptr = fv;
+					fvl->profile_id = offset;
+					LIST_ADD(&fvl->list_entry, fv_list);
+					break;
+				}
 			}
 		}
 	} while (fv);

@@ -109,6 +109,7 @@ enum ice_sw_tunnel_type {
 	ICE_SW_TUN_PPPOE_PAY_QINQ,
 	ICE_SW_TUN_PPPOE_IPV4_QINQ,
 	ICE_SW_TUN_PPPOE_IPV6_QINQ,
+	ICE_ANY,
 	ICE_ALL_TUNNELS /* All tunnel types including NVGRE */
 };
 
@@ -164,7 +165,7 @@ enum ice_prot_id {
 };
 
 #define ICE_VNI_OFFSET		12 /* offset of VNI from ICE_PROT_UDP_OF */
-
+#define ICE_NAN_OFFSET		511
 #define ICE_MAC_OFOS_HW		1
 #define ICE_MAC_IL_HW		4
 #define ICE_ETYPE_OL_HW		9
