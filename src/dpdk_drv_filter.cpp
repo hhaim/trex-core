@@ -77,8 +77,7 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
     eth_spec.type = 0;
     eth_mask.type = 0;
 
-    
-	pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_ETH;
+    pattern[pattern_index].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[pattern_index].spec = &eth_spec;
 	pattern[pattern_index].mask = &eth_mask;
 
@@ -137,12 +136,13 @@ static struct rte_flow * filter_tos_flow_to_rq(uint8_t port_id,
 static struct rte_flow * filter_drop_all(uint8_t port_id,
                                         dpdk_filter_hw_nic_t hw_mode,
                                          struct rte_flow_error *error){
+    printf(" filter_drop_all \n");
 	struct rte_flow_attr attr;
 	struct rte_flow_item pattern[MAX_PATTERN_NUM];
 	struct rte_flow_action action[MAX_PATTERN_NUM];
 	struct rte_flow *flow = NULL;
-	struct rte_flow_item_eth eth_spec;
-	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_item_any eth_spec;
+	struct rte_flow_item_any eth_mask;
 
 	int res;
 
@@ -175,15 +175,15 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	 */
 	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
 	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
-    if (hw_mode == fhtMLX){
+    /*if (hw_mode == fhtMLX){
 	    eth_spec.type = 0x0000;
 	    eth_mask.type = 0x0000;
     }else{
         eth_spec.type = RTE_BE16(0x0000); 
         eth_mask.type = RTE_BE16(0x4000);
-    }
+    }*/
 
-	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ANY;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;
 
@@ -193,6 +193,8 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	res = rte_flow_validate(port_id, &attr, pattern, action, error);
 	if (!res)
 		flow = rte_flow_create(port_id, &attr, pattern, action, error);
+
+    printf(" filter_drop_all  %p \n",flow);
 
 	return flow;
 }
