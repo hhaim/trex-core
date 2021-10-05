@@ -141,8 +141,8 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	struct rte_flow_item pattern[MAX_PATTERN_NUM];
 	struct rte_flow_action action[MAX_PATTERN_NUM];
 	struct rte_flow *flow = NULL;
-	struct rte_flow_item_any eth_spec;
-	struct rte_flow_item_any eth_mask;
+	struct rte_flow_item_any any_spec;
+	struct rte_flow_item_any any_mask;
 
 	int res;
 
@@ -173,8 +173,8 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
 	 * since in this example we just want to get the
 	 * ipv4 we set this level to allow all.
 	 */
-	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
-	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	memset(&any_spec, 0, sizeof(struct rte_flow_item_any));
+	memset(&any_mask, 0, sizeof(struct rte_flow_item_any));
     /*if (hw_mode == fhtMLX){
 	    eth_spec.type = 0x0000;
 	    eth_mask.type = 0x0000;
@@ -184,8 +184,8 @@ static struct rte_flow * filter_drop_all(uint8_t port_id,
     }*/
 
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ANY;
-	pattern[0].spec = &eth_spec;
-	pattern[0].mask = &eth_mask;
+	pattern[0].spec = &any_spec;
+	pattern[0].mask = &any_mask;
 
 	/* the final level must be always type end */
 	pattern[1].type = RTE_FLOW_ITEM_TYPE_END;
